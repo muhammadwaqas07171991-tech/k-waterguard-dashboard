@@ -1941,18 +1941,18 @@ class DashboardGenerator:
       color: var(--ink);
     }}
     header {{
-      min-height: 390px;
+      min-height: 360px;
       display: flex;
       align-items: flex-end;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.44) 42%, rgba(9, 45, 77, 0.18)), url("{self._asset_uri('Kwater.png')}");
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78) 44%, rgba(9, 45, 77, 0.18)), url("{self._asset_uri('Kwater.png')}");
       background-size: cover;
-      background-position: center;
+      background-position: center right;
       color: #082a5f;
       padding: 34px 24px 32px;
     }}
     .wrap {{ width: min(1280px, calc(100% - 32px)); margin: 0 auto; }}
     .topline {{ display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }}
-    .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.84); border: 1px solid rgba(255,255,255,0.72); border-radius: 8px; box-shadow: var(--shadow); }}
+    .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.86); border-radius: 8px; box-shadow: var(--shadow); }}
     .brand-logo {{ width: 54px; height: 54px; object-fit: contain; border-radius: 6px; background: white; }}
     .brand-name {{ font-size: 18px; font-weight: 800; color: #073b8e; }}
     h1 {{ margin: 18px 0 8px; font-size: 38px; line-height: 1.08; letter-spacing: 0; }}
@@ -1970,17 +1970,24 @@ class DashboardGenerator:
     .stat {{ padding: 15px; }}
     .label {{ color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }}
     .value {{ font-size: 28px; font-weight: 700; margin-top: 4px; }}
-    .section {{ padding: 16px; margin-top: 16px; }}
+    .section {{ padding: 18px; margin-top: 16px; }}
     h2 {{ margin: 0 0 12px; font-size: 20px; }}
     .param-grid {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
-    .param {{ padding: 13px; border-left: 4px solid var(--green); }}
-    .param.warn {{ border-left-color: var(--amber); }}
-    .param.bad {{ border-left-color: var(--red); }}
+    .param {{
+      position: relative; padding: 16px; min-height: 142px; border-left: 5px solid var(--green);
+      border-radius: 8px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }}
+    .param:hover {{ transform: translateY(-1px); box-shadow: 0 12px 28px rgba(30, 44, 46, 0.12); }}
+    .param:focus {{ outline: 3px solid rgba(31, 111, 139, 0.22); outline-offset: 2px; }}
+    .param.warn {{ border-left-color: var(--amber); background: #fffaf0; }}
+    .param.bad {{ border-left-color: var(--red); background: #fff6f5; }}
+    .param.active {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(31, 111, 139, 0.18), var(--shadow); }}
     .alert-pill {{ display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
     .alert-pill.critical {{ background: #ffe6e3; color: #8d231d; }}
     .alert-pill.warning {{ background: #fff1d8; color: #744b0c; }}
     .alert-pill.ok {{ background: #e7f3ea; color: #255c37; }}
-    .param-value {{ font-size: 24px; font-weight: 700; margin: 4px 0; }}
+    .param-value {{ font-size: 26px; font-weight: 700; margin: 10px 0 5px; }}
+    .param-action {{ display: block; margin-top: 9px; color: var(--blue); font-size: 12px; font-weight: 700; }}
     .muted {{ color: var(--muted); }}
     .plots {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
@@ -1990,6 +1997,7 @@ class DashboardGenerator:
     table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
     th, td {{ padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
     th {{ background: #edf3f2; position: sticky; top: 0; z-index: 1; }}
+    tr.filtered-match {{ background: #fff8df; }}
     .table-wrap {{ max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }}
     .two-col {{ grid-template-columns: 1.2fr 0.8fr; align-items: start; }}
     footer {{ color: var(--muted); padding: 20px 0; font-size: 13px; }}
@@ -2129,17 +2137,25 @@ class DashboardGenerator:
     const searchStatus = document.getElementById('searchStatus');
     const searchableTables = Array.from(document.querySelectorAll('table'));
     const searchableRows = Array.from(document.querySelectorAll('table tbody tr'));
+    const parameterCards = Array.from(document.querySelectorAll('.param[data-filter-param]'));
+    let activeParameter = '';
 
-    function applyDashboardSearch(scrollToFirstMatch = false) {{
+    function applyDashboardFilters(scrollToFirstMatch = false) {{
       const query = search.value.trim().toLowerCase();
       let visibleCount = 0;
       let firstMatch = null;
+      let alertMatchCount = 0;
 
       searchableRows.forEach(row => {{
-        const matched = !query || row.textContent.toLowerCase().includes(query);
+        const textMatched = !query || row.textContent.toLowerCase().includes(query);
+        const rowParameter = row.dataset.alertParam || '';
+        const parameterMatched = !activeParameter || !rowParameter || rowParameter === activeParameter;
+        const matched = textMatched && parameterMatched;
         row.style.display = matched ? '' : 'none';
         row.classList.toggle('search-match', Boolean(query && matched));
-        if (matched && query) {{
+        row.classList.toggle('filtered-match', Boolean(activeParameter && matched && rowParameter === activeParameter));
+        if (matched && row.closest('#alertTable')) alertMatchCount += 1;
+        if (matched && (query || activeParameter)) {{
           visibleCount += 1;
           if (!firstMatch) firstMatch = row;
         }}
@@ -2150,14 +2166,17 @@ class DashboardGenerator:
         table.closest('.section')?.classList.toggle('search-empty', Boolean(query && visibleRows.length === 0));
       }});
 
-      if (!query) {{
-        searchStatus.textContent = 'Search filters the alert, province, and station tables below.';
+      if (!query && !activeParameter) {{
+        searchStatus.textContent = 'Search filters the alert, province, and station tables below. Click an indicator card to filter alerts by parameter.';
         return;
       }}
 
-      searchStatus.textContent = visibleCount
-        ? `${{visibleCount.toLocaleString()}} matching table row${{visibleCount === 1 ? '' : 's'}} found. Press Enter to jump to the first match.`
-        : `No table rows found for "${{search.value.trim()}}". Try a city, province, station, parameter, or value.`;
+      const pieces = [];
+      if (activeParameter) pieces.push(`${{alertMatchCount.toLocaleString()}} alert row${{alertMatchCount === 1 ? '' : 's'}} for ${{activeParameter.toUpperCase()}}`);
+      if (query) pieces.push(`${{visibleCount.toLocaleString()}} matching table row${{visibleCount === 1 ? '' : 's'}} for "${{search.value.trim()}}"`);
+      searchStatus.textContent = visibleCount || alertMatchCount
+        ? `${{pieces.join(' and ')}}. Press Enter to jump to the first match.`
+        : `No table rows found. Try a city, province, station, parameter, or value.`;
 
       if (scrollToFirstMatch && firstMatch) {{
         firstMatch.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
@@ -2165,15 +2184,37 @@ class DashboardGenerator:
     }}
 
     if (search) {{
-      search.addEventListener('input', () => applyDashboardSearch(false));
-      search.addEventListener('search', () => applyDashboardSearch(false));
+      search.addEventListener('input', () => applyDashboardFilters(false));
+      search.addEventListener('search', () => applyDashboardFilters(false));
       search.addEventListener('keydown', (event) => {{
         if (event.key === 'Enter') {{
           event.preventDefault();
-          applyDashboardSearch(true);
+          applyDashboardFilters(true);
         }}
       }});
     }}
+
+    function activateParameterFilter(card) {{
+      const parameter = card.dataset.filterParam || '';
+      activeParameter = activeParameter === parameter ? '' : parameter;
+      parameterCards.forEach(item => {{
+        item.classList.toggle('active', Boolean(activeParameter && item.dataset.filterParam === activeParameter));
+      }});
+      applyDashboardFilters(false);
+      if (activeParameter) {{
+        document.getElementById('alertTable')?.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+      }}
+    }}
+
+    parameterCards.forEach(card => {{
+      card.addEventListener('click', () => activateParameterFilter(card));
+      card.addEventListener('keydown', (event) => {{
+        if (event.key === 'Enter' || event.key === ' ') {{
+          event.preventDefault();
+          activateParameterFilter(card);
+        }}
+      }});
+    }});
     {chatbot_script}
   </script>
 </body>
@@ -2414,10 +2455,15 @@ class DashboardGenerator:
             unit = rule.get('unit') or PlotGenerator.PARAMETER_UNITS.get(parameter, '')
             pill_class = 'critical' if critical_count else 'warning' if alert_count else 'ok'
             pill_text = f"{alert_count:,} alerts" if alert_count else 'OK'
+            parameter_label = PlotGenerator()._format_parameter_label(parameter)
+            parameter_filter = html.escape(parameter_label.lower(), quote=True)
+            parameter_key = html.escape(parameter.lower(), quote=True)
             cards.append(
-                f'<div class="card param {status}"><div class="label">{html.escape(PlotGenerator()._format_parameter_label(parameter))}</div>'
+                f'<div class="card param {status}" role="button" tabindex="0" data-filter-param="{parameter_filter}" data-param-key="{parameter_key}" aria-label="Filter alerts for {html.escape(parameter_label)}">'
+                f'<div class="label">{html.escape(parameter_label)}</div>'
                 f'<div class="param-value">{mean_value:.2f}</div><div class="muted">Average {html.escape(unit)}</div>'
-                f'<div style="margin-top:8px;"><span class="alert-pill {pill_class}">{html.escape(pill_text)}</span></div></div>'
+                f'<div style="margin-top:8px;"><span class="alert-pill {pill_class}">{html.escape(pill_text)}</span></div>'
+                f'<span class="param-action">Filter alerts</span></div>'
             )
         return ''.join(cards) or '<p class="muted">No numeric parameter data available.</p>'
 
@@ -2434,11 +2480,12 @@ class DashboardGenerator:
             except Exception:
                 timestamp = str(timestamp)
             value_text = f"{row.get('value', 0):.2f} {row.get('unit', '')}".strip()
+            parameter_label = PlotGenerator()._format_parameter_label(str(row.get("parameter", "")))
             rows.append(
-                '<tr>'
+                f'<tr data-alert-param="{html.escape(parameter_label.lower(), quote=True)}">'
                 f'<td><span class="alert-pill {html.escape(severity)}">{html.escape(label)}</span></td>'
                 f'<td>{html.escape(str(row.get("display_location", "")))}</td>'
-                f'<td>{html.escape(PlotGenerator()._format_parameter_label(str(row.get("parameter", ""))))}</td>'
+                f'<td>{html.escape(parameter_label)}</td>'
                 f'<td>{html.escape(value_text)}</td>'
                 f'<td>{html.escape(str(row.get("standard", "")))}</td>'
                 f'<td>{html.escape(str(row.get("basis", "")))}</td>'
