@@ -21,6 +21,10 @@ from pathlib import Path
 import logging
 import warnings
 import numpy as np
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 warnings.filterwarnings('ignore')
 
 
@@ -89,6 +93,7 @@ if requests is None or pd is None or plt is None or sns is None:
 # ==================== CONFIGURATION ====================
 class Config:
     """Configuration for Water Quality Agent"""
+    KOREA_TZ = ZoneInfo("Asia/Seoul") if ZoneInfo is not None else None
     
     # Data storage paths
     DATA_DIR = Path(os.environ.get("WATER_QUALITY_DATA_DIR", str(Path.home() / "water_quality_data")))
@@ -218,16 +223,22 @@ class Config:
     DATA_RETENTION_DAYS = 90
 
     @staticmethod
+    def now():
+        if Config.KOREA_TZ is not None:
+            return datetime.now(Config.KOREA_TZ).replace(tzinfo=None)
+        return datetime.now()
+
+    @staticmethod
     def output_date_label(value=None):
         if value is None:
-            return datetime.now().strftime('%Y-%m-%d')
+            return Config.now().strftime('%Y-%m-%d')
         try:
             parsed = pd.to_datetime(value, errors='coerce')
             if pd.isna(parsed):
-                return datetime.now().strftime('%Y-%m-%d')
+                return Config.now().strftime('%Y-%m-%d')
             return parsed.strftime('%Y-%m-%d')
         except Exception:
-            return datetime.now().strftime('%Y-%m-%d')
+            return Config.now().strftime('%Y-%m-%d')
 
     @staticmethod
     def daily_output_dir(date_label=None):
@@ -377,7 +388,7 @@ class WaterQualityCollector:
         return features
 
     def _extract_feature_record(self, feature):
-        record = {'timestamp': datetime.now(), 'source': 'Korean Water Quality API'}
+        record = {'timestamp': Config.now(), 'source': 'Korean Water Quality API'}
         for child in list(feature):
             tag = self._clean_tag(child.tag)
             if tag:
@@ -428,7 +439,7 @@ class WaterQualityCollector:
             location_name = display_location
 
         record.update({
-            'date': datetime.now().strftime('%Y-%m-%d'),
+            'date': Config.now().strftime('%Y-%m-%d'),
             'display_location': display_location,
             'region': display_location,
             'location_name': location_name or display_location,
@@ -635,7 +646,7 @@ class WaterQualityCollector:
         """
         try:
             record = {
-                'timestamp': datetime.now(),
+                'timestamp': Config.now(),
                 'region': region,
                 'location_name': region,
                 'station_name': region,
@@ -1037,7 +1048,7 @@ class DataManager:
         """Remove data older than retention period"""
         try:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            cutoff_date = datetime.now() - timedelta(days=Config.DATA_RETENTION_DAYS)
+            cutoff_date = Config.now() - timedelta(days=Config.DATA_RETENTION_DAYS)
             df_clean = df[df['timestamp'] > cutoff_date]
             
             if len(df_clean) < len(df):
@@ -1055,7 +1066,7 @@ class DataManager:
             df = pd.read_csv(Config.CSV_FILE)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            cutoff = datetime.now() - timedelta(days=days)
+            cutoff = Config.now() - timedelta(days=days)
             return df[df['timestamp'] > cutoff]
         except Exception as e:
             self.logger.error(f"Error retrieving data: {str(e)}")
@@ -1763,7 +1774,7 @@ class PlotGenerator:
             date_min = plot_df['timestamp'].min().strftime('%Y-%m-%d')
             date_max = plot_df['timestamp'].max().strftime('%Y-%m-%d')
             info_text = (
-                f"Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Updated: {Config.now().strftime('%Y-%m-%d %H:%M:%S')} KST\n"
                 f"Date range: {date_min} to {date_max}\n"
                 f"Records: {len(plot_df):,}    Stations: {station_count:,}\n"
                 f"Latest mean pH: {latest['pH'].mean():.2f}    Latest mean DO: {latest['DO'].mean():.2f} mg/L"
@@ -1880,13 +1891,13 @@ class DashboardGenerator:
         return df.sort_values('timestamp').groupby(station_column, dropna=False).tail(1)
 
     def _render_html(self, all_df, latest_df, latest_station_df, latest_date, alerts_df):
-        generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        generated_at = Config.now().strftime('%Y-%m-%d %H:%M:%S KST')
         station_count = latest_df['display_location'].nunique()
         record_count = len(latest_df)
         city_count = latest_df['city'].replace('', np.nan).nunique()
         province_count = latest_df['province'].replace('', np.nan).nunique()
         latest_time = latest_df['timestamp'].dropna().max()
-        latest_time_text = latest_time.strftime('%Y-%m-%d %H:%M') if pd.notna(latest_time) else 'Not available'
+        latest_time_text = latest_time.strftime('%Y-%m-%d %H:%M KST') if pd.notna(latest_time) else 'Not available'
         critical_count = int((alerts_df['severity'] == 'critical').sum()) if not alerts_df.empty else 0
         warning_count = int((alerts_df['severity'] == 'warning').sum()) if not alerts_df.empty else 0
         alert_station_count = alerts_df['display_location'].nunique() if not alerts_df.empty else 0
@@ -1907,7 +1918,7 @@ class DashboardGenerator:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="900">
+  <meta http-equiv="refresh" content="3600">
   <title>K-WaterGuard AI Dashboard</title>
   <style>
     :root {{
@@ -2023,7 +2034,7 @@ class DashboardGenerator:
           <img class="brand-logo" src="{self._asset_uri('KwGAI logo.png')}" alt="K-Water Guard AI logo">
           <span class="brand-name">K-Water Guard AI</span>
         </div>
-        <span class="badge">Auto refresh: 15 min</span>
+        <span class="badge">Hourly update: Korea time</span>
       </div>
       <h1>Water Quality Dashboard</h1>
       <p class="subtitle">Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.</p>
@@ -2370,12 +2381,12 @@ class DashboardGenerator:
         if alerts_df is None or alerts_df.empty:
             return '<tr><td colspan="7"><span class="alert-pill ok">OK</span> No current parameter alerts for the latest date.</td></tr>'
         rows = []
-        for _, row in alerts_df.head(500).iterrows():
+        for _, row in alerts_df.iterrows():
             severity = str(row.get('severity', 'warning'))
             label = 'Critical' if severity == 'critical' else 'Attention'
             timestamp = row.get('timestamp', '')
             try:
-                timestamp = pd.to_datetime(timestamp).strftime('%Y-%m-%d %H:%M')
+                timestamp = pd.to_datetime(timestamp).strftime('%Y-%m-%d %H:%M KST')
             except Exception:
                 timestamp = str(timestamp)
             value_text = f"{row.get('value', 0):.2f} {row.get('unit', '')}".strip()
@@ -2405,7 +2416,7 @@ class DashboardGenerator:
         rows = []
         display_columns = ['display_location', 'monitoring_point_id', 'pH', 'DO', 'BOD', 'COD', 'TN', 'TP', 'timestamp']
         latest = df.sort_values('display_location')
-        for _, row in latest.head(500).iterrows():
+        for _, row in latest.iterrows():
             cells = []
             for column in display_columns:
                 value = row.get(column, '')
@@ -2417,7 +2428,7 @@ class DashboardGenerator:
                     except Exception:
                         value = str(value)
                 elif column == 'timestamp' and pd.notna(value):
-                    value = pd.to_datetime(value).strftime('%Y-%m-%d %H:%M')
+                    value = pd.to_datetime(value).strftime('%Y-%m-%d %H:%M KST')
                 cells.append(f'<td>{html.escape(str(value))}</td>')
             rows.append('<tr>' + ''.join(cells) + '</tr>')
         return ''.join(rows)
