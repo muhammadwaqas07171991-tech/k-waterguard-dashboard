@@ -1,0 +1,8 @@
+numpy
+requests
+pandas
+matplotlib
+seaborn
+apscheduler
+pyproj
+reverse_geocoder
