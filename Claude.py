@@ -1980,11 +1980,11 @@ class DashboardGenerator:
     .stats {{ grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }}
     .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }}
     .insight-rail {{
-      display: none; position: fixed; top: 404px; width: min(300px, calc((100vw - 1320px) / 2));
+      display: none; position: fixed; top: 404px; width: clamp(260px, calc((100vw - 1280px) / 2 - 32px), 340px);
       z-index: 5; gap: 14px; pointer-events: none;
     }}
-    .insight-rail.left {{ left: 24px; }}
-    .insight-rail.right {{ right: 24px; }}
+    .insight-rail.left {{ left: max(16px, calc((100vw - 1280px) / 2 - 360px)); }}
+    .insight-rail.right {{ right: max(16px, calc((100vw - 1280px) / 2 - 360px)); }}
     .rail-card {{
       pointer-events: auto; overflow: hidden; background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(8px); border: 1px solid rgba(217, 225, 238, 0.92);
@@ -2005,10 +2005,13 @@ class DashboardGenerator:
     .rail-bar {{ height: 8px; overflow: hidden; border-radius: 999px; background: #e8edf6; }}
     .rail-fill {{ display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--red)); }}
     .rail-fill.black {{ background: linear-gradient(90deg, var(--black), var(--blue)); }}
-    .mini-map {{ position: relative; min-height: 170px; background: linear-gradient(135deg, #f8fbff, #eef4ff); }}
-    .mini-map svg {{ width: 100%; height: 170px; display: block; }}
-    .map-dot {{ fill: var(--blue); opacity: .72; }}
-    .map-dot.alert {{ fill: var(--red); opacity: .82; }}
+    .mini-map {{ position: relative; min-height: 220px; background: linear-gradient(135deg, #f8fbff, #eef4ff); }}
+    .mini-map svg {{ width: 100%; height: 220px; display: block; }}
+    .korea-ring {{ fill: rgba(255,255,255,.88); stroke: #90a1b7; stroke-width: .8; }}
+    .korea-ring:nth-of-type(3n) {{ fill: rgba(0, 71, 160, .08); }}
+    .korea-ring:nth-of-type(3n+1) {{ fill: rgba(205, 46, 58, .07); }}
+    .map-dot {{ fill: var(--blue); opacity: .68; stroke: white; stroke-width: .8; }}
+    .map-dot.alert {{ fill: var(--red); opacity: .86; }}
     .rail-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
     .stat {{ padding: 15px; border-top: 4px solid var(--blue); }}
     .stats > .stat:nth-child(even) {{ border-top-color: var(--red); }}
@@ -2073,7 +2076,7 @@ class DashboardGenerator:
     @media (max-width: 980px) {{
       .stats, .param-grid, .plots, .spatial-maps, .two-col {{ grid-template-columns: 1fr 1fr; }}
     }}
-    @media (min-width: 1680px) {{
+    @media (min-width: 1840px) {{
       .insight-rail {{ display: grid; }}
     }}
     @media (max-width: 640px) {{
@@ -2683,11 +2686,46 @@ class DashboardGenerator:
         if points.empty:
             return '<p class="muted" style="padding: 13px;">Station coordinates are not available yet.</p>'
 
+        try:
+            south_korea_map = PlotGenerator()._load_south_korea_map()
+            map_rings = south_korea_map['rings']
+            min_lon, min_lat, max_lon, max_lat = south_korea_map['bounds']
+        except Exception:
+            map_rings = []
+            min_lon, min_lat, max_lon, max_lat = 124.5, 33.0, 131.5, 39.2
+
+        width, height = 240, 220
+        pad_x, pad_y = 14, 14
+
+        def project(lon, lat):
+            usable_w = width - (pad_x * 2)
+            usable_h = height - (pad_y * 2)
+            x = pad_x + ((lon - min_lon) / max(0.0001, max_lon - min_lon)) * usable_w
+            y = height - pad_y - ((lat - min_lat) / max(0.0001, max_lat - min_lat)) * usable_h
+            return x, y
+
+        ring_paths = []
+        for ring in map_rings:
+            if len(ring) < 3:
+                continue
+            sampled_ring = ring[::max(1, len(ring) // 80)]
+            coords = []
+            for lon, lat in sampled_ring:
+                x, y = project(float(lon), float(lat))
+                coords.append(f'{x:.1f},{y:.1f}')
+            projected_points = [tuple(map(float, item.split(','))) for item in coords]
+            x_values = [item[0] for item in projected_points]
+            y_values = [item[1] for item in projected_points]
+            if max(x_values) - min(x_values) < 1.2 and max(y_values) - min(y_values) < 1.2:
+                continue
+            if len(set(coords)) >= 3:
+                ring_paths.append(f'<path class="korea-ring" d="M {" L ".join(coords)} Z"></path>')
+            if len(ring_paths) >= 220:
+                break
+
         alert_locations = set()
         if alerts_df is not None and not alerts_df.empty and 'display_location' in alerts_df.columns:
             alert_locations = set(alerts_df['display_location'].dropna().astype(str))
-        min_lon, max_lon = 124.5, 131.5
-        min_lat, max_lat = 33.0, 39.2
         svg_points = []
         sampled = points.drop_duplicates('display_location').head(90)
         for _, row in sampled.iterrows():
@@ -2696,17 +2734,15 @@ class DashboardGenerator:
                 lat = float(row.get('latitude'))
             except Exception:
                 continue
-            x = 18 + ((lon - min_lon) / (max_lon - min_lon)) * 164
-            y = 150 - ((lat - min_lat) / (max_lat - min_lat)) * 130
-            if not (8 <= x <= 192 and 8 <= y <= 162):
+            x, y = project(lon, lat)
+            if not (0 <= x <= width and 0 <= y <= height):
                 continue
             dot_class = 'map-dot alert' if str(row.get('display_location', '')) in alert_locations else 'map-dot'
-            svg_points.append(f'<circle class="{dot_class}" cx="{x:.1f}" cy="{y:.1f}" r="2.8"></circle>')
+            svg_points.append(f'<circle class="{dot_class}" cx="{x:.1f}" cy="{y:.1f}" r="2.4"></circle>')
         return (
-            '<svg viewBox="0 0 200 170" role="img" aria-label="Mini map of latest monitoring stations">'
-            '<path d="M106 13 C134 28 151 50 151 75 C151 112 128 148 95 154 C67 159 45 139 48 110 C51 84 71 73 75 48 C78 29 89 15 106 13 Z" fill="#ffffff" stroke="#d9e1ee" stroke-width="2"></path>'
-            '<path d="M84 62 C101 49 124 54 133 72 C113 73 101 83 92 99 C79 94 71 84 73 75 C74 70 78 66 84 62 Z" fill="rgba(205,46,58,.16)"></path>'
-            '<path d="M92 99 C101 83 113 73 133 72 C140 89 135 111 119 124 C101 139 77 134 65 118 C74 118 84 112 92 99 Z" fill="rgba(0,71,160,.16)"></path>'
+            f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Actual South Korea map with latest monitoring stations">'
+            '<rect x="0" y="0" width="240" height="220" fill="rgba(255,255,255,.18)"></rect>'
+            + ''.join(ring_paths)
             + ''.join(svg_points) +
             '</svg>'
         )
