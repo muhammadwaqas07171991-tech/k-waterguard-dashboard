@@ -112,7 +112,7 @@ class Config:
     # "https://your-chatbot-backend.example.com/api/chat"
     CHATBOT_API_URL = os.environ.get(
         "CHATBOT_API_URL",
-        "https://k-waterguard-chatbot-backend-fsvj.vercel.app/api/chat",
+        "",
     )
     CHATBOT_ENABLED = os.environ.get("CHATBOT_ENABLED", "true").lower() not in {"0", "false", "no"}
     WATER_QUALITY_ALERT_RULES = {
@@ -2132,7 +2132,7 @@ class DashboardGenerator:
         greeting = (
             "Hello. I am connected to the K-Water Guard AI chatbot backend. Ask me about alerts, stations, maps, or water quality parameters."
             if raw_endpoint else
-            "Hello. The chatbot interface is ready, but the backend URL is not configured yet."
+            "Hello. I am running in free dashboard mode. Ask me about latest date, stations, records, alerts, parameters, or maps."
         )
         return f"""
   <button class="chat-launch" id="chatLaunch" type="button">Ask AI</button>
@@ -2173,6 +2173,77 @@ class DashboardGenerator:
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    function textContent(selector) {
+      const element = document.querySelector(selector);
+      return element ? element.textContent.replace(/\\s+/g, ' ').trim() : '';
+    }
+
+    function tableRows(selector, limit) {
+      return Array.from(document.querySelectorAll(`${selector} tbody tr`))
+        .slice(0, limit)
+        .map((row) => row.textContent.replace(/\\s+/g, ' ').trim())
+        .filter(Boolean);
+    }
+
+    function dashboardStats() {
+      const cards = Array.from(document.querySelectorAll('.stats .card.stat'));
+      const stats = {};
+      cards.forEach((card) => {
+        const label = card.querySelector('.label')?.textContent.trim();
+        const value = card.querySelector('.value')?.textContent.trim();
+        if (label && value) stats[label.toLowerCase()] = value;
+      });
+      return stats;
+    }
+
+    function parameterSummary() {
+      return Array.from(document.querySelectorAll('.param-grid .card.param'))
+        .map((card) => card.textContent.replace(/\\s+/g, ' ').trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    function localDashboardAnswer(question) {
+      const q = question.toLowerCase();
+      const stats = dashboardStats();
+      const alerts = tableRows('#alertTable', 5);
+      const stations = tableRows('#stationTable', 5);
+      const parameters = parameterSummary();
+
+      if (q.includes('date') || q.includes('latest') || q.includes('time')) {
+        return `Latest dashboard date: ${stats['latest date'] || 'not available'}. Records: ${stats.records || 'not available'}. Stations: ${stats.stations || 'not available'}.`;
+      }
+      if (q.includes('alert') || q.includes('warning') || q.includes('critical')) {
+        const alertCount = stats.alerts || '0';
+        const alertStations = stats['alert stations'] || '0';
+        if (!alerts.length || alerts[0].toLowerCase().includes('no current parameter alerts')) {
+          return `There are ${alertCount} alerts and ${alertStations} alert stations on the latest dashboard. No current parameter alerts are listed.`;
+        }
+        return `There are ${alertCount} alerts across ${alertStations} alert stations. Top alert rows: ${alerts.join(' | ')}`;
+      }
+      if (q.includes('station') || q.includes('location') || q.includes('site')) {
+        if (!stations.length) return 'No station rows are available in the latest dashboard table.';
+        return `The dashboard shows ${stats.stations || 'available'} stations. First station rows: ${stations.join(' | ')}`;
+      }
+      if (q.includes('record') || q.includes('data')) {
+        return `The latest dashboard has ${stats.records || 'not available'} records for ${stats.stations || 'not available'} stations. Latest date: ${stats['latest date'] || 'not available'}.`;
+      }
+      if (q.includes('parameter') || q.includes('ph') || q.includes('do') || q.includes('bod') || q.includes('cod') || q.includes('tn') || q.includes('tp')) {
+        if (!parameters.length) return 'No numeric parameter cards are available on this dashboard run.';
+        return `Latest parameter summary: ${parameters.join(' | ')}`;
+      }
+      if (q.includes('map') || q.includes('chart') || q.includes('plot')) {
+        const chartTitles = Array.from(document.querySelectorAll('.plot h3')).map((item) => item.textContent.trim()).filter(Boolean);
+        return chartTitles.length
+          ? `Available charts/maps: ${chartTitles.join(', ')}.`
+          : 'Charts and maps will appear after the dashboard has enough generated plot files.';
+      }
+      if (q.includes('help') || q.includes('what can')) {
+        return 'You can ask about latest date, number of records, stations, alerts, parameter averages, charts, and maps. This free mode answers from the current dashboard page only.';
+      }
+      return `Free mode answer: latest date ${stats['latest date'] || 'not available'}, ${stats.records || 'not available'} records, ${stats.stations || 'not available'} stations, and ${stats.alerts || '0'} alerts. Ask about alerts, stations, parameters, charts, or maps for more detail.`;
+    }
+
     if (chatLaunch && chatPanel) {
       chatLaunch.addEventListener('click', () => chatPanel.classList.toggle('open'));
     }
@@ -2187,7 +2258,7 @@ class DashboardGenerator:
         chatInput.value = '';
         addChatMessage(question, 'user');
         if (!chatUrl) {
-          addChatMessage('The chatbot interface is ready, but the backend URL is not configured yet. Set CHATBOT_API_URL in Claude.py after deploying a secure backend.', 'bot');
+          addChatMessage(localDashboardAnswer(question), 'bot');
           return;
         }
         try {
@@ -2203,12 +2274,12 @@ class DashboardGenerator:
           const data = await response.json();
           if (!response.ok) {
             const apiMessage = data?.error?.error?.message || data?.error?.message || data?.answer || `HTTP ${response.status}`;
-            addChatMessage(apiMessage, 'bot');
+            addChatMessage(`Backend unavailable (${apiMessage}). Free dashboard answer: ${localDashboardAnswer(question)}`, 'bot');
             return;
           }
           addChatMessage(data.answer || 'No answer returned by chatbot backend.', 'bot');
         } catch (error) {
-          addChatMessage(`The chatbot backend could not be reached: ${error.message || error}.`, 'bot');
+          addChatMessage(`Backend unavailable (${error.message || error}). Free dashboard answer: ${localDashboardAnswer(question)}`, 'bot');
         }
       });
     }"""
