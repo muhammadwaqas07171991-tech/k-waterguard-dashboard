@@ -1909,6 +1909,7 @@ class DashboardGenerator:
         plot_cards = self._plot_cards(str(latest_date))
         spatial_map_cards = self._spatial_map_cards(str(latest_date))
         province_rows = self._province_rows(latest_df)
+        side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count)
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
         chatbot_html = self._chatbot_html()
         chatbot_script = self._chatbot_script()
@@ -1978,6 +1979,37 @@ class DashboardGenerator:
     .grid {{ display: grid; gap: 14px; }}
     .stats {{ grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }}
     .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }}
+    .insight-rail {{
+      display: none; position: fixed; top: 404px; width: min(300px, calc((100vw - 1320px) / 2));
+      z-index: 5; gap: 14px; pointer-events: none;
+    }}
+    .insight-rail.left {{ left: 24px; }}
+    .insight-rail.right {{ right: 24px; }}
+    .rail-card {{
+      pointer-events: auto; overflow: hidden; background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px); border: 1px solid rgba(217, 225, 238, 0.92);
+      border-radius: 8px; box-shadow: var(--shadow);
+    }}
+    .rail-head {{
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 12px 13px; border-bottom: 1px solid var(--line); font-weight: 800;
+    }}
+    .rail-mark {{ width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(180deg, var(--red) 0 50%, var(--blue) 50% 100%); border: 2px solid white; box-shadow: 0 0 0 1px var(--line); }}
+    .rail-body {{ padding: 12px 13px; }}
+    .rail-metric {{ display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 0; border-bottom: 1px solid #eef2f8; }}
+    .rail-metric:last-child {{ border-bottom: 0; }}
+    .rail-value {{ font-weight: 800; color: var(--blue); }}
+    .rail-list {{ display: grid; gap: 10px; }}
+    .rail-row {{ display: grid; gap: 5px; }}
+    .rail-row-top {{ display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }}
+    .rail-bar {{ height: 8px; overflow: hidden; border-radius: 999px; background: #e8edf6; }}
+    .rail-fill {{ display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--red)); }}
+    .rail-fill.black {{ background: linear-gradient(90deg, var(--black), var(--blue)); }}
+    .mini-map {{ position: relative; min-height: 170px; background: linear-gradient(135deg, #f8fbff, #eef4ff); }}
+    .mini-map svg {{ width: 100%; height: 170px; display: block; }}
+    .map-dot {{ fill: var(--blue); opacity: .72; }}
+    .map-dot.alert {{ fill: var(--red); opacity: .82; }}
+    .rail-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
     .stat {{ padding: 15px; border-top: 4px solid var(--blue); }}
     .stats > .stat:nth-child(even) {{ border-top-color: var(--red); }}
     .stats > .stat:nth-child(3n) {{ border-top-color: var(--black); }}
@@ -2041,6 +2073,9 @@ class DashboardGenerator:
     @media (max-width: 980px) {{
       .stats, .param-grid, .plots, .spatial-maps, .two-col {{ grid-template-columns: 1fr 1fr; }}
     }}
+    @media (min-width: 1680px) {{
+      .insight-rail {{ display: grid; }}
+    }}
     @media (max-width: 640px) {{
       h1 {{ font-size: 30px; }}
       header {{ min-height: 330px; background-position: center right; }}
@@ -2051,6 +2086,7 @@ class DashboardGenerator:
   </style>
 </head>
 <body>
+  {side_rail_html}
   <header>
     <div class="wrap">
       <div class="topline">
@@ -2112,7 +2148,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section">
+    <section class="card section" id="provinceCoverage">
         <h2>Province Coverage</h2>
         <div class="table-wrap">
           <table>
@@ -2122,7 +2158,7 @@ class DashboardGenerator:
         </div>
     </section>
 
-    <section class="card section">
+    <section class="card section" id="latestCharts">
       <h2>Latest Charts And Maps</h2>
       <div class="grid plots">{plot_cards}</div>
     </section>
@@ -2552,6 +2588,128 @@ class DashboardGenerator:
                 f'<tr><td>{html.escape(str(province_name))}</td><td>{int(row.stations):,}</td><td>{int(row.records):,}</td></tr>'
             )
         return ''.join(rows)
+
+    def _side_rail_html(self, latest_df, latest_station_df, alerts_df, date_label, city_count, province_count):
+        station_count = latest_df['display_location'].nunique() if 'display_location' in latest_df.columns else len(latest_df)
+        record_count = len(latest_df)
+        alert_count = len(alerts_df) if alerts_df is not None else 0
+        alert_station_count = alerts_df['display_location'].nunique() if alerts_df is not None and not alerts_df.empty else 0
+        coordinate_count = 0
+        if {'latitude', 'longitude'}.issubset(latest_station_df.columns):
+            coordinate_count = int(latest_station_df[['latitude', 'longitude']].dropna().shape[0])
+        coordinate_share = (coordinate_count / max(1, len(latest_station_df))) * 100
+
+        province_bars = self._province_bar_rows(latest_df)
+        alert_bars = self._alert_parameter_bar_rows(alerts_df)
+        quick_map = self._mini_korea_map(latest_station_df, alerts_df)
+
+        return f"""
+  <aside class="insight-rail left" aria-label="Korea water quality side insights">
+    <section class="rail-card">
+      <div class="rail-head"><span>Korea Snapshot</span><span class="rail-mark" aria-hidden="true"></span></div>
+      <div class="rail-body">
+        <div class="rail-metric"><span class="muted">Monitoring date</span><span class="rail-value">{html.escape(str(date_label))}</span></div>
+        <div class="rail-metric"><span class="muted">Stations watched</span><span class="rail-value">{station_count:,}</span></div>
+        <div class="rail-metric"><span class="muted">Latest records</span><span class="rail-value">{record_count:,}</span></div>
+        <div class="rail-metric"><span class="muted">Cities / provinces</span><span class="rail-value">{city_count:,} / {province_count:,}</span></div>
+      </div>
+    </section>
+    <section class="rail-card">
+      <div class="rail-head"><span>Province Coverage</span><a class="rail-link" href="#provinceCoverage">Table</a></div>
+      <div class="rail-body rail-list">{province_bars}</div>
+    </section>
+  </aside>
+  <aside class="insight-rail right" aria-label="Map and alert side insights">
+    <section class="rail-card">
+      <div class="rail-head"><span>Station Map</span><a class="rail-link" href="#latestCharts">Maps</a></div>
+      <div class="mini-map">{quick_map}</div>
+      <div class="rail-body">
+        <div class="rail-metric"><span class="muted">Mapped stations</span><span class="rail-value">{coordinate_count:,}</span></div>
+        <div class="rail-metric"><span class="muted">Coordinate coverage</span><span class="rail-value">{coordinate_share:.0f}%</span></div>
+      </div>
+    </section>
+    <section class="rail-card">
+      <div class="rail-head"><span>Alert Focus</span><a class="rail-link" href="#alertTable">Alerts</a></div>
+      <div class="rail-body">
+        <div class="rail-metric"><span class="muted">Alert rows</span><span class="rail-value">{alert_count:,}</span></div>
+        <div class="rail-metric"><span class="muted">Alert stations</span><span class="rail-value">{alert_station_count:,}</span></div>
+        <div class="rail-list" style="margin-top: 10px;">{alert_bars}</div>
+      </div>
+    </section>
+  </aside>"""
+
+    def _province_bar_rows(self, df):
+        if 'province' not in df.columns or 'display_location' not in df.columns:
+            return '<p class="muted">Province coverage is not available yet.</p>'
+        province = df.copy()
+        province['province'] = province['province'].replace('', 'Unknown').fillna('Unknown')
+        grouped = (
+            province.groupby('province', dropna=False)['display_location']
+            .nunique()
+            .sort_values(ascending=False)
+            .head(6)
+        )
+        if grouped.empty:
+            return '<p class="muted">Province coverage is not available yet.</p>'
+        max_value = max(1, int(grouped.max()))
+        rows = []
+        for province_name, count in grouped.items():
+            percent = max(4, (int(count) / max_value) * 100)
+            rows.append(
+                f'<div class="rail-row"><div class="rail-row-top"><span>{html.escape(str(province_name))}</span><strong>{int(count):,}</strong></div>'
+                f'<div class="rail-bar"><span class="rail-fill" style="width:{percent:.1f}%"></span></div></div>'
+            )
+        return ''.join(rows)
+
+    def _alert_parameter_bar_rows(self, alerts_df):
+        if alerts_df is None or alerts_df.empty or 'parameter' not in alerts_df.columns:
+            return '<p class="muted">No current parameter alerts.</p>'
+        grouped = alerts_df['parameter'].fillna('Unknown').astype(str).value_counts().head(5)
+        max_value = max(1, int(grouped.max()))
+        rows = []
+        for parameter, count in grouped.items():
+            label = PlotGenerator()._format_parameter_label(parameter)
+            percent = max(5, (int(count) / max_value) * 100)
+            rows.append(
+                f'<div class="rail-row"><div class="rail-row-top"><span>{html.escape(label)}</span><strong>{int(count):,}</strong></div>'
+                f'<div class="rail-bar"><span class="rail-fill black" style="width:{percent:.1f}%"></span></div></div>'
+            )
+        return ''.join(rows)
+
+    def _mini_korea_map(self, latest_station_df, alerts_df):
+        if not {'latitude', 'longitude'}.issubset(latest_station_df.columns):
+            return '<p class="muted" style="padding: 13px;">Station coordinates are not available yet.</p>'
+        points = latest_station_df[['display_location', 'latitude', 'longitude']].dropna().copy()
+        if points.empty:
+            return '<p class="muted" style="padding: 13px;">Station coordinates are not available yet.</p>'
+
+        alert_locations = set()
+        if alerts_df is not None and not alerts_df.empty and 'display_location' in alerts_df.columns:
+            alert_locations = set(alerts_df['display_location'].dropna().astype(str))
+        min_lon, max_lon = 124.5, 131.5
+        min_lat, max_lat = 33.0, 39.2
+        svg_points = []
+        sampled = points.drop_duplicates('display_location').head(90)
+        for _, row in sampled.iterrows():
+            try:
+                lon = float(row.get('longitude'))
+                lat = float(row.get('latitude'))
+            except Exception:
+                continue
+            x = 18 + ((lon - min_lon) / (max_lon - min_lon)) * 164
+            y = 150 - ((lat - min_lat) / (max_lat - min_lat)) * 130
+            if not (8 <= x <= 192 and 8 <= y <= 162):
+                continue
+            dot_class = 'map-dot alert' if str(row.get('display_location', '')) in alert_locations else 'map-dot'
+            svg_points.append(f'<circle class="{dot_class}" cx="{x:.1f}" cy="{y:.1f}" r="2.8"></circle>')
+        return (
+            '<svg viewBox="0 0 200 170" role="img" aria-label="Mini map of latest monitoring stations">'
+            '<path d="M106 13 C134 28 151 50 151 75 C151 112 128 148 95 154 C67 159 45 139 48 110 C51 84 71 73 75 48 C78 29 89 15 106 13 Z" fill="#ffffff" stroke="#d9e1ee" stroke-width="2"></path>'
+            '<path d="M84 62 C101 49 124 54 133 72 C113 73 101 83 92 99 C79 94 71 84 73 75 C74 70 78 66 84 62 Z" fill="rgba(205,46,58,.16)"></path>'
+            '<path d="M92 99 C101 83 113 73 133 72 C140 89 135 111 119 124 C101 139 77 134 65 118 C74 118 84 112 92 99 Z" fill="rgba(0,71,160,.16)"></path>'
+            + ''.join(svg_points) +
+            '</svg>'
+        )
 
     def _plot_cards(self, date_label):
         plots_dir = Config.daily_plots_dir(date_label)
