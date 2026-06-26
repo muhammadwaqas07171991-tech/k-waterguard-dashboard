@@ -1922,82 +1922,96 @@ class DashboardGenerator:
   <title>K-WaterGuard AI Dashboard</title>
   <style>
     :root {{
-      --bg: #f5f7f4;
+      --bg: #f4f6fb;
       --panel: #ffffff;
-      --ink: #172126;
-      --muted: #647174;
-      --line: #d9e1df;
-      --blue: #1f6f8b;
-      --green: #3f7d52;
-      --red: #b94a48;
-      --amber: #a66f22;
-      --shadow: 0 10px 24px rgba(30, 44, 46, 0.08);
+      --panel-soft: #f9fbff;
+      --ink: #121826;
+      --muted: #5f6b7a;
+      --line: #d9e1ee;
+      --blue: #0047a0;
+      --blue-soft: #e7eefb;
+      --green: #0047a0;
+      --red: #cd2e3a;
+      --red-soft: #fde9eb;
+      --amber: #191919;
+      --black: #191919;
+      --shadow: 0 14px 30px rgba(0, 35, 90, 0.09);
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       font-family: "Segoe UI", Arial, sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 16% 0%, rgba(205, 46, 58, 0.10), transparent 28%),
+        radial-gradient(circle at 88% 8%, rgba(0, 71, 160, 0.12), transparent 30%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 36%, #eef3fb 100%);
       color: var(--ink);
     }}
     header {{
       min-height: 360px;
       display: flex;
       align-items: flex-end;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78) 44%, rgba(9, 45, 77, 0.18)), url("{self._asset_uri('Kwater.png')}");
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.84) 45%, rgba(0, 71, 160, 0.12)),
+        linear-gradient(135deg, rgba(205, 46, 58, 0.18), transparent 34%),
+        url("{self._asset_uri('Kwater.png')}");
       background-size: cover;
       background-position: center right;
-      color: #082a5f;
+      color: var(--blue);
       padding: 34px 24px 32px;
+      border-bottom: 4px solid var(--black);
     }}
     .wrap {{ width: min(1280px, calc(100% - 32px)); margin: 0 auto; }}
     .topline {{ display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }}
-    .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.86); border-radius: 8px; box-shadow: var(--shadow); }}
+    .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.94); border: 1px solid rgba(0, 71, 160, 0.16); border-radius: 8px; box-shadow: var(--shadow); }}
     .brand-logo {{ width: 54px; height: 54px; object-fit: contain; border-radius: 6px; background: white; }}
-    .brand-name {{ font-size: 18px; font-weight: 800; color: #073b8e; }}
+    .brand-name {{ font-size: 18px; font-weight: 800; color: var(--blue); }}
     h1 {{ margin: 18px 0 8px; font-size: 38px; line-height: 1.08; letter-spacing: 0; }}
-    .subtitle {{ max-width: 820px; color: #173a60; margin: 0; font-size: 16px; font-weight: 600; }}
-    .badge {{ border: 1px solid rgba(7, 59, 142, 0.22); padding: 7px 10px; border-radius: 6px; color: #073b8e; background: rgba(255,255,255,0.86); text-decoration: none; font-weight: 700; }}
+    .subtitle {{ max-width: 820px; color: #26364c; margin: 0; font-size: 16px; font-weight: 600; }}
+    .badge {{ border: 1px solid rgba(205, 46, 58, 0.28); padding: 7px 10px; border-radius: 6px; color: var(--red); background: rgba(255,255,255,0.88); text-decoration: none; font-weight: 700; }}
     main {{ padding: 22px 0 44px; }}
     .toolbar {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }}
     .search {{ min-width: min(420px, 100%); flex: 1; padding: 11px 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }}
     .search-status {{ margin: -4px 0 14px; color: var(--muted); font-size: 13px; min-height: 18px; }}
-    tr.search-match {{ background: #fff8df; }}
+    tr.search-match {{ background: #fff1f3; }}
     .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
     .grid {{ display: grid; gap: 14px; }}
-    .stats {{ grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }}
+    .stats {{ grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }}
     .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }}
-    .stat {{ padding: 15px; }}
+    .stat {{ padding: 15px; border-top: 4px solid var(--blue); }}
+    .stats > .stat:nth-child(even) {{ border-top-color: var(--red); }}
+    .stats > .stat:nth-child(3n) {{ border-top-color: var(--black); }}
     .label {{ color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }}
-    .value {{ font-size: 28px; font-weight: 700; margin-top: 4px; }}
+    .value {{ font-size: 28px; font-weight: 800; margin-top: 4px; color: var(--blue); }}
     .section {{ padding: 18px; margin-top: 16px; }}
     h2 {{ margin: 0 0 12px; font-size: 20px; }}
     .param-grid {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
     .param {{
-      position: relative; padding: 16px; min-height: 142px; border-left: 5px solid var(--green);
+      position: relative; padding: 16px; min-height: 142px; border-left: 5px solid var(--blue);
+      background: linear-gradient(180deg, #ffffff, var(--panel-soft));
       border-radius: 8px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
     }}
-    .param:hover {{ transform: translateY(-1px); box-shadow: 0 12px 28px rgba(30, 44, 46, 0.12); }}
-    .param:focus {{ outline: 3px solid rgba(31, 111, 139, 0.22); outline-offset: 2px; }}
-    .param.warn {{ border-left-color: var(--amber); background: #fffaf0; }}
-    .param.bad {{ border-left-color: var(--red); background: #fff6f5; }}
-    .param.active {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(31, 111, 139, 0.18), var(--shadow); }}
+    .param:hover {{ transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0, 35, 90, 0.14); }}
+    .param:focus {{ outline: 3px solid rgba(0, 71, 160, 0.22); outline-offset: 2px; }}
+    .param.warn {{ border-left-color: var(--black); background: #fbfbfc; }}
+    .param.bad {{ border-left-color: var(--red); background: var(--red-soft); }}
+    .param.active {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 71, 160, 0.18), var(--shadow); }}
     .alert-pill {{ display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-    .alert-pill.critical {{ background: #ffe6e3; color: #8d231d; }}
-    .alert-pill.warning {{ background: #fff1d8; color: #744b0c; }}
-    .alert-pill.ok {{ background: #e7f3ea; color: #255c37; }}
+    .alert-pill.critical {{ background: var(--red-soft); color: #921a24; }}
+    .alert-pill.warning {{ background: #eeeeef; color: var(--black); }}
+    .alert-pill.ok {{ background: var(--blue-soft); color: var(--blue); }}
     .param-value {{ font-size: 26px; font-weight: 700; margin: 10px 0 5px; }}
     .param-action {{ display: block; margin-top: 9px; color: var(--blue); font-size: 12px; font-weight: 700; }}
     .muted {{ color: var(--muted); }}
     .plots {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
     .plot img {{ width: 100%; display: block; border-top: 1px solid var(--line); }}
-    .plot .image-missing {{ display: none; padding: 14px; border-top: 1px solid var(--line); color: var(--red); background: #fff5f4; }}
+    .plot .image-missing {{ display: none; padding: 14px; border-top: 1px solid var(--line); color: var(--red); background: #fff5f6; }}
     .plot h3 {{ margin: 12px; font-size: 15px; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
     th, td {{ padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
-    th {{ background: #edf3f2; position: sticky; top: 0; z-index: 1; }}
-    tr.filtered-match {{ background: #fff8df; }}
+    th {{ background: var(--blue-soft); color: #16233a; position: sticky; top: 0; z-index: 1; }}
+    tr.filtered-match {{ background: #fff1f3; }}
     .table-wrap {{ max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }}
     .two-col {{ grid-template-columns: 1.2fr 0.8fr; align-items: start; }}
     footer {{ color: var(--muted); padding: 20px 0; font-size: 13px; }}
@@ -2005,13 +2019,13 @@ class DashboardGenerator:
       position: fixed; right: 22px; bottom: 22px; z-index: 30;
       border: 0; border-radius: 999px; background: var(--blue); color: white;
       min-height: 46px; padding: 0 16px; font: inherit; font-weight: 700;
-      box-shadow: 0 12px 26px rgba(31, 111, 139, 0.28); cursor: pointer;
+      box-shadow: 0 12px 26px rgba(0, 71, 160, 0.28); cursor: pointer;
     }}
     .chat-panel {{
       position: fixed; right: 22px; bottom: 82px; width: min(380px, calc(100vw - 32px));
       max-height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column;
       background: white; border: 1px solid var(--line); border-radius: 8px;
-      box-shadow: 0 18px 44px rgba(20, 34, 38, 0.22); z-index: 31;
+      box-shadow: 0 18px 44px rgba(18, 24, 38, 0.22); z-index: 31;
     }}
     .chat-panel.open {{ display: flex; }}
     .chat-head {{ padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; }}
@@ -2019,11 +2033,11 @@ class DashboardGenerator:
     .chat-close {{ border: 0; background: transparent; font: inherit; cursor: pointer; color: var(--muted); }}
     .chat-messages {{ padding: 12px; overflow: auto; display: grid; gap: 10px; }}
     .chat-msg {{ padding: 10px 11px; border-radius: 8px; line-height: 1.4; font-size: 14px; }}
-    .chat-msg.bot {{ background: #edf3f2; color: var(--ink); }}
-    .chat-msg.user {{ background: #e9f1fb; color: #0d3d6b; justify-self: end; }}
+    .chat-msg.bot {{ background: var(--blue-soft); color: var(--ink); }}
+    .chat-msg.user {{ background: var(--red-soft); color: #7d1720; justify-self: end; }}
     .chat-form {{ padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; }}
     .chat-input {{ flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: inherit; }}
-    .chat-send {{ border: 0; border-radius: 6px; background: var(--green); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
+    .chat-send {{ border: 0; border-radius: 6px; background: var(--red); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
     @media (max-width: 980px) {{
       .stats, .param-grid, .plots, .spatial-maps, .two-col {{ grid-template-columns: 1fr 1fr; }}
     }}
