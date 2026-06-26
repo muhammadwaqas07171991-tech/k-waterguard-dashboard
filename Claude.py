@@ -1961,6 +1961,8 @@ class DashboardGenerator:
     main {{ padding: 22px 0 44px; }}
     .toolbar {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }}
     .search {{ min-width: min(420px, 100%); flex: 1; padding: 11px 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }}
+    .search-status {{ margin: -4px 0 14px; color: var(--muted); font-size: 13px; min-height: 18px; }}
+    tr.search-match {{ background: #fff8df; }}
     .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
     .grid {{ display: grid; gap: 14px; }}
     .stats {{ grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; }}
@@ -2045,6 +2047,7 @@ class DashboardGenerator:
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
       <a class="button" href="{csv_link}">Open latest CSV</a>
     </div>
+    <div class="search-status" id="searchStatus">Search filters the alert, province, and station tables below.</div>
 
     <section class="grid stats">
       {self._stat_card('Latest date', html.escape(str(latest_date)))}
@@ -2123,13 +2126,54 @@ class DashboardGenerator:
   <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt after each agent run. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
   <script>
     const search = document.getElementById('stationSearch');
-    const rows = Array.from(document.querySelectorAll('#stationTable tbody tr, #alertTable tbody tr'));
-    search.addEventListener('input', () => {{
+    const searchStatus = document.getElementById('searchStatus');
+    const searchableTables = Array.from(document.querySelectorAll('table'));
+    const searchableRows = Array.from(document.querySelectorAll('table tbody tr'));
+
+    function applyDashboardSearch(scrollToFirstMatch = false) {{
       const query = search.value.trim().toLowerCase();
-      rows.forEach(row => {{
-        row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
+      let visibleCount = 0;
+      let firstMatch = null;
+
+      searchableRows.forEach(row => {{
+        const matched = !query || row.textContent.toLowerCase().includes(query);
+        row.style.display = matched ? '' : 'none';
+        row.classList.toggle('search-match', Boolean(query && matched));
+        if (matched && query) {{
+          visibleCount += 1;
+          if (!firstMatch) firstMatch = row;
+        }}
       }});
-    }});
+
+      searchableTables.forEach(table => {{
+        const visibleRows = Array.from(table.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
+        table.closest('.section')?.classList.toggle('search-empty', Boolean(query && visibleRows.length === 0));
+      }});
+
+      if (!query) {{
+        searchStatus.textContent = 'Search filters the alert, province, and station tables below.';
+        return;
+      }}
+
+      searchStatus.textContent = visibleCount
+        ? `${{visibleCount.toLocaleString()}} matching table row${{visibleCount === 1 ? '' : 's'}} found. Press Enter to jump to the first match.`
+        : `No table rows found for "${{search.value.trim()}}". Try a city, province, station, parameter, or value.`;
+
+      if (scrollToFirstMatch && firstMatch) {{
+        firstMatch.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+      }}
+    }}
+
+    if (search) {{
+      search.addEventListener('input', () => applyDashboardSearch(false));
+      search.addEventListener('search', () => applyDashboardSearch(false));
+      search.addEventListener('keydown', (event) => {{
+        if (event.key === 'Enter') {{
+          event.preventDefault();
+          applyDashboardSearch(true);
+        }}
+      }});
+    }}
     {chatbot_script}
   </script>
 </body>
