@@ -1184,8 +1184,8 @@ class PlotGenerator:
             self._plot_quality_heatmap(df)
             self._plot_parameter_distributions(df)
             self._plot_quality_summary(df)
-            self._plot_alert_parameter_breakdown(df)
-            self._plot_station_risk_overview(df)
+            self._plot_parameter_compliance_overview(df)
+            self._plot_top_attention_stations(df)
             self._plot_station_coverage_map(df)
             self._plot_parameter_maps(df)
             
@@ -1531,77 +1531,132 @@ class PlotGenerator:
                     })
         return pd.DataFrame(rows)
 
-    def _plot_alert_parameter_breakdown(self, df):
-        """Plot which parameters are causing the most alerts."""
+    def _plot_parameter_compliance_overview(self, df):
+        """Plot percent of latest station measurements passing each screening rule."""
         try:
             plot_df = self._prepare_plot_dataframe(df)
-            alerts = self._evaluate_plot_alerts(plot_df)
-            fig, ax = plt.subplots(figsize=(11, 6), facecolor='white')
-            if alerts.empty:
-                ax.text(0.5, 0.55, 'No current parameter alerts', ha='center', va='center',
+            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1)
+            rows = []
+            for parameter, rule in Config.WATER_QUALITY_ALERT_RULES.items():
+                if parameter not in latest.columns:
+                    continue
+                values = pd.to_numeric(latest[parameter], errors='coerce').dropna()
+                if values.empty:
+                    continue
+                passing = pd.Series(True, index=values.index)
+                if rule.get('min') is not None:
+                    passing &= values >= rule.get('min')
+                if rule.get('max') is not None:
+                    passing &= values <= rule.get('max')
+                rows.append({
+                    'parameter': parameter,
+                    'label': self._format_parameter_label(parameter),
+                    'pass_rate': float(passing.mean() * 100),
+                    'pass_count': int(passing.sum()),
+                    'total': int(len(values)),
+                })
+
+            fig, ax = plt.subplots(figsize=(12, 7), facecolor='white')
+            if not rows:
+                ax.text(0.5, 0.55, 'Compliance overview waiting for numeric data', ha='center', va='center',
+                        fontsize=18, fontweight='bold', color='#0047a0')
+                ax.text(0.5, 0.43, 'The chart will fill automatically when the API returns parameter measurements.',
+                        ha='center', va='center', fontsize=12, color='#5f6b7a')
+                ax.axis('off')
+            else:
+                compliance = pd.DataFrame(rows).sort_values('pass_rate')
+                colors = [
+                    '#cd2e3a' if value < 70 else '#191919' if value < 90 else '#0047a0'
+                    for value in compliance['pass_rate']
+                ]
+                ax.barh(compliance['label'], compliance['pass_rate'], color=colors, edgecolor='white')
+                ax.axvline(90, color='#0047a0', linestyle='--', linewidth=1.2, alpha=0.8)
+                ax.axvline(70, color='#cd2e3a', linestyle='--', linewidth=1.2, alpha=0.8)
+                for index, row in enumerate(compliance.itertuples()):
+                    ax.text(
+                        min(99, row.pass_rate + 1),
+                        index,
+                        f'{row.pass_rate:.0f}% ({row.pass_count:,}/{row.total:,})',
+                        va='center',
+                        ha='left',
+                        fontsize=9,
+                        fontweight='bold',
+                        color='#121826',
+                    )
+                ax.set_xlim(0, 108)
+                ax.set_xlabel('Stations within dashboard screening rule (%)')
+                ax.set_ylabel('')
+                ax.set_title('Parameter Compliance Overview', fontsize=18, fontweight='bold')
+                ax.text(90, len(compliance) - 0.25, '90% target', ha='right', va='bottom', fontsize=9, color='#0047a0')
+                ax.grid(True, axis='x', color='0.90')
+                ax.spines[['top', 'right', 'left']].set_visible(False)
+            fig.tight_layout()
+            fig.savefig(self._plots_dir() / 'parameter_compliance_overview.png', dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close(fig)
+            self.logger.info("Parameter compliance overview plot saved")
+        except Exception as e:
+            self.logger.error(f"Error in parameter compliance overview plot: {str(e)}")
+
+    def _plot_top_attention_stations(self, df):
+        """Rank latest stations by number of screening-rule exceedances."""
+        try:
+            plot_df = self._prepare_plot_dataframe(df)
+            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1).copy()
+            station_column = 'display_location' if 'display_location' in latest.columns else 'station_key'
+            if latest.empty:
+                self.logger.warning("No latest station data available for station attention ranking")
+                return
+
+            scores = pd.Series(0, index=latest.index, dtype='float64')
+            critical_scores = pd.Series(0, index=latest.index, dtype='float64')
+            for parameter, rule in Config.WATER_QUALITY_ALERT_RULES.items():
+                if parameter not in latest.columns:
+                    continue
+                values = pd.to_numeric(latest[parameter], errors='coerce')
+                violated = pd.Series(False, index=latest.index)
+                if rule.get('min') is not None:
+                    violated |= values < rule.get('min')
+                if rule.get('max') is not None:
+                    violated |= values > rule.get('max')
+                scores += violated.fillna(False).astype(int)
+                if rule.get('severity') == 'critical':
+                    critical_scores += violated.fillna(False).astype(int)
+
+            ranking = pd.DataFrame({
+                'station': latest[station_column].fillna('Unknown').astype(str),
+                'attention': scores.astype(int),
+                'critical': critical_scores.astype(int),
+            })
+            ranking = ranking[ranking['attention'] > 0].sort_values(['critical', 'attention', 'station'], ascending=[False, False, True]).head(15)
+
+            fig, ax = plt.subplots(figsize=(12, 7), facecolor='white')
+            if ranking.empty:
+                ax.text(0.5, 0.55, 'No stations require attention', ha='center', va='center',
                         fontsize=20, fontweight='bold', color='#0047a0')
                 ax.text(0.5, 0.42, 'Latest station measurements are within configured screening rules.',
                         ha='center', va='center', fontsize=12, color='#5f6b7a')
                 ax.axis('off')
             else:
-                counts = alerts['parameter'].value_counts().sort_values()
-                labels = [self._format_parameter_label(parameter) for parameter in counts.index]
-                colors = ['#cd2e3a' if parameter in {'pH', 'DO', 'Fecal_Coliform', 'E_coli'} else '#191919' for parameter in counts.index]
-                ax.barh(labels, counts.values, color=colors, edgecolor='white')
-                for index, value in enumerate(counts.values):
-                    ax.text(value, index, f' {int(value):,}', va='center', ha='left', fontsize=10, fontweight='bold')
-                ax.set_title('Alert Contribution By Parameter', fontsize=17, fontweight='bold')
-                ax.set_xlabel('Latest alert rows')
+                ranking = ranking.sort_values('attention')
+                labels = [label if len(label) <= 42 else label[:39] + '...' for label in ranking['station']]
+                attention_only = (ranking['attention'] - ranking['critical']).clip(lower=0)
+                ax.barh(labels, attention_only, color='#191919', edgecolor='white', label='Attention')
+                ax.barh(labels, ranking['critical'], left=attention_only, color='#cd2e3a', edgecolor='white', label='Critical')
+                totals = ranking['attention'].to_numpy()
+                for index, total in enumerate(totals):
+                    ax.text(total + 0.08, index, f'{int(total)} flags', va='center', ha='left', fontsize=9, fontweight='bold')
+                ax.set_xlabel('Number of parameters outside rule')
                 ax.set_ylabel('')
+                ax.set_title('Top Stations Requiring Attention', fontsize=18, fontweight='bold')
                 ax.grid(True, axis='x', color='0.90')
+                ax.legend(frameon=False, loc='lower right')
                 ax.spines[['top', 'right', 'left']].set_visible(False)
             fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'alert_parameter_breakdown.png', dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(self._plots_dir() / 'top_attention_stations.png', dpi=300, bbox_inches='tight', facecolor='white')
             plt.close(fig)
-            self.logger.info("Alert parameter breakdown plot saved")
+            self.logger.info("Top attention stations plot saved")
         except Exception as e:
-            self.logger.error(f"Error in alert parameter breakdown plot: {str(e)}")
-
-    def _plot_station_risk_overview(self, df):
-        """Plot how many stations have no alerts, attention alerts, or critical alerts."""
-        try:
-            plot_df = self._prepare_plot_dataframe(df)
-            alerts = self._evaluate_plot_alerts(plot_df)
-            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1)
-            station_column = 'display_location' if 'display_location' in latest.columns else 'station_key'
-            total_station_labels = set(latest[station_column].dropna().astype(str))
-            total_stations = len(total_station_labels) if total_station_labels else len(latest)
-            critical_stations = set()
-            attention_stations = set()
-            if not alerts.empty:
-                critical_stations = set(alerts.loc[alerts['severity'] == 'critical', 'display_location'].astype(str))
-                attention_stations = set(alerts.loc[alerts['severity'] != 'critical', 'display_location'].astype(str))
-            attention_only = len(attention_stations - critical_stations)
-            critical_count = len(critical_stations)
-            ok_count = max(0, int(total_stations) - attention_only - critical_count)
-
-            labels = ['OK', 'Attention', 'Critical']
-            values = [ok_count, attention_only, critical_count]
-            colors = ['#0047a0', '#191919', '#cd2e3a']
-
-            fig, ax = plt.subplots(figsize=(9.5, 6), facecolor='white')
-            wedges, _ = ax.pie(
-                values,
-                colors=colors,
-                startangle=90,
-                wedgeprops=dict(width=0.38, edgecolor='white', linewidth=2),
-            )
-            ax.text(0, 0.08, f'{int(total_stations):,}', ha='center', va='center', fontsize=28, fontweight='bold', color='#0047a0')
-            ax.text(0, -0.13, 'Stations', ha='center', va='center', fontsize=12, color='#5f6b7a')
-            legend_labels = [f'{label}: {value:,}' for label, value in zip(labels, values)]
-            ax.legend(wedges, legend_labels, loc='center left', bbox_to_anchor=(0.92, 0.5), frameon=False)
-            ax.set_title('Latest Station Risk Overview', fontsize=17, fontweight='bold')
-            fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'station_risk_overview.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
-            self.logger.info("Station risk overview plot saved")
-        except Exception as e:
-            self.logger.error(f"Error in station risk overview plot: {str(e)}")
+            self.logger.error(f"Error in top attention stations plot: {str(e)}")
     
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
@@ -2194,9 +2249,24 @@ class DashboardGenerator:
     .muted {{ color: var(--muted); }}
     .plots {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    .plot img {{ width: 100%; display: block; border-top: 1px solid var(--line); }}
+    .plot img {{ width: 100%; display: block; border-top: 1px solid var(--line); cursor: zoom-in; }}
+    .plot img:hover {{ filter: saturate(1.04) contrast(1.03); }}
     .plot .image-missing {{ display: none; padding: 14px; border-top: 1px solid var(--line); color: var(--red); background: #fff5f6; }}
     .plot h3 {{ margin: 12px; font-size: 15px; }}
+    .lightbox {{
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      z-index: 80; padding: 24px; background: rgba(8, 13, 24, 0.86);
+    }}
+    .lightbox.open {{ display: flex; }}
+    .lightbox-panel {{
+      width: min(1500px, 96vw); max-height: 94vh; display: grid; grid-template-rows: auto minmax(0, 1fr);
+      background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.34);
+    }}
+    .lightbox-head {{ display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }}
+    .lightbox-title {{ font-weight: 800; color: var(--blue); }}
+    .lightbox-close {{ border: 0; border-radius: 6px; background: var(--red); color: white; font: inherit; font-weight: 800; padding: 8px 12px; cursor: pointer; }}
+    .lightbox-img-wrap {{ overflow: auto; background: #f7f9fd; padding: 14px; }}
+    .lightbox-img {{ display: block; max-width: 100%; height: auto; margin: 0 auto; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
     th, td {{ padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
     th {{ background: var(--blue-soft); color: #16233a; position: sticky; top: 0; z-index: 1; }}
@@ -2353,6 +2423,17 @@ class DashboardGenerator:
     </section>
   </main>
   {chatbot_html}
+  <div class="lightbox" id="imageLightbox" aria-hidden="true">
+    <div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="Expanded dashboard image">
+      <div class="lightbox-head">
+        <div class="lightbox-title" id="lightboxTitle">Dashboard image</div>
+        <button class="lightbox-close" id="lightboxClose" type="button">Close</button>
+      </div>
+      <div class="lightbox-img-wrap">
+        <img class="lightbox-img" id="lightboxImage" src="" alt="">
+      </div>
+    </div>
+  </div>
   <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt after each agent run. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
   <script>
     const search = document.getElementById('stationSearch');
@@ -2360,6 +2441,10 @@ class DashboardGenerator:
     const searchableTables = Array.from(document.querySelectorAll('table'));
     const searchableRows = Array.from(document.querySelectorAll('table tbody tr'));
     const parameterCards = Array.from(document.querySelectorAll('.param[data-filter-param]'));
+    const imageLightbox = document.getElementById('imageLightbox');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxTitle = document.getElementById('lightboxTitle');
+    const lightboxClose = document.getElementById('lightboxClose');
     let activeParameter = '';
 
     function applyDashboardFilters(scrollToFirstMatch = false) {{
@@ -2436,6 +2521,46 @@ class DashboardGenerator:
           activateParameterFilter(card);
         }}
       }});
+    }});
+
+    function openImageLightbox(image) {{
+      if (!imageLightbox || !lightboxImage) return;
+      lightboxImage.src = image.currentSrc || image.src;
+      lightboxImage.alt = image.alt || 'Expanded dashboard image';
+      lightboxTitle.textContent = image.alt || image.closest('.plot')?.querySelector('h3')?.textContent || 'Dashboard image';
+      imageLightbox.classList.add('open');
+      imageLightbox.setAttribute('aria-hidden', 'false');
+      lightboxClose?.focus();
+    }}
+
+    function closeImageLightbox() {{
+      if (!imageLightbox || !lightboxImage) return;
+      imageLightbox.classList.remove('open');
+      imageLightbox.setAttribute('aria-hidden', 'true');
+      lightboxImage.src = '';
+    }}
+
+    document.querySelectorAll('.plot img').forEach(image => {{
+      image.setAttribute('tabindex', '0');
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-label', `Expand ${{image.alt || 'dashboard image'}}`);
+      image.addEventListener('click', () => openImageLightbox(image));
+      image.addEventListener('keydown', (event) => {{
+        if (event.key === 'Enter' || event.key === ' ') {{
+          event.preventDefault();
+          openImageLightbox(image);
+        }}
+      }});
+    }});
+
+    lightboxClose?.addEventListener('click', closeImageLightbox);
+    imageLightbox?.addEventListener('click', (event) => {{
+      if (event.target === imageLightbox) closeImageLightbox();
+    }});
+    document.addEventListener('keydown', (event) => {{
+      if (event.key === 'Escape' && imageLightbox?.classList.contains('open')) {{
+        closeImageLightbox();
+      }}
     }});
     {chatbot_script}
   </script>
@@ -2970,8 +3095,8 @@ class DashboardGenerator:
         plots_dir = Config.daily_plots_dir(date_label)
         plot_specs = [
             ('quality_summary.png', 'Quality Summary'),
-            ('station_risk_overview.png', 'Station Risk Overview'),
-            ('alert_parameter_breakdown.png', 'Alert Parameter Focus'),
+            ('parameter_compliance_overview.png', 'Parameter Compliance Overview'),
+            ('top_attention_stations.png', 'Top Attention Stations'),
             ('station_coverage_map.png', 'Station Coverage Map'),
             ('timeline_parameters.png', 'Parameter Timeline'),
             ('regional_comparison.png', 'Station Distributions'),
