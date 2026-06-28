@@ -102,6 +102,7 @@ class Config:
     LOG_FILE = DATA_DIR / "agent_log.txt"
     LOCATION_EXPORTS_DIR = DATA_DIR / "location_exports"
     DAILY_OUTPUTS_DIR = DATA_DIR / "daily_outputs"
+    RUN_ARCHIVES_DIR = DATA_DIR / "run_archives"
     DASHBOARD_FILE = DATA_DIR / "dashboard.html"
     WORKSPACE_DASHBOARD_FILE = Path(__file__).resolve().parent / "Claude_dashboard.html"
     SITE_DASHBOARD_DIR = DATA_DIR / "google_site_dashboard"
@@ -258,9 +259,30 @@ class Config:
         return Config.daily_output_dir(date_label) / "location_exports"
 
     @staticmethod
+    def daily_runs_dir(date_label=None):
+        return Config.daily_output_dir(date_label) / "runs"
+
+    @staticmethod
     def daily_csv_file(date_label=None):
         label = date_label or Config.output_date_label()
         return Config.daily_data_dir(label) / f"water_quality_records_{label}.csv"
+
+    @staticmethod
+    def run_id(value=None):
+        value = value or Config.now()
+        try:
+            parsed = pd.to_datetime(value, errors='coerce')
+            if pd.isna(parsed):
+                parsed = Config.now()
+            return parsed.strftime('%Y%m%d_%H%M%S_KST')
+        except Exception:
+            return Config.now().strftime('%Y%m%d_%H%M%S_KST')
+
+    @staticmethod
+    def daily_run_csv_file(run_id=None, date_label=None):
+        label = date_label or Config.output_date_label()
+        rid = run_id or Config.run_id()
+        return Config.daily_runs_dir(label) / f"water_quality_run_{rid}.csv"
 
 # ==================== SETUP ====================
 def setup_environment():
@@ -268,9 +290,11 @@ def setup_environment():
     Config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     Config.PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     Config.DAILY_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    Config.RUN_ARCHIVES_DIR.mkdir(parents=True, exist_ok=True)
     Config.daily_data_dir().mkdir(parents=True, exist_ok=True)
     Config.daily_plots_dir().mkdir(parents=True, exist_ok=True)
     Config.daily_location_exports_dir().mkdir(parents=True, exist_ok=True)
+    Config.daily_runs_dir().mkdir(parents=True, exist_ok=True)
     
     logging.basicConfig(
         level=logging.INFO,
@@ -709,6 +733,7 @@ class DataManager:
             df_new['station_identity'] = self._station_identity_series(df_new)
             df_new['location_key'] = df_new['station_identity']
             df_new['hour'] = df_new['timestamp'].dt.floor('h')
+            run_archive_path = self._save_run_archive(df_new)
             
             # Load existing data
             if Config.CSV_FILE.exists():
@@ -776,6 +801,8 @@ class DataManager:
             df.to_csv(Config.CSV_FILE, index=False)
             self._save_location_exports(df)
             self._save_daily_exports(df)
+            if run_archive_path:
+                self.logger.info(f"Run CSV archive saved at: {run_archive_path}")
             self.logger.info(f"Data saved. Total records: {len(df)}")
             
             # Cleanup old data
@@ -795,6 +822,32 @@ class DataManager:
             self.logger.info(f"Saved location-specific exports to {Config.LOCATION_EXPORTS_DIR}")
         except Exception as e:
             self.logger.error(f"Error saving per-location exports: {str(e)}")
+
+    def _save_run_archive(self, df_new):
+        """Save a timestamped CSV for this individual agent run."""
+        try:
+            if df_new is None or df_new.empty:
+                return None
+            run_df = df_new.copy()
+            run_df = run_df.drop(columns=[column for column in ['hour', 'location_key'] if column in run_df.columns])
+            run_df = self._prepare_export_dataframe(run_df)
+            timestamps = pd.to_datetime(run_df.get('timestamp'), errors='coerce').dropna()
+            run_time = timestamps.max() if not timestamps.empty else Config.now()
+            date_label = Config.output_date_label(run_time)
+            run_id = Config.run_id(run_time)
+
+            daily_runs_dir = Config.daily_runs_dir(date_label)
+            daily_runs_dir.mkdir(parents=True, exist_ok=True)
+            Config.RUN_ARCHIVES_DIR.mkdir(parents=True, exist_ok=True)
+
+            daily_path = Config.daily_run_csv_file(run_id, date_label)
+            flat_path = Config.RUN_ARCHIVES_DIR / daily_path.name
+            run_df.to_csv(daily_path, index=False)
+            run_df.to_csv(flat_path, index=False)
+            return daily_path
+        except Exception as e:
+            self.logger.error(f"Error saving run CSV archive: {str(e)}")
+            return None
 
     def _enrich_location_columns(self, df):
         df = df.copy()
@@ -1131,6 +1184,8 @@ class PlotGenerator:
             self._plot_quality_heatmap(df)
             self._plot_parameter_distributions(df)
             self._plot_quality_summary(df)
+            self._plot_alert_parameter_breakdown(df)
+            self._plot_station_risk_overview(df)
             self._plot_station_coverage_map(df)
             self._plot_parameter_maps(df)
             
@@ -1449,6 +1504,104 @@ class PlotGenerator:
             self.logger.info("Distribution plot saved")
         except Exception as e:
             self.logger.error(f"Error in distributions: {str(e)}")
+
+    def _evaluate_plot_alerts(self, df):
+        if df is None or df.empty:
+            return pd.DataFrame(columns=['parameter', 'display_location', 'severity'])
+        latest = df.copy()
+        latest['timestamp'] = pd.to_datetime(latest.get('timestamp'), errors='coerce')
+        station_column = 'display_location' if 'display_location' in latest.columns else 'station_key'
+        latest = latest.sort_values('timestamp').groupby(station_column, dropna=False).tail(1)
+        rows = []
+        for parameter, rule in Config.WATER_QUALITY_ALERT_RULES.items():
+            if parameter not in latest.columns:
+                continue
+            values = pd.to_numeric(latest[parameter], errors='coerce')
+            for index, value in values.dropna().items():
+                violates = False
+                if rule.get('min') is not None and value < rule.get('min'):
+                    violates = True
+                if rule.get('max') is not None and value > rule.get('max'):
+                    violates = True
+                if violates:
+                    rows.append({
+                        'parameter': parameter,
+                        'display_location': latest.loc[index].get(station_column, ''),
+                        'severity': rule.get('severity', 'warning'),
+                    })
+        return pd.DataFrame(rows)
+
+    def _plot_alert_parameter_breakdown(self, df):
+        """Plot which parameters are causing the most alerts."""
+        try:
+            plot_df = self._prepare_plot_dataframe(df)
+            alerts = self._evaluate_plot_alerts(plot_df)
+            fig, ax = plt.subplots(figsize=(11, 6), facecolor='white')
+            if alerts.empty:
+                ax.text(0.5, 0.55, 'No current parameter alerts', ha='center', va='center',
+                        fontsize=20, fontweight='bold', color='#0047a0')
+                ax.text(0.5, 0.42, 'Latest station measurements are within configured screening rules.',
+                        ha='center', va='center', fontsize=12, color='#5f6b7a')
+                ax.axis('off')
+            else:
+                counts = alerts['parameter'].value_counts().sort_values()
+                labels = [self._format_parameter_label(parameter) for parameter in counts.index]
+                colors = ['#cd2e3a' if parameter in {'pH', 'DO', 'Fecal_Coliform', 'E_coli'} else '#191919' for parameter in counts.index]
+                ax.barh(labels, counts.values, color=colors, edgecolor='white')
+                for index, value in enumerate(counts.values):
+                    ax.text(value, index, f' {int(value):,}', va='center', ha='left', fontsize=10, fontweight='bold')
+                ax.set_title('Alert Contribution By Parameter', fontsize=17, fontweight='bold')
+                ax.set_xlabel('Latest alert rows')
+                ax.set_ylabel('')
+                ax.grid(True, axis='x', color='0.90')
+                ax.spines[['top', 'right', 'left']].set_visible(False)
+            fig.tight_layout()
+            fig.savefig(self._plots_dir() / 'alert_parameter_breakdown.png', dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close(fig)
+            self.logger.info("Alert parameter breakdown plot saved")
+        except Exception as e:
+            self.logger.error(f"Error in alert parameter breakdown plot: {str(e)}")
+
+    def _plot_station_risk_overview(self, df):
+        """Plot how many stations have no alerts, attention alerts, or critical alerts."""
+        try:
+            plot_df = self._prepare_plot_dataframe(df)
+            alerts = self._evaluate_plot_alerts(plot_df)
+            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1)
+            station_column = 'display_location' if 'display_location' in latest.columns else 'station_key'
+            total_station_labels = set(latest[station_column].dropna().astype(str))
+            total_stations = len(total_station_labels) if total_station_labels else len(latest)
+            critical_stations = set()
+            attention_stations = set()
+            if not alerts.empty:
+                critical_stations = set(alerts.loc[alerts['severity'] == 'critical', 'display_location'].astype(str))
+                attention_stations = set(alerts.loc[alerts['severity'] != 'critical', 'display_location'].astype(str))
+            attention_only = len(attention_stations - critical_stations)
+            critical_count = len(critical_stations)
+            ok_count = max(0, int(total_stations) - attention_only - critical_count)
+
+            labels = ['OK', 'Attention', 'Critical']
+            values = [ok_count, attention_only, critical_count]
+            colors = ['#0047a0', '#191919', '#cd2e3a']
+
+            fig, ax = plt.subplots(figsize=(9.5, 6), facecolor='white')
+            wedges, _ = ax.pie(
+                values,
+                colors=colors,
+                startangle=90,
+                wedgeprops=dict(width=0.38, edgecolor='white', linewidth=2),
+            )
+            ax.text(0, 0.08, f'{int(total_stations):,}', ha='center', va='center', fontsize=28, fontweight='bold', color='#0047a0')
+            ax.text(0, -0.13, 'Stations', ha='center', va='center', fontsize=12, color='#5f6b7a')
+            legend_labels = [f'{label}: {value:,}' for label, value in zip(labels, values)]
+            ax.legend(wedges, legend_labels, loc='center left', bbox_to_anchor=(0.92, 0.5), frameon=False)
+            ax.set_title('Latest Station Risk Overview', fontsize=17, fontweight='bold')
+            fig.tight_layout()
+            fig.savefig(self._plots_dir() / 'station_risk_overview.png', dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close(fig)
+            self.logger.info("Station risk overview plot saved")
+        except Exception as e:
+            self.logger.error(f"Error in station risk overview plot: {str(e)}")
     
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
@@ -1909,6 +2062,7 @@ class DashboardGenerator:
         plot_cards = self._plot_cards(str(latest_date))
         spatial_map_cards = self._spatial_map_cards(str(latest_date))
         province_rows = self._province_rows(latest_df)
+        history_rows = self._history_rows(limit=30)
         side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count)
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
         chatbot_html = self._chatbot_html()
@@ -2048,6 +2202,8 @@ class DashboardGenerator:
     th {{ background: var(--blue-soft); color: #16233a; position: sticky; top: 0; z-index: 1; }}
     tr.filtered-match {{ background: #fff1f3; }}
     .table-wrap {{ max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }}
+    .history-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
+    .history-link:hover {{ text-decoration: underline; }}
     .two-col {{ grid-template-columns: 1.2fr 0.8fr; align-items: start; }}
     footer {{ color: var(--muted); padding: 20px 0; font-size: 13px; }}
     .chat-launch {{
@@ -2136,6 +2292,19 @@ class DashboardGenerator:
             <tbody>{standard_rows}</tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <section class="card section" id="historicalDownloads">
+      <h2>Historical Data Downloads</h2>
+      <p class="muted">Each hourly GitHub Actions run is archived as a separate CSV, so users can download past snapshots without losing the latest dashboard view.</p>
+      <div class="table-wrap">
+        <table id="historyTable">
+          <thead>
+            <tr><th>Run Time</th><th>Date</th><th>Records</th><th>File</th></tr>
+          </thead>
+          <tbody>{history_rows}</tbody>
+        </table>
       </div>
     </section>
 
@@ -2747,10 +2916,62 @@ class DashboardGenerator:
             '</svg>'
         )
 
+    def _history_rows(self, limit=30):
+        try:
+            run_files = []
+            if Config.DAILY_OUTPUTS_DIR.exists():
+                run_files.extend(Config.DAILY_OUTPUTS_DIR.glob("*/runs/water_quality_run_*.csv"))
+            if Config.RUN_ARCHIVES_DIR.exists():
+                run_files.extend(Config.RUN_ARCHIVES_DIR.glob("water_quality_run_*.csv"))
+
+            unique_files = {}
+            for path in run_files:
+                unique_files[path.name] = path
+            paths = sorted(unique_files.values(), key=lambda path: path.name, reverse=True)[:limit]
+            if not paths:
+                return '<tr><td colspan="4">Historical run CSVs will appear after the next scheduled GitHub Actions update.</td></tr>'
+
+            rows = []
+            for path in paths:
+                run_time, date_label = self._history_file_labels(path)
+                record_count = self._csv_record_count(path)
+                rows.append(
+                    '<tr>'
+                    f'<td>{html.escape(run_time)}</td>'
+                    f'<td>{html.escape(date_label)}</td>'
+                    f'<td>{record_count:,}</td>'
+                    f'<td><a class="history-link" href="{self._file_uri(path)}">Download CSV</a></td>'
+                    '</tr>'
+                )
+            return ''.join(rows)
+        except Exception as e:
+            self.logger.error(f"Error building historical CSV rows: {str(e)}")
+            return '<tr><td colspan="4">Historical CSV list is temporarily unavailable.</td></tr>'
+
+    def _history_file_labels(self, path):
+        match = re.search(r'water_quality_run_(\d{8})_(\d{6})_KST\.csv$', path.name)
+        if not match:
+            return path.stem, ''
+        date_part, time_part = match.groups()
+        try:
+            parsed = datetime.strptime(date_part + time_part, '%Y%m%d%H%M%S')
+            return parsed.strftime('%Y-%m-%d %H:%M:%S KST'), parsed.strftime('%Y-%m-%d')
+        except Exception:
+            return path.stem, date_part
+
+    def _csv_record_count(self, path):
+        try:
+            with open(path, 'r', encoding='utf-8') as handle:
+                return max(0, sum(1 for _ in handle) - 1)
+        except Exception:
+            return 0
+
     def _plot_cards(self, date_label):
         plots_dir = Config.daily_plots_dir(date_label)
         plot_specs = [
             ('quality_summary.png', 'Quality Summary'),
+            ('station_risk_overview.png', 'Station Risk Overview'),
+            ('alert_parameter_breakdown.png', 'Alert Parameter Focus'),
             ('station_coverage_map.png', 'Station Coverage Map'),
             ('timeline_parameters.png', 'Parameter Timeline'),
             ('regional_comparison.png', 'Station Distributions'),
@@ -2824,9 +3045,10 @@ class DashboardGenerator:
         assets_dir = bundle_dir / "assets"
         plots_dir = bundle_dir / "plots"
         data_dir = bundle_dir / "data"
+        history_dir = bundle_dir / "history"
         if bundle_dir.exists():
             shutil.rmtree(bundle_dir)
-        for directory in [bundle_dir, assets_dir, plots_dir, data_dir]:
+        for directory in [bundle_dir, assets_dir, plots_dir, data_dir, history_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
         replacements = {}
@@ -2857,6 +3079,19 @@ class DashboardGenerator:
             root_target = bundle_dir / daily_csv.name
             shutil.copyfile(daily_csv, root_target)
             replacements[self._file_uri(daily_csv)] = self._site_asset_url(daily_csv.name)
+
+        run_files = []
+        if Config.DAILY_OUTPUTS_DIR.exists():
+            run_files.extend(Config.DAILY_OUTPUTS_DIR.glob("*/runs/water_quality_run_*.csv"))
+        if Config.RUN_ARCHIVES_DIR.exists():
+            run_files.extend(Config.RUN_ARCHIVES_DIR.glob("water_quality_run_*.csv"))
+        unique_run_files = {}
+        for source in run_files:
+            unique_run_files[source.name] = source
+        for source in sorted(unique_run_files.values(), key=lambda path: path.name, reverse=True)[:60]:
+            target = history_dir / source.name
+            shutil.copyfile(source, target)
+            replacements[self._file_uri(source)] = self._site_asset_url(f"history/{source.name}")
 
         site_html = html_text
         for old, new in replacements.items():
