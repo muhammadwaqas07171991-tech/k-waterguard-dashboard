@@ -2129,6 +2129,12 @@ class DashboardGenerator:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="3600">
+  <meta name="theme-color" content="#0047a0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="K-Water Guard AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
   <title>K-WaterGuard AI Dashboard</title>
   <style>
     :root {{
@@ -2185,6 +2191,8 @@ class DashboardGenerator:
     .search-status {{ margin: -4px 0 14px; color: var(--muted); font-size: 13px; min-height: 18px; }}
     tr.search-match {{ background: #fff1f3; }}
     .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
+    .install-button {{ display: none; border: 0; cursor: pointer; font: inherit; }}
+    .install-button.ready {{ display: inline-flex; }}
     .grid {{ display: grid; gap: 14px; }}
     .stats {{ grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }}
     .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }}
@@ -2332,6 +2340,7 @@ class DashboardGenerator:
   <main class="wrap">
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
+      <button class="button install-button" id="installAppButton" type="button">Install App</button>
       <a class="button" href="{csv_link}">Open latest CSV</a>
     </div>
     <div class="search-status" id="searchStatus">Search filters the alert, province, and station tables below.</div>
@@ -2445,7 +2454,9 @@ class DashboardGenerator:
     const lightboxImage = document.getElementById('lightboxImage');
     const lightboxTitle = document.getElementById('lightboxTitle');
     const lightboxClose = document.getElementById('lightboxClose');
+    const installAppButton = document.getElementById('installAppButton');
     let activeParameter = '';
+    let deferredInstallPrompt = null;
 
     function applyDashboardFilters(scrollToFirstMatch = false) {{
       const query = search.value.trim().toLowerCase();
@@ -2561,6 +2572,31 @@ class DashboardGenerator:
       if (event.key === 'Escape' && imageLightbox?.classList.contains('open')) {{
         closeImageLightbox();
       }}
+    }});
+
+    if ('serviceWorker' in navigator) {{
+      window.addEventListener('load', () => {{
+        navigator.serviceWorker.register('sw.js').catch(() => {{}});
+      }});
+    }}
+
+    window.addEventListener('beforeinstallprompt', (event) => {{
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      installAppButton?.classList.add('ready');
+    }});
+
+    installAppButton?.addEventListener('click', async () => {{
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice.catch(() => null);
+      deferredInstallPrompt = null;
+      installAppButton.classList.remove('ready');
+    }});
+
+    window.addEventListener('appinstalled', () => {{
+      deferredInstallPrompt = null;
+      installAppButton?.classList.remove('ready');
     }});
     {chatbot_script}
   </script>
@@ -3187,6 +3223,8 @@ class DashboardGenerator:
                 target = assets_dir / output_name
                 shutil.copyfile(source, target)
                 replacements[self._file_uri(source)] = self._image_data_uri(source)
+                if output_name == "logo.png":
+                    self._write_pwa_icons(source, assets_dir)
 
         daily_plots_dir = Config.daily_plots_dir(date_label)
         if daily_plots_dir.exists():
@@ -3226,10 +3264,134 @@ class DashboardGenerator:
             "The dashboard is rebuilt after each agent run.",
             "This page is generated for online embedding and rebuilt after each agent run."
         )
+        self._write_pwa_files(bundle_dir)
         output_path = bundle_dir / "index.html"
         output_path.write_text(site_html, encoding='utf-8')
         (bundle_dir / ".nojekyll").write_text("", encoding='utf-8')
         return output_path
+
+    def _write_pwa_files(self, bundle_dir):
+        manifest = {
+            "name": "K-Water Guard AI Dashboard",
+            "short_name": "K-Water AI",
+            "description": "Hourly South Korea water quality monitoring dashboard.",
+            "start_url": "./",
+            "scope": "./",
+            "display": "standalone",
+            "background_color": "#f4f6fb",
+            "theme_color": "#0047a0",
+            "orientation": "portrait-primary",
+            "icons": [
+                {
+                    "src": "assets/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                },
+                {
+                    "src": "assets/icon-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ],
+            "categories": ["utilities", "productivity"],
+        }
+        (bundle_dir / "manifest.webmanifest").write_text(
+            json.dumps(manifest, indent=2),
+            encoding='utf-8',
+        )
+
+        cache_version = Config.run_id()
+        cache_files = [
+            "./",
+            "./index.html",
+            "./manifest.webmanifest",
+            "./assets/logo.png",
+            "./assets/icon-192.png",
+            "./assets/icon-512.png",
+        ]
+        for filename in [
+            "quality_summary.png",
+            "parameter_compliance_overview.png",
+            "top_attention_stations.png",
+            "station_coverage_map.png",
+            "timeline_parameters.png",
+            "regional_comparison.png",
+            "quality_heatmap.png",
+            "distributions.png",
+        ]:
+            if (bundle_dir / filename).exists():
+                cache_files.append(f"./{filename}")
+
+        service_worker = f"""const CACHE_NAME = 'k-water-guard-ai-{cache_version}';
+const APP_SHELL = {json.dumps(cache_files, indent=2)};
+
+self.addEventListener('install', event => {{
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
+}});
+
+self.addEventListener('activate', event => {{
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+}});
+
+self.addEventListener('fetch', event => {{
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  if (request.mode === 'navigate') {{
+    event.respondWith(
+      fetch(request)
+        .then(response => {{
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+          return response;
+        }})
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }}
+
+  event.respondWith(
+    caches.match(request).then(cached => {{
+      const network = fetch(request).then(response => {{
+        if (response && response.ok) {{
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        }}
+        return response;
+      }}).catch(() => cached);
+      return cached || network;
+    }})
+  );
+}});
+"""
+        (bundle_dir / "sw.js").write_text(service_worker, encoding='utf-8')
+
+    def _write_pwa_icons(self, source, assets_dir):
+        try:
+            from PIL import Image
+            with Image.open(source) as image:
+                image = image.convert("RGBA")
+                for size in [192, 512]:
+                    canvas = Image.new("RGBA", (size, size), (255, 255, 255, 255))
+                    working = image.copy()
+                    working.thumbnail((int(size * 0.82), int(size * 0.82)))
+                    x = (size - working.width) // 2
+                    y = (size - working.height) // 2
+                    canvas.alpha_composite(working, (x, y))
+                    canvas.save(assets_dir / f"icon-{size}.png")
+        except Exception:
+            shutil.copyfile(source, assets_dir / "icon-192.png")
+            shutil.copyfile(source, assets_dir / "icon-512.png")
 
     def _site_asset_url(self, relative_path):
         base_url = str(getattr(Config, 'GITHUB_PAGES_BASE_URL', '') or '').strip()
