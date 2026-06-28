@@ -1,4 +1,4 @@
-"""
+﻿"""
 Water Quality Data Agent
 - Autonomous data collection from Korean water quality sources
 - Automatic data storage and updates
@@ -1177,15 +1177,15 @@ class PlotGenerator:
             
             self.logger.info("Generating plots...")
             self._set_output_date_from_df(df)
+            self._cleanup_removed_plot_files()
             
             # Multiple plot types
-            self._plot_parameters_timeline(df)
             self._plot_regional_comparison(df)
             self._plot_quality_heatmap(df)
             self._plot_parameter_distributions(df)
             self._plot_quality_summary(df)
-            self._plot_parameter_compliance_overview(df)
-            self._plot_top_attention_stations(df)
+            self._plot_water_quality_signal_board(df)
+            self._plot_alert_hotspot_matrix(df)
             self._plot_station_coverage_map(df)
             self._plot_parameter_maps(df)
             
@@ -1208,44 +1208,24 @@ class PlotGenerator:
         plots_dir = Config.daily_plots_dir(date_label or self.output_date_label)
         plots_dir.mkdir(parents=True, exist_ok=True)
         return plots_dir
-    
-    def _plot_parameters_timeline(self, df):
-        """Time series plot of water quality parameters"""
-        try:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
-            fig, axes = plt.subplots(4, 4, figsize=(20, 16))
-            fig.suptitle('Water Quality Parameters - Time Series (Last 7 Days)\nSouth Korea', fontsize=16, fontweight='bold')
-            
-            parameters = ['pH', 'DO', 'BOD', 'COD', 'SS', 'TN', 'TP', 'temperature', 'EC', 'Turbidity', 'Chlorophyll_a', 'Ammonia_N', 'Nitrate_N', 'Phosphate_P']
-            units = ['', 'mg/L', 'mg/L', 'mg/L', 'mg/L', 'mg/L', 'mg/L', '°C', 'μS/cm', 'NTU', 'μg/L', 'mg/L', 'mg/L', 'mg/L']
-            
-            for idx, (param, unit) in enumerate(zip(parameters, units)):
-                ax = axes.flatten()[idx]
-                
-                for region in df['region'].unique():
-                    region_data = df[df['region'] == region].sort_values('timestamp')
-                    location_info = Config.LOCATION_INFO.get(region, {})
-                    label = f"{region} ({location_info.get('type', 'Unknown')})"
-                    ax.plot(region_data['timestamp'], region_data[param], 
-                           marker='o', label=label, linewidth=2, markersize=4)
-                
-                ax.set_title(f'{param} ({unit})', fontweight='bold')
-                ax.set_xlabel('Time')
-                ax.set_ylabel(unit if unit else 'Value')
-                ax.legend(fontsize=8)
-                ax.grid(True, alpha=0.3)
-                ax.tick_params(axis='x', rotation=45)
-            
-            for empty_ax in axes.flatten()[len(parameters):]:
-                empty_ax.remove()
-            
-            plt.tight_layout()
-            plt.savefig(Config.PLOTS_DIR / 'timeline_parameters.png', dpi=300, bbox_inches='tight')
-            plt.close()
-            self.logger.info("Timeline plot saved")
-        except Exception as e:
-            self.logger.error(f"Error in timeline plot: {str(e)}")
+
+    def _cleanup_removed_plot_files(self):
+        active_files = {
+            'quality_summary.png',
+            'water_quality_signal_board.png',
+            'alert_hotspot_matrix.png',
+            'station_coverage_map.png',
+            'regional_comparison.png',
+            'quality_heatmap.png',
+            'distributions.png',
+        }
+        for path in self._plots_dir().glob("*.png"):
+            if path.name in active_files or '_map_' in path.name:
+                continue
+            try:
+                path.unlink()
+            except Exception:
+                pass
     
     def _plot_regional_comparison(self, df):
         """Compare parameters across regions"""
@@ -1260,9 +1240,9 @@ class PlotGenerator:
                 ('DO', 'Dissolved Oxygen (mg/L)'),
                 ('BOD', 'Biochemical Oxygen Demand (mg/L)'),
                 ('TP', 'Total Phosphorus (mg/L)'),
-                ('EC', 'Electrical Conductivity (μS/cm)'),
+                ('EC', 'Electrical Conductivity (關S/cm)'),
                 ('Turbidity', 'Turbidity (NTU)'),
-                ('Chlorophyll_a', 'Chlorophyll-a (μg/L)'),
+                ('Chlorophyll_a', 'Chlorophyll-a (關g/L)'),
                 ('Ammonia_N', 'Ammonia-N (mg/L)')
             ]
             
@@ -1369,41 +1349,6 @@ class PlotGenerator:
         unit = self.PARAMETER_UNITS.get(param, '')
         label = self._format_parameter_label(param)
         return f"{label} ({unit})" if unit else label
-
-    def _plot_parameters_timeline(self, df):
-        """Plot daily mean and median trends instead of one line per station."""
-        try:
-            plot_df = self._prepare_plot_dataframe(df)
-            if plot_df.empty:
-                self.logger.warning("No numeric data available for timeline plot")
-                return
-            parameters = [p for p in self.PLOT_PARAMETERS if plot_df[p].notna().any()]
-            fig, axes = plt.subplots(4, 4, figsize=(14, 11), facecolor='white')
-            fig.suptitle('Daily Water Quality Trends - South Korea Monitoring Network', fontsize=18, fontweight='bold')
-
-            for idx, param in enumerate(parameters):
-                ax = axes.flatten()[idx]
-                daily = plot_df.groupby('date')[param].agg(['mean', 'median']).dropna()
-                if daily.empty:
-                    ax.axis('off')
-                    continue
-                ax.plot(daily.index, daily['mean'], color='#b2182b', marker='o', linewidth=1.8, markersize=4, label='Mean')
-                ax.plot(daily.index, daily['median'], color='#2166ac', marker='s', linewidth=1.2, markersize=3, label='Median')
-                ax.set_title(self._format_axis_label(param), fontweight='bold', fontsize=11)
-                ax.set_ylabel(self.PARAMETER_UNITS.get(param, 'Value') or 'Value')
-                ax.grid(True, color='0.90', linewidth=0.6)
-                ax.tick_params(axis='x', rotation=30)
-                if idx == 0:
-                    ax.legend(frameon=False, fontsize=8)
-
-            for empty_ax in axes.flatten()[len(parameters):]:
-                empty_ax.axis('off')
-            fig.tight_layout(rect=[0, 0, 1, 0.96])
-            fig.savefig(self._plots_dir() / 'timeline_parameters.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
-            self.logger.info("Timeline plot saved")
-        except Exception as e:
-            self.logger.error(f"Error in timeline plot: {str(e)}")
 
     def _plot_regional_comparison(self, df):
         """Plot latest station distributions without thousands of category labels."""
@@ -1531,133 +1476,148 @@ class PlotGenerator:
                     })
         return pd.DataFrame(rows)
 
-    def _plot_parameter_compliance_overview(self, df):
-        """Plot percent of latest station measurements passing each screening rule."""
+    def _plot_water_quality_signal_board(self, df):
+        """Create an operator-friendly status board for core water-quality parameters."""
         try:
             plot_df = self._prepare_plot_dataframe(df)
             latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1)
+            parameters = ['pH', 'DO', 'BOD', 'COD', 'SS', 'TN', 'TP', 'temperature']
+            parameters = [param for param in parameters if param in latest.columns and pd.to_numeric(latest[param], errors='coerce').notna().any()]
+
+            fig, axes = plt.subplots(2, 4, figsize=(14, 7), facecolor='white')
+            fig.suptitle('Water Quality Signal Board', fontsize=20, fontweight='bold', color='#121826')
+            fig.text(0.5, 0.925, 'Latest station averages with screening-rule status', ha='center', fontsize=11, color='#5f6b7a')
+
+            if not parameters:
+                for ax in axes.flatten():
+                    ax.axis('off')
+                axes.flatten()[0].text(0.5, 0.5, 'Waiting for numeric API measurements', ha='center', va='center',
+                                      fontsize=16, fontweight='bold', color='#0047a0')
+            for index, param in enumerate(parameters[:8]):
+                ax = axes.flatten()[index]
+                values = pd.to_numeric(latest[param], errors='coerce').dropna()
+                mean_value = values.mean()
+                rule = Config.WATER_QUALITY_ALERT_RULES.get(param, {})
+                status = 'OK'
+                color = '#0047a0'
+                if self._violates_plot_rule(mean_value, rule):
+                    status = 'ATTENTION' if rule.get('severity') != 'critical' else 'CRITICAL'
+                    color = '#191919' if status == 'ATTENTION' else '#cd2e3a'
+
+                ax.set_facecolor('#f9fbff')
+                ax.add_patch(plt.Rectangle((0.02, 0.02), 0.96, 0.96, transform=ax.transAxes,
+                                           facecolor='white', edgecolor='#d9e1ee', linewidth=1.2))
+                ax.add_patch(plt.Rectangle((0.02, 0.02), 0.025, 0.96, transform=ax.transAxes,
+                                           facecolor=color, edgecolor=color))
+                ax.text(0.10, 0.78, self._format_parameter_label(param), transform=ax.transAxes,
+                        fontsize=13, fontweight='bold', color='#121826')
+                ax.text(0.10, 0.48, f'{mean_value:.2f}', transform=ax.transAxes,
+                        fontsize=26, fontweight='bold', color=color)
+                unit = self.PARAMETER_UNITS.get(param, '')
+                ax.text(0.10, 0.30, f'Average {unit}'.strip(), transform=ax.transAxes,
+                        fontsize=10, color='#5f6b7a')
+                ax.text(0.10, 0.14, status, transform=ax.transAxes,
+                        fontsize=10, fontweight='bold', color='white',
+                        bbox=dict(boxstyle='round,pad=0.35', facecolor=color, edgecolor=color))
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+
+            for ax in axes.flatten()[len(parameters[:8]):]:
+                ax.axis('off')
+
+            fig.tight_layout(rect=[0, 0, 1, 0.90])
+            fig.savefig(self._plots_dir() / 'water_quality_signal_board.png', dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close(fig)
+            self.logger.info("Water quality signal board plot saved")
+        except Exception as e:
+            self.logger.error(f"Error in water quality signal board plot: {str(e)}")
+
+    def _plot_alert_hotspot_matrix(self, df):
+        """Create a parameter-by-province hotspot matrix for quick alert understanding."""
+        try:
+            plot_df = self._prepare_plot_dataframe(df)
+            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1).copy()
+            if 'province' not in latest.columns:
+                latest['province'] = 'Unknown'
+
             rows = []
             for parameter, rule in Config.WATER_QUALITY_ALERT_RULES.items():
                 if parameter not in latest.columns:
                     continue
-                values = pd.to_numeric(latest[parameter], errors='coerce').dropna()
-                if values.empty:
-                    continue
-                passing = pd.Series(True, index=values.index)
-                if rule.get('min') is not None:
-                    passing &= values >= rule.get('min')
-                if rule.get('max') is not None:
-                    passing &= values <= rule.get('max')
-                rows.append({
-                    'parameter': parameter,
-                    'label': self._format_parameter_label(parameter),
-                    'pass_rate': float(passing.mean() * 100),
-                    'pass_count': int(passing.sum()),
-                    'total': int(len(values)),
-                })
-
-            fig, ax = plt.subplots(figsize=(12, 7), facecolor='white')
-            if not rows:
-                ax.text(0.5, 0.55, 'Compliance overview waiting for numeric data', ha='center', va='center',
-                        fontsize=18, fontweight='bold', color='#0047a0')
-                ax.text(0.5, 0.43, 'The chart will fill automatically when the API returns parameter measurements.',
-                        ha='center', va='center', fontsize=12, color='#5f6b7a')
-                ax.axis('off')
-            else:
-                compliance = pd.DataFrame(rows).sort_values('pass_rate')
-                colors = [
-                    '#cd2e3a' if value < 70 else '#191919' if value < 90 else '#0047a0'
-                    for value in compliance['pass_rate']
-                ]
-                ax.barh(compliance['label'], compliance['pass_rate'], color=colors, edgecolor='white')
-                ax.axvline(90, color='#0047a0', linestyle='--', linewidth=1.2, alpha=0.8)
-                ax.axvline(70, color='#cd2e3a', linestyle='--', linewidth=1.2, alpha=0.8)
-                for index, row in enumerate(compliance.itertuples()):
-                    ax.text(
-                        min(99, row.pass_rate + 1),
-                        index,
-                        f'{row.pass_rate:.0f}% ({row.pass_count:,}/{row.total:,})',
-                        va='center',
-                        ha='left',
-                        fontsize=9,
-                        fontweight='bold',
-                        color='#121826',
-                    )
-                ax.set_xlim(0, 108)
-                ax.set_xlabel('Stations within dashboard screening rule (%)')
-                ax.set_ylabel('')
-                ax.set_title('Parameter Compliance Overview', fontsize=18, fontweight='bold')
-                ax.text(90, len(compliance) - 0.25, '90% target', ha='right', va='bottom', fontsize=9, color='#0047a0')
-                ax.grid(True, axis='x', color='0.90')
-                ax.spines[['top', 'right', 'left']].set_visible(False)
-            fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'parameter_compliance_overview.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
-            self.logger.info("Parameter compliance overview plot saved")
-        except Exception as e:
-            self.logger.error(f"Error in parameter compliance overview plot: {str(e)}")
-
-    def _plot_top_attention_stations(self, df):
-        """Rank latest stations by number of screening-rule exceedances."""
-        try:
-            plot_df = self._prepare_plot_dataframe(df)
-            latest = plot_df.sort_values('timestamp').groupby('station_key', dropna=False).tail(1).copy()
-            station_column = 'display_location' if 'display_location' in latest.columns else 'station_key'
-            if latest.empty:
-                self.logger.warning("No latest station data available for station attention ranking")
-                return
-
-            scores = pd.Series(0, index=latest.index, dtype='float64')
-            critical_scores = pd.Series(0, index=latest.index, dtype='float64')
-            for parameter, rule in Config.WATER_QUALITY_ALERT_RULES.items():
-                if parameter not in latest.columns:
-                    continue
                 values = pd.to_numeric(latest[parameter], errors='coerce')
-                violated = pd.Series(False, index=latest.index)
-                if rule.get('min') is not None:
-                    violated |= values < rule.get('min')
-                if rule.get('max') is not None:
-                    violated |= values > rule.get('max')
-                scores += violated.fillna(False).astype(int)
-                if rule.get('severity') == 'critical':
-                    critical_scores += violated.fillna(False).astype(int)
+                for index, value in values.dropna().items():
+                    if self._violates_plot_rule(value, rule):
+                        rows.append({
+                            'province': latest.loc[index].get('province') or 'Unknown',
+                            'parameter': self._format_parameter_label(parameter),
+                            'severity': rule.get('severity', 'warning'),
+                        })
 
-            ranking = pd.DataFrame({
-                'station': latest[station_column].fillna('Unknown').astype(str),
-                'attention': scores.astype(int),
-                'critical': critical_scores.astype(int),
-            })
-            ranking = ranking[ranking['attention'] > 0].sort_values(['critical', 'attention', 'station'], ascending=[False, False, True]).head(15)
-
-            fig, ax = plt.subplots(figsize=(12, 7), facecolor='white')
-            if ranking.empty:
-                ax.text(0.5, 0.55, 'No stations require attention', ha='center', va='center',
+            fig, ax = plt.subplots(figsize=(13, 7), facecolor='white')
+            if not rows:
+                ax.text(0.5, 0.55, 'No current alert hotspots', ha='center', va='center',
                         fontsize=20, fontweight='bold', color='#0047a0')
-                ax.text(0.5, 0.42, 'Latest station measurements are within configured screening rules.',
+                ax.text(0.5, 0.42, 'Hotspot bubbles will appear when station values exceed configured rules.',
                         ha='center', va='center', fontsize=12, color='#5f6b7a')
                 ax.axis('off')
             else:
-                ranking = ranking.sort_values('attention')
-                labels = [label if len(label) <= 42 else label[:39] + '...' for label in ranking['station']]
-                attention_only = (ranking['attention'] - ranking['critical']).clip(lower=0)
-                ax.barh(labels, attention_only, color='#191919', edgecolor='white', label='Attention')
-                ax.barh(labels, ranking['critical'], left=attention_only, color='#cd2e3a', edgecolor='white', label='Critical')
-                totals = ranking['attention'].to_numpy()
-                for index, total in enumerate(totals):
-                    ax.text(total + 0.08, index, f'{int(total)} flags', va='center', ha='left', fontsize=9, fontweight='bold')
-                ax.set_xlabel('Number of parameters outside rule')
-                ax.set_ylabel('')
-                ax.set_title('Top Stations Requiring Attention', fontsize=18, fontweight='bold')
-                ax.grid(True, axis='x', color='0.90')
-                ax.legend(frameon=False, loc='lower right')
-                ax.spines[['top', 'right', 'left']].set_visible(False)
+                hotspot_df = pd.DataFrame(rows)
+                grouped = (
+                    hotspot_df.groupby(['province', 'parameter', 'severity'])
+                    .size()
+                    .reset_index(name='count')
+                )
+                top_provinces = hotspot_df['province'].value_counts().head(8).index.tolist()
+                top_parameters = hotspot_df['parameter'].value_counts().head(8).index.tolist()
+                grouped = grouped[grouped['province'].isin(top_provinces) & grouped['parameter'].isin(top_parameters)]
+
+                province_lookup = {value: index for index, value in enumerate(top_provinces)}
+                parameter_lookup = {value: index for index, value in enumerate(top_parameters)}
+                grouped['x'] = grouped['parameter'].map(parameter_lookup)
+                grouped['y'] = grouped['province'].map(province_lookup)
+                grouped['size'] = grouped['count'].clip(lower=1) * 65
+                grouped['color'] = grouped['severity'].map({'critical': '#cd2e3a'}).fillna('#191919')
+
+                ax.scatter(grouped['x'], grouped['y'], s=grouped['size'], c=grouped['color'],
+                           alpha=0.78, edgecolor='white', linewidth=1.2)
+                for row in grouped.itertuples():
+                    ax.text(row.x, row.y, str(int(row.count)), ha='center', va='center',
+                            fontsize=9, fontweight='bold', color='white')
+
+                ax.set_xticks(range(len(top_parameters)))
+                ax.set_xticklabels(top_parameters, rotation=30, ha='right')
+                ax.set_yticks(range(len(top_provinces)))
+                ax.set_yticklabels(top_provinces)
+                ax.set_title('Alert Hotspot Matrix', fontsize=18, fontweight='bold')
+                ax.set_xlabel('Parameter')
+                ax.set_ylabel('Province')
+                ax.grid(True, color='#e7eefb', linewidth=0.8)
+                ax.set_axisbelow(True)
+                ax.spines[['top', 'right']].set_visible(False)
+                ax.text(0.99, 1.02, 'Bubble size = alert rows', transform=ax.transAxes,
+                        ha='right', va='bottom', fontsize=10, color='#5f6b7a')
+
             fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'top_attention_stations.png', dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(self._plots_dir() / 'alert_hotspot_matrix.png', dpi=300, bbox_inches='tight', facecolor='white')
             plt.close(fig)
-            self.logger.info("Top attention stations plot saved")
+            self.logger.info("Alert hotspot matrix plot saved")
         except Exception as e:
-            self.logger.error(f"Error in top attention stations plot: {str(e)}")
-    
+            self.logger.error(f"Error in alert hotspot matrix plot: {str(e)}")
+
+    def _violates_plot_rule(self, value, rule):
+        try:
+            if pd.isna(value):
+                return False
+            if rule.get('min') is not None and value < rule.get('min'):
+                return True
+            if rule.get('max') is not None and value > rule.get('max'):
+                return True
+            return False
+        except Exception:
+            return False
+
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
         try:
@@ -3131,10 +3091,9 @@ class DashboardGenerator:
         plots_dir = Config.daily_plots_dir(date_label)
         plot_specs = [
             ('quality_summary.png', 'Quality Summary'),
-            ('parameter_compliance_overview.png', 'Parameter Compliance Overview'),
-            ('top_attention_stations.png', 'Top Attention Stations'),
+            ('water_quality_signal_board.png', 'Water Quality Signal Board'),
+            ('alert_hotspot_matrix.png', 'Alert Hotspot Matrix'),
             ('station_coverage_map.png', 'Station Coverage Map'),
-            ('timeline_parameters.png', 'Parameter Timeline'),
             ('regional_comparison.png', 'Station Distributions'),
             ('quality_heatmap.png', 'Daily Mean Heatmap'),
             ('distributions.png', 'Parameter Distributions'),
@@ -3313,10 +3272,7 @@ class DashboardGenerator:
         ]
         for filename in [
             "quality_summary.png",
-            "parameter_compliance_overview.png",
-            "top_attention_stations.png",
             "station_coverage_map.png",
-            "timeline_parameters.png",
             "regional_comparison.png",
             "quality_heatmap.png",
             "distributions.png",
@@ -3424,7 +3380,7 @@ class WaterQualityAgent:
         self.scheduler = BackgroundScheduler() if APSCHEDULER_AVAILABLE else None
     
     def execute_cycle(self):
-        """Execute one complete cycle: collect → store → visualize"""
+        """Execute one complete cycle: collect ??store ??visualize"""
         try:
             self.logger.info("=" * 50)
             self.logger.info("Starting Water Quality Agent Cycle")
@@ -3521,3 +3477,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
