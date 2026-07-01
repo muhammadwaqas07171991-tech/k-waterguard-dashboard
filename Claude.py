@@ -16,6 +16,8 @@ import struct
 import shutil
 import html
 import base64
+import argparse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -121,6 +123,16 @@ class Config:
         "",
     )
     CHATBOT_ENABLED = os.environ.get("CHATBOT_ENABLED", "true").lower() not in {"0", "false", "no"}
+    # Local OpenAI-compatible chatbot backend settings. Keep the API key in an
+    # environment variable; never write it into dashboard HTML or frontend JS.
+    LOCAL_OPENAI_BASE_URL = os.environ.get(
+        "LOCAL_OPENAI_BASE_URL",
+        "https://crouton-hankie-shelve.ngrok-free.dev",
+    ).rstrip("/")
+    LOCAL_OPENAI_API_KEY = os.environ.get("LOCAL_OPENAI_API_KEY", "")
+    LOCAL_OPENAI_MODEL = os.environ.get("LOCAL_OPENAI_MODEL", "").strip()
+    LOCAL_CHATBOT_HOST = os.environ.get("LOCAL_CHATBOT_HOST", "127.0.0.1")
+    LOCAL_CHATBOT_PORT = int(os.environ.get("LOCAL_CHATBOT_PORT", "8765"))
     WATER_QUALITY_ALERT_RULES = {
         # Korean environmental water-quality screening targets. Defaults are conservative
         # dashboard alerts and can be adjusted if a station has a stricter designated class.
@@ -3454,9 +3466,203 @@ class WaterQualityAgent:
         locations_str = ', '.join([f"{r} ({Config.LOCATION_INFO.get(r, {}).get('type', '')})" for r in Config.MONITORING_REGIONS])
         self.logger.info(f"Monitoring Locations: {locations_str}")
 
+
+# ==================== LOCAL CHATBOT BACKEND ====================
+def _json_response(handler, status_code, payload):
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _local_ai_url(path):
+    base = Config.LOCAL_OPENAI_BASE_URL.rstrip("/")
+    return f"{base}{path}"
+
+
+def _local_ai_headers():
+    headers = {"Content-Type": "application/json"}
+    if Config.LOCAL_OPENAI_API_KEY:
+        headers["Authorization"] = f"Bearer {Config.LOCAL_OPENAI_API_KEY}"
+    return headers
+
+
+def _dashboard_context(limit=8):
+    if not Config.CSV_FILE.exists():
+        return "No CSV records are available yet. Run the water-quality agent once to collect dashboard data."
+    try:
+        df = pd.read_csv(Config.CSV_FILE)
+        if df.empty:
+            return "The CSV exists, but it does not contain records yet."
+        latest_date = ""
+        if "date" in df.columns:
+            latest_date = str(df["date"].dropna().iloc[-1]) if not df["date"].dropna().empty else ""
+        latest = df.tail(limit)
+        columns = [
+            column for column in [
+                "date", "display_location", "station_name", "station_code", "pH", "DO",
+                "BOD", "COD", "SS", "TN", "TP", "temperature", "Turbidity"
+            ] if column in latest.columns
+        ]
+        rows = latest[columns].fillna("").to_dict(orient="records") if columns else latest.fillna("").to_dict(orient="records")
+        return (
+            f"Latest CSV date: {latest_date or 'not available'}\n"
+            f"Total records: {len(df)}\n"
+            f"Recent records: {json.dumps(rows, ensure_ascii=False)}"
+        )
+    except Exception as exc:
+        return f"CSV context could not be loaded: {exc}"
+
+
+def _get_local_ai_model():
+    if Config.LOCAL_OPENAI_MODEL:
+        return Config.LOCAL_OPENAI_MODEL
+    for path in ("/v1/models", "/api/models"):
+        try:
+            response = requests.get(_local_ai_url(path), headers=_local_ai_headers(), timeout=20)
+            if not response.ok:
+                continue
+            data = response.json()
+            models = data.get("data", data if isinstance(data, list) else [])
+            if isinstance(models, dict):
+                models = models.get("models", [])
+            if models:
+                first = models[0]
+                if isinstance(first, dict):
+                    return first.get("id") or first.get("name") or "local-model"
+                return str(first)
+        except Exception:
+            continue
+    return "local-model"
+
+
+def _ask_local_ai(question, dashboard_url="", latest_date=""):
+    if not Config.LOCAL_OPENAI_API_KEY:
+        raise RuntimeError("LOCAL_OPENAI_API_KEY is not set. Set it in your environment before starting the chatbot backend.")
+    if not question:
+        raise ValueError("Question is required.")
+
+    model = _get_local_ai_model()
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are K-Water Guard AI, a concise assistant for a South Korea water-quality dashboard. "
+                "Answer using the provided dashboard and CSV context when relevant. "
+                "If the data is missing, say what is missing and suggest the next practical step."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Dashboard URL: {dashboard_url or 'not provided'}\n"
+                f"Dashboard latest date from browser: {latest_date or 'not provided'}\n"
+                f"{_dashboard_context()}\n\n"
+                f"User question: {question}"
+            ),
+        },
+    ]
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": 700,
+    }
+
+    errors = []
+    for path in ("/v1/chat/completions", "/api/chat/completions"):
+        try:
+            response = requests.post(_local_ai_url(path), headers=_local_ai_headers(), json=payload, timeout=90)
+            if response.status_code == 404:
+                errors.append(f"{path}: HTTP 404")
+                continue
+            response.raise_for_status()
+            data = response.json()
+            choices = data.get("choices") or []
+            if choices:
+                message = choices[0].get("message", {})
+                answer = message.get("content") or choices[0].get("text")
+                if answer:
+                    return answer.strip()
+            if data.get("answer"):
+                return str(data["answer"]).strip()
+            raise RuntimeError("Local AI returned no assistant message.")
+        except Exception as exc:
+            errors.append(f"{path}: {exc}")
+    raise RuntimeError("Local AI request failed. " + " | ".join(errors))
+
+
+class LocalChatbotHandler(BaseHTTPRequestHandler):
+    server_version = "KWaterGuardLocalChatbot/1.0"
+
+    def log_message(self, format, *args):
+        logging.getLogger("LocalChatbot").info(format, *args)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_POST(self):
+        if self.path.rstrip("/") != "/api/chat":
+            _json_response(self, 404, {"error": {"message": "Use POST /api/chat"}})
+            return
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(content_length).decode("utf-8")
+            payload = json.loads(body or "{}")
+            answer = _ask_local_ai(
+                str(payload.get("question", "")).strip(),
+                dashboard_url=str(payload.get("dashboardUrl", "")).strip(),
+                latest_date=str(payload.get("latestDate", "")).strip(),
+            )
+            _json_response(self, 200, {"answer": answer})
+        except Exception as exc:
+            _json_response(self, 500, {"error": {"message": str(exc)}})
+
+
+def run_local_chatbot_backend():
+    """Run a local proxy so the browser never receives the local AI API key."""
+    setup_environment()
+    host = Config.LOCAL_CHATBOT_HOST
+    port = Config.LOCAL_CHATBOT_PORT
+    server = ThreadingHTTPServer((host, port), LocalChatbotHandler)
+    print("\n" + "=" * 60)
+    print("K-Water Guard local chatbot backend")
+    print(f"Backend URL: http://{host}:{port}/api/chat")
+    print(f"Local AI base URL: {Config.LOCAL_OPENAI_BASE_URL}")
+    print("API key loaded:", "yes" if bool(Config.LOCAL_OPENAI_API_KEY) else "no")
+    print("Keep this window open while using the dashboard chatbot.")
+    print("=" * 60 + "\n")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping local chatbot backend...")
+    finally:
+        server.server_close()
+
+
 # ==================== MAIN ====================
 def main():
     """Entry point for the Water Quality Agent"""
+    parser = argparse.ArgumentParser(description="K-Water Guard AI data agent and local chatbot backend")
+    parser.add_argument(
+        "--serve-chatbot",
+        action="store_true",
+        help="Start the secure local chatbot proxy at /api/chat instead of running the data agent.",
+    )
+    args = parser.parse_args()
+    if args.serve_chatbot:
+        run_local_chatbot_backend()
+        return
+
     setup_environment()
     agent = WaterQualityAgent()
     
