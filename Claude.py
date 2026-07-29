@@ -3419,6 +3419,511 @@ class DashboardGenerator:
       .nav-tabs {{ position: static; }}
       .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps {{ grid-template-columns: 1fr; }}
     }}
+
+    /* K-WaterGuard command-center template v6.
+       Design direction follows current analytics dashboard patterns: compact app shell,
+       dense KPI strip, chart-first pages, reduced decorative whitespace, and clear active navigation. */
+    :root {{
+      --bg: #eef5fb;
+      --surface: #ffffff;
+      --surface-2: #f6faff;
+      --ink: #071426;
+      --muted: #5b6a7f;
+      --line: #d7e3f2;
+      --blue: #0047a0;
+      --blue-deep: #042f67;
+      --blue-soft: #eaf3ff;
+      --red: #cd2e3a;
+      --red-soft: #fff0f3;
+      --black: #101828;
+      --shadow: 0 14px 36px rgba(15, 39, 72, .10);
+      --shadow-hover: 0 22px 56px rgba(15, 39, 72, .15);
+    }}
+    html {{ scroll-behavior: smooth; }}
+    body {{
+      background:
+        linear-gradient(135deg, rgba(239,247,255,.96), rgba(255,255,255,.92) 46%, rgba(255,246,248,.90)),
+        linear-gradient(180deg, #f8fbff, #edf4fb);
+      color: var(--ink);
+    }}
+    header {{
+      min-height: 154px;
+      padding: 18px 24px 16px;
+      align-items: center;
+      border-bottom: 1px solid rgba(0,71,160,.16);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.93) 45%, rgba(235,246,255,.73) 72%, rgba(0,71,160,.18)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    header .wrap {{
+      width: min(1760px, calc(100% - 44px));
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px 22px;
+      align-items: center;
+    }}
+    .topline {{
+      display: contents;
+    }}
+    .brand {{
+      grid-column: 1;
+      width: max-content;
+      min-height: 48px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(0,71,160,.14);
+      box-shadow: 0 10px 24px rgba(15,39,72,.09);
+    }}
+    .brand-logo {{ width: 34px; height: 34px; }}
+    .brand-name {{ font-size: 18px; color: var(--blue-deep); }}
+    .badge {{
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+      min-height: 36px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: #fff;
+      color: var(--red);
+      box-shadow: 0 10px 24px rgba(15,39,72,.08);
+    }}
+    h1 {{
+      grid-column: 1;
+      margin: 0;
+      max-width: none;
+      font-size: clamp(34px, 3.1vw, 58px);
+      line-height: .98;
+      color: var(--blue);
+    }}
+    .subtitle {{
+      grid-column: 1 / -1;
+      max-width: 980px;
+      margin: -6px 0 0;
+      font-size: clamp(15px, 1vw, 18px);
+      line-height: 1.28;
+      color: #142943;
+      font-weight: 700;
+    }}
+    main.wrap {{
+      width: min(1760px, calc(100% - 44px));
+      padding-top: 14px;
+      padding-bottom: 28px;
+    }}
+    body.page-data main.wrap,
+    body.page-spatial main.wrap {{
+      display: grid;
+      grid-template-columns: minmax(380px, .78fr) minmax(0, 1.22fr);
+      gap: 12px;
+      align-items: start;
+    }}
+    body.page-data .nav-tabs,
+    body.page-data .toolbar,
+    body.page-data .search-status,
+    body.page-spatial .nav-tabs,
+    body.page-spatial .toolbar,
+    body.page-spatial .search-status {{
+      grid-column: 1 / -1;
+    }}
+    body.page-data #historicalDownloads,
+    body.page-data #historicalDataPage,
+    body.page-spatial .section {{
+      margin-top: 0;
+    }}
+    body.page-spatial #latestCharts,
+    body.page-spatial #spatialParameterMaps,
+    body.page-spatial #stationMeasurements {{
+      grid-column: 1 / -1;
+    }}
+    .nav-tabs {{
+      position: sticky;
+      top: 8px;
+      z-index: 20;
+      width: 100%;
+      margin: 0 0 14px;
+      padding: 7px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 6px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(215,227,242,.92);
+      box-shadow: 0 12px 34px rgba(15,39,72,.10);
+      backdrop-filter: blur(18px);
+    }}
+    .nav-tabs a {{
+      min-height: 40px;
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #18385f;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0;
+      transition: background .16s ease, color .16s ease, transform .16s ease;
+    }}
+    .nav-tabs a:hover {{
+      background: var(--blue-soft);
+      transform: translateY(-1px);
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-data .nav-tabs a[href="data.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"] {{
+      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(0,71,160,.22);
+    }}
+    .toolbar {{
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 8px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(215,227,242,.9);
+      box-shadow: 0 10px 30px rgba(15,39,72,.08);
+    }}
+    .search {{
+      min-height: 42px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      background: #fff;
+      border: 1px solid rgba(0,71,160,.15);
+      font-size: 15px;
+    }}
+    .button {{
+      min-height: 42px;
+      padding: 9px 13px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+      color: #fff;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(0,71,160,.20);
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }}
+    .button:hover {{
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(0,71,160,.25);
+    }}
+    .search-status {{
+      margin: 8px 4px 12px;
+      min-height: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }}
+    .card {{
+      border-radius: 8px;
+      border: 1px solid rgba(215,227,242,.96);
+      background: rgba(255,255,255,.95);
+      box-shadow: var(--shadow);
+    }}
+    .section {{
+      margin-top: 12px;
+      padding: clamp(16px, 1.35vw, 24px);
+    }}
+    h2 {{
+      margin: 0 0 12px;
+      font-size: clamp(22px, 1.55vw, 30px);
+      line-height: 1.08;
+      color: var(--ink);
+    }}
+    h3 {{
+      margin: 0 0 10px;
+      font-size: clamp(16px, 1vw, 20px);
+      line-height: 1.14;
+      color: var(--ink);
+    }}
+    body.page-home .toolbar,
+    body.page-home .search-status,
+    body.page-home .insight-rail {{
+      display: none !important;
+    }}
+    #agentOverview.card {{
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }}
+    .home-overview {{
+      min-height: 0;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+      gap: 14px;
+      padding: 18px;
+      border-radius: 8px;
+      background:
+        linear-gradient(115deg, rgba(3,30,69,.94), rgba(0,71,160,.83) 54%, rgba(205,46,58,.80)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+      box-shadow: 0 18px 48px rgba(6,34,72,.18);
+    }}
+    .overview-panel {{
+      padding: clamp(16px, 1.6vw, 24px);
+      border-radius: 8px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.23);
+      box-shadow: 0 18px 42px rgba(0,0,0,.12);
+      backdrop-filter: blur(14px);
+    }}
+    .overview-kicker {{
+      margin-bottom: 7px;
+      font-size: 11px;
+      letter-spacing: .08em;
+    }}
+    .home-overview h2 {{
+      margin-bottom: 10px;
+      font-size: clamp(26px, 2.2vw, 40px);
+      line-height: 1.04;
+    }}
+    .home-overview p,
+    .home-overview li {{
+      font-size: 15px;
+      line-height: 1.38;
+    }}
+    .overview-list {{
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }}
+    .page-actions {{
+      margin-top: 12px;
+      gap: 8px;
+    }}
+    .page-actions .button,
+    .home-overview .history-link {{
+      min-height: 38px;
+      background: #fff;
+      color: var(--blue);
+      box-shadow: 0 8px 18px rgba(0,0,0,.10);
+    }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }}
+    .stat {{
+      min-height: 92px;
+      padding: 13px 14px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, #fff, #f8fbff);
+      border-top: 0;
+      position: relative;
+    }}
+    .stat::before {{
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: var(--blue);
+    }}
+    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
+    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
+    .label {{
+      color: #66758a;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }}
+    .value {{
+      margin-top: 5px;
+      font-size: clamp(22px, 1.65vw, 34px);
+      line-height: 1.02;
+      color: var(--blue);
+      overflow-wrap: anywhere;
+    }}
+    .capability-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .capability-card {{
+      min-height: 118px;
+      padding: 15px;
+      border-top: 0;
+      position: relative;
+      background: linear-gradient(180deg, #fff, #f7fbff);
+    }}
+    .capability-card::before {{
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--blue);
+    }}
+    .capability-card:nth-child(even)::before {{ background: var(--red); }}
+    .capability-card h3 {{
+      margin-bottom: 6px;
+      font-size: 17px;
+    }}
+    .capability-card p {{
+      font-size: 14px;
+      line-height: 1.36;
+    }}
+    .two-col {{
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      gap: 12px;
+    }}
+    .three-col {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .param-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .param {{
+      min-height: 118px;
+      padding: 14px;
+      border-left: 0;
+      background: linear-gradient(180deg, #fff, #f8fbff);
+    }}
+    .param::before {{
+      content: "";
+      display: block;
+      height: 3px;
+      width: 42px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+      background: var(--blue);
+    }}
+    .param.warn::before {{ background: var(--black); }}
+    .param.bad::before {{ background: var(--red); }}
+    .param:hover {{
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+    }}
+    .param-value {{
+      margin: 7px 0 3px;
+      font-size: clamp(22px, 1.55vw, 30px);
+      line-height: 1;
+    }}
+    .param-action {{
+      margin-top: 7px;
+      font-size: 12px;
+    }}
+    .alert-pill {{
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+    }}
+    .plots {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    body.page-trends .plots,
+    body.page-algal .plots {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    .spatial-maps {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    .plot {{
+      overflow: hidden;
+      background: #fff;
+    }}
+    .plot h3 {{
+      margin: 0;
+      padding: 10px 12px;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(215,227,242,.86);
+      background: linear-gradient(90deg, #f1f7ff, #ffffff);
+      color: #10233f;
+      font-size: 15px;
+    }}
+    .plot img {{
+      width: 100%;
+      padding: 8px;
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+    }}
+    .table-wrap {{
+      max-height: 460px;
+      border-radius: 8px;
+      border: 1px solid rgba(215,227,242,.92);
+      background: #fff;
+    }}
+    body.page-data .table-wrap,
+    body.page-spatial #stationMeasurements .table-wrap {{
+      max-height: 620px;
+    }}
+    table {{
+      font-size: 14px;
+    }}
+    th {{
+      padding: 10px 12px;
+      background: linear-gradient(180deg, #eef6ff, #e4effb);
+      color: #10233f;
+      font-weight: 900;
+    }}
+    td {{
+      padding: 9px 12px;
+      color: #213149;
+    }}
+    tbody tr:nth-child(even) {{ background: #fbfdff; }}
+    tbody tr:hover {{ background: #f3f8ff; }}
+    .history-link {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 7px 10px;
+      margin: 2px 5px 2px 0;
+      border-radius: 7px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-weight: 900;
+    }}
+    .history-link:hover {{
+      background: var(--blue);
+      color: #fff;
+      text-decoration: none;
+    }}
+    footer {{
+      width: min(1760px, calc(100% - 44px));
+      margin: 0 auto 20px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(215,227,242,.86);
+      box-shadow: 0 10px 26px rgba(15,39,72,.07);
+      font-size: 12px;
+    }}
+    .chat-launch {{
+      right: 18px;
+      bottom: 18px;
+      min-height: 46px;
+      border-radius: 999px;
+    }}
+    @media (max-width: 1280px) {{
+      body.page-data main.wrap,
+      body.page-spatial main.wrap {{ display: block; }}
+      .stats {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+      .capability-grid, .param-grid, .plots, .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      body.page-trends .plots, body.page-algal .plots {{ grid-template-columns: 1fr; }}
+      .two-col, .home-overview {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 760px) {{
+      header .wrap, main.wrap, .wrap, footer {{ width: min(100% - 24px, 1760px); }}
+      header {{ min-height: 150px; padding: 14px 12px; }}
+      header .wrap {{ grid-template-columns: 1fr; }}
+      .badge {{ grid-column: 1; grid-row: auto; justify-self: start; }}
+      h1 {{ font-size: 34px; }}
+      .nav-tabs {{ position: static; grid-template-columns: 1fr; }}
+      .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps, .three-col {{ grid-template-columns: 1fr; }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -3624,12 +4129,12 @@ class DashboardGenerator:
       <div class="grid plots">{plot_cards}</div>
     </section>
 
-    <section class="card section page page-spatial">
+    <section class="card section page page-spatial" id="spatialParameterMaps">
       <h2>Spatial Parameter Maps</h2>
       <div class="grid spatial-maps">{spatial_map_cards}</div>
     </section>
 
-    <section class="card section page page-spatial">
+    <section class="card section page page-spatial" id="stationMeasurements">
       <h2>Latest Station Measurements</h2>
       <div class="table-wrap">
         <table id="stationTable">
