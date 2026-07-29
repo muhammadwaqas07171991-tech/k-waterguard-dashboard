@@ -2900,6 +2900,328 @@ class DashboardGenerator:
       .nav-tabs {{ position: static; }}
       .nav-tabs a {{ flex: 1 1 auto; text-align: center; }}
     }}
+
+    /* K-WaterGuard professional template v4. */
+    :root {{
+      --bg: #f3f7fc;
+      --panel: rgba(255,255,255,.96);
+      --panel-solid: #ffffff;
+      --panel-soft: #f7fbff;
+      --ink: #071426;
+      --muted: #56677d;
+      --line: #d8e3f1;
+      --blue: #0047a0;
+      --blue-deep: #052e66;
+      --blue-soft: #edf5ff;
+      --red: #cd2e3a;
+      --red-soft: #fff1f3;
+      --black: #101828;
+      --shadow: 0 18px 45px rgba(20, 44, 78, .10);
+      --shadow-hover: 0 26px 60px rgba(20, 44, 78, .16);
+    }}
+    body {{
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.98), rgba(239,247,255,.94) 48%, rgba(255,245,247,.82)),
+        radial-gradient(circle at 9% 16%, rgba(0,71,160,.10), transparent 26%),
+        radial-gradient(circle at 93% 6%, rgba(205,46,58,.09), transparent 25%);
+      color: var(--ink);
+    }}
+    header {{
+      min-height: 285px;
+      border-bottom: 1px solid rgba(0,71,160,.14);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.90) 43%, rgba(235,246,255,.70) 68%, rgba(0,71,160,.18)),
+        linear-gradient(135deg, rgba(205,46,58,.12), transparent 36%),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    .wrap {{ width: min(1480px, calc(100% - 48px)); }}
+    .brand {{
+      border-radius: 8px;
+      border: 1px solid rgba(0,71,160,.13);
+      box-shadow: 0 10px 28px rgba(20,44,78,.10);
+    }}
+    .brand-logo {{ border-radius: 4px; }}
+    .badge {{
+      border-radius: 8px;
+      background: #fff;
+      color: var(--red);
+      box-shadow: 0 10px 26px rgba(20,44,78,.08);
+    }}
+    h1 {{
+      font-size: clamp(44px, 5.2vw, 78px);
+      line-height: .98;
+      letter-spacing: 0;
+      max-width: 940px;
+      text-wrap: balance;
+    }}
+    .subtitle {{
+      max-width: 980px;
+      font-size: clamp(17px, 1.35vw, 23px);
+      line-height: 1.28;
+      color: #13243a;
+      text-wrap: balance;
+    }}
+    main.wrap {{
+      padding-top: 28px;
+    }}
+    .nav-tabs {{
+      position: sticky;
+      top: 12px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 8px;
+      margin-bottom: 22px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(216,227,241,.95);
+      box-shadow: 0 16px 40px rgba(20,44,78,.10);
+      backdrop-filter: blur(16px);
+    }}
+    .nav-tabs a {{
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 7px;
+      padding: 10px 15px;
+      color: #18385f;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-data .nav-tabs a[href="data.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"] {{
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(0,71,160,.20);
+    }}
+    .toolbar {{
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(216,227,241,.95);
+      box-shadow: var(--shadow);
+    }}
+    .search {{
+      min-height: 50px;
+      border-radius: 8px;
+      border-color: rgba(0,71,160,.17);
+      font-size: 16px;
+    }}
+    .button {{
+      border-radius: 8px;
+      min-height: 46px;
+      font-weight: 800;
+      background: var(--blue);
+      box-shadow: 0 12px 24px rgba(0,71,160,.18);
+    }}
+    .button:hover {{
+      background: var(--blue-deep);
+      transform: translateY(-1px);
+    }}
+    .card {{
+      border-radius: 8px;
+      border: 1px solid rgba(216,227,241,.96);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }}
+    .section {{
+      padding: clamp(22px, 2.4vw, 36px);
+      margin-top: 22px;
+    }}
+    .section:hover, .capability-card:hover, .param:hover {{
+      box-shadow: var(--shadow-hover);
+    }}
+    h2 {{
+      font-size: clamp(25px, 2.1vw, 36px);
+      line-height: 1.08;
+      color: var(--ink);
+      margin-bottom: 18px;
+    }}
+    h3 {{
+      font-size: clamp(18px, 1.35vw, 24px);
+      line-height: 1.15;
+      color: var(--ink);
+    }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(150px, 1fr));
+      gap: 14px;
+    }}
+    .stat {{
+      min-height: 126px;
+      padding: 18px;
+      position: relative;
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
+      border-top: 0;
+    }}
+    .stat::before {{
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      background: var(--blue);
+    }}
+    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
+    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
+    .value {{
+      font-size: clamp(30px, 2.3vw, 44px);
+      line-height: .98;
+      color: var(--blue);
+    }}
+    .label {{
+      font-weight: 800;
+      color: #637287;
+    }}
+    .home-overview {{
+      min-height: 470px;
+      border-radius: 8px;
+      padding: clamp(30px, 4vw, 58px);
+      background:
+        linear-gradient(115deg, rgba(4,33,74,.96), rgba(0,71,160,.84) 50%, rgba(205,46,58,.82)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+      box-shadow: var(--shadow-hover);
+    }}
+    .overview-panel {{
+      border-radius: 8px;
+      padding: clamp(20px, 2.2vw, 30px);
+      background: rgba(255,255,255,.13);
+      border: 1px solid rgba(255,255,255,.24);
+      box-shadow: 0 20px 58px rgba(0,0,0,.15);
+    }}
+    .overview-kicker {{
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.82);
+    }}
+    .home-overview h2 {{
+      font-size: clamp(34px, 3vw, 54px);
+      color: white;
+    }}
+    .home-overview p, .home-overview li {{
+      font-size: 17px;
+      line-height: 1.45;
+    }}
+    .page-actions .button, .home-overview .history-link {{
+      background: #ffffff;
+      color: var(--blue);
+    }}
+    .capability-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }}
+    .capability-card {{
+      min-height: 180px;
+      padding: 22px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }}
+    .param-grid {{
+      gap: 14px;
+    }}
+    .param {{
+      min-height: 164px;
+      border-left: 0;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }}
+    .param::before {{
+      content: "";
+      display: block;
+      height: 4px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      background: var(--blue);
+    }}
+    .param.warn::before {{ background: var(--black); }}
+    .param.bad::before {{ background: var(--red); }}
+    .param-value {{
+      font-size: clamp(24px, 2vw, 34px);
+      color: var(--ink);
+    }}
+    .plots, .spatial-maps {{
+      gap: 18px;
+    }}
+    .plot h3 {{
+      margin: 0;
+      padding: 15px 16px;
+      background: linear-gradient(90deg, var(--blue-soft), #fff);
+    }}
+    .plot img {{
+      border-top: 1px solid rgba(216,227,241,.9);
+      background: #fff;
+    }}
+    .table-wrap {{
+      border-radius: 8px;
+      border: 1px solid rgba(216,227,241,.95);
+      background: #fff;
+      max-height: 560px;
+    }}
+    table {{
+      font-size: 15px;
+    }}
+    th {{
+      background: linear-gradient(180deg, #edf5ff, #e5effc);
+      color: #10233f;
+      padding: 13px 14px;
+      font-weight: 800;
+    }}
+    td {{
+      padding: 12px 14px;
+      color: #213149;
+    }}
+    tbody tr:hover {{ background: #f8fbff; }}
+    .history-link {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 11px;
+      margin: 3px 6px 3px 0;
+      border-radius: 7px;
+      background: var(--blue-soft);
+      color: var(--blue);
+    }}
+    .history-link:hover {{
+      background: var(--blue);
+      color: #fff;
+      text-decoration: none;
+    }}
+    .alert-pill {{
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-weight: 800;
+    }}
+    footer {{
+      width: min(1480px, calc(100% - 48px));
+      margin: 0 auto 28px;
+      padding: 16px 18px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(216,227,241,.86);
+      box-shadow: 0 10px 30px rgba(20,44,78,.07);
+    }}
+    .chat-launch {{
+      border-radius: 8px;
+      min-height: 50px;
+      box-shadow: 0 18px 34px rgba(0,71,160,.24);
+    }}
+    .chat-panel {{
+      border-radius: 8px;
+      box-shadow: 0 24px 70px rgba(20,44,78,.22);
+    }}
+    @media (max-width: 1180px) {{
+      .stats, .capability-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+      .param-grid, .plots, .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+    }}
+    @media (max-width: 820px) {{
+      .wrap, footer {{ width: min(100% - 24px, 1480px); }}
+      .stats, .capability-grid, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr; }}
+      .toolbar {{ grid-template-columns: 1fr; }}
+      .nav-tabs {{ position: static; width: 100%; }}
+      .nav-tabs a {{ flex: 1 1 160px; justify-content: center; }}
+      header {{ min-height: 250px; padding: 22px 12px; }}
+    }}
   </style>
 </head>
 <body class="page-home">
