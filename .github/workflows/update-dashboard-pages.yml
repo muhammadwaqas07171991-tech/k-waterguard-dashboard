@@ -2,7 +2,7 @@ name: Update Water Dashboard Pages
 
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "7 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,7 @@ jobs:
     env:
       WATER_QUALITY_DATA_DIR: ${{ github.workspace }}/water_quality_data
       GITHUB_PAGES_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+      TZ: Asia/Seoul
 
     steps:
       - name: Checkout repository
@@ -34,7 +35,40 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Restore historical water data cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            water_quality_data/water_quality_records.csv
+            water_quality_data/run_archives
+            water_quality_data/daily_outputs/*/runs
+          key: water-quality-data-${{ github.run_id }}
+          restore-keys: |
+            water-quality-data-
+
+      - name: Verify dashboard support datasets
+        run: |
+          test -s dashboard_static_data/historical_annual_station_measurements.csv
+          test -s dashboard_static_data/south_korea_water_quality_station_metadata.csv
+          test -s dashboard_static_data/download_manifest.json
+          test -s HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv
+          test -s HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv
+          python - <<'PY'
+          from pathlib import Path
+          files = [
+              Path("dashboard_static_data/historical_annual_station_measurements.csv"),
+              Path("dashboard_static_data/south_korea_water_quality_station_metadata.csv"),
+              Path("dashboard_static_data/download_manifest.json"),
+              Path("HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv"),
+              Path("HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv"),
+          ]
+          for path in files:
+              print(f"{path}: {path.stat().st_size:,} bytes")
+          PY
+
       - name: Generate latest dashboard
+        env:
+          REQUIRE_DASHBOARD_SUPPORT_DATA: "1"
         run: python Claude.py
 
       - name: Prepare GitHub Pages artifact
