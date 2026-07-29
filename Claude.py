@@ -1218,14 +1218,14 @@ class PlotGenerator:
         'Phosphate_P': 'mg/L',
     }
 
-    FIG_BG = '#f7fbff'
-    AX_BG = '#ffffff'
-    BLUE = '#0047a0'
-    BLUE_DARK = '#052e66'
+    FIG_BG = '#071426'
+    AX_BG = '#f8fbff'
+    BLUE = '#0057c2'
+    BLUE_DARK = '#003b87'
     RED = '#cd2e3a'
     INK = '#071426'
     MUTED = '#5f6b7a'
-    GRID = '#dce7f4'
+    GRID = '#d8e5f4'
 
     def _new_figure(self, *args, **kwargs):
         kwargs.setdefault('facecolor', self.FIG_BG)
@@ -1243,13 +1243,17 @@ class PlotGenerator:
         ax.tick_params(colors='#26364c', labelsize=10)
 
     def _title_figure(self, fig, title, subtitle=''):
-        fig.suptitle(title, fontsize=20, fontweight='bold', color=self.INK, y=0.985)
+        fig.suptitle(title, fontsize=20, fontweight='bold', color='#f7fbff', y=0.985)
         if subtitle:
-            fig.text(0.5, 0.948, subtitle, ha='center', va='top', fontsize=11, color=self.MUTED)
+            fig.text(0.5, 0.948, subtitle, ha='center', va='top', fontsize=11, color='#b8c7db')
 
     def _save_figure(self, fig, path, rect=None):
         if rect is None:
             rect = [0, 0, 1, 0.93]
+        for ax in fig.axes:
+            ax.xaxis.label.set_color('#d8e8fb')
+            ax.yaxis.label.set_color('#d8e8fb')
+            ax.tick_params(colors='#d8e8fb')
         fig.tight_layout(rect=rect)
         fig.savefig(path, dpi=320, bbox_inches='tight', facecolor=self.FIG_BG)
         plt.close(fig)
@@ -4337,6 +4341,151 @@ class DashboardGenerator:
       .two-col,
       .three-col,
       .home-overview {{
+        grid-template-columns: 1fr;
+      }}
+    }}
+
+    /* K-WaterGuard polish layer v8: readable overview, compact sidebar, integrated plots. */
+    header {{
+      background:
+        linear-gradient(90deg, rgba(7,20,38,.98), rgba(9,30,55,.96) 60%, rgba(0,87,194,.82)),
+        url("{self._asset_uri('Kwater.png')}");
+    }}
+    .nav-tabs {{
+      height: auto;
+      max-height: calc(100vh - 132px);
+      overflow: auto;
+      padding: 12px;
+      gap: 7px;
+    }}
+    .nav-tabs a {{
+      flex: 0 0 auto !important;
+      min-height: 42px;
+      height: auto;
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.055);
+      color: #d9e8fb;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-data .nav-tabs a[href="data.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"] {{
+      background: linear-gradient(135deg, #ffffff, #edf5ff);
+      color: var(--blue-deep);
+      transform: none;
+    }}
+    .home-overview {{
+      background:
+        linear-gradient(135deg, rgba(7,20,38,.98), rgba(8,34,66,.96) 54%, rgba(83,31,52,.94));
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 20px 58px rgba(0,0,0,.24);
+    }}
+    .overview-panel,
+    .overview-panel:first-child {{
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.20);
+      box-shadow: 0 16px 42px rgba(0,0,0,.20);
+    }}
+    .overview-panel:first-child {{
+      position: relative;
+      overflow: hidden;
+    }}
+    .overview-panel:first-child::after {{
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.06), transparent 42%),
+        radial-gradient(circle at 88% 18%, rgba(0,87,194,.30), transparent 34%),
+        radial-gradient(circle at 96% 86%, rgba(205,46,58,.20), transparent 32%);
+      opacity: .75;
+    }}
+    .overview-panel > * {{
+      position: relative;
+      z-index: 1;
+    }}
+    .home-overview h2 {{
+      max-width: 840px;
+      color: #ffffff;
+      text-shadow: 0 2px 18px rgba(0,0,0,.34);
+    }}
+    .home-overview p,
+    .home-overview li {{
+      max-width: 1000px;
+      color: #edf6ff;
+      text-shadow: 0 1px 10px rgba(0,0,0,.30);
+    }}
+    .overview-kicker {{
+      color: #bcd8ff;
+    }}
+    .page-actions {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 720px;
+    }}
+    .page-actions .button,
+    .home-overview .history-link {{
+      justify-content: space-between;
+      min-height: 46px;
+      padding: 10px 13px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: linear-gradient(135deg, #ffffff, #e8f3ff);
+      color: var(--blue-deep);
+      box-shadow: 0 14px 28px rgba(0,0,0,.20);
+    }}
+    .page-actions .button::after,
+    .home-overview .history-link::after {{
+      content: ">";
+      margin-left: 10px;
+      font-weight: 900;
+      color: var(--red);
+    }}
+    .plot {{
+      background: #071426;
+      border-color: rgba(219,230,243,.16);
+      box-shadow: 0 18px 44px rgba(0,0,0,.18);
+    }}
+    .plot h3 {{
+      min-height: 44px;
+      background: linear-gradient(135deg, #071426, #0c2b50);
+      color: #f7fbff;
+      border-bottom: 1px solid rgba(219,230,243,.16);
+    }}
+    .plot img {{
+      padding: 8px;
+      background: #071426;
+    }}
+    .plot:hover {{
+      box-shadow: 0 24px 58px rgba(0,0,0,.24);
+      transform: translateY(-1px);
+    }}
+    .stat,
+    .capability-card,
+    .param {{
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 10px 28px rgba(9,24,45,.08);
+    }}
+    .capability-card {{
+      background: linear-gradient(145deg, #ffffff, #f6faff);
+    }}
+    .param {{
+      background: linear-gradient(145deg, #ffffff, #f7fbff);
+    }}
+    @media (max-width: 1320px) {{
+      .nav-tabs {{
+        max-height: none;
+        overflow: visible;
+      }}
+      .nav-tabs a {{
+        justify-content: center;
+      }}
+    }}
+    @media (max-width: 980px) {{
+      .page-actions {{
         grid-template-columns: 1fr;
       }}
     }}
