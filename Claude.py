@@ -1218,7 +1218,7 @@ class PlotGenerator:
         'Phosphate_P': 'mg/L',
     }
 
-    FIG_BG = '#071426'
+    FIG_BG = '#ffffff'
     AX_BG = '#f8fbff'
     BLUE = '#0057c2'
     BLUE_DARK = '#003b87'
@@ -1243,17 +1243,17 @@ class PlotGenerator:
         ax.tick_params(colors='#26364c', labelsize=10)
 
     def _title_figure(self, fig, title, subtitle=''):
-        fig.suptitle(title, fontsize=20, fontweight='bold', color='#f7fbff', y=0.985)
+        fig.suptitle(title, fontsize=20, fontweight='bold', color=self.INK, y=0.985)
         if subtitle:
-            fig.text(0.5, 0.948, subtitle, ha='center', va='top', fontsize=11, color='#b8c7db')
+            fig.text(0.5, 0.948, subtitle, ha='center', va='top', fontsize=11, color=self.MUTED)
 
     def _save_figure(self, fig, path, rect=None):
         if rect is None:
             rect = [0, 0, 1, 0.93]
         for ax in fig.axes:
-            ax.xaxis.label.set_color('#d8e8fb')
-            ax.yaxis.label.set_color('#d8e8fb')
-            ax.tick_params(colors='#d8e8fb')
+            ax.xaxis.label.set_color('#26364c')
+            ax.yaxis.label.set_color('#26364c')
+            ax.tick_params(colors='#26364c')
         fig.tight_layout(rect=rect)
         fig.savefig(path, dpi=320, bbox_inches='tight', facecolor=self.FIG_BG)
         plt.close(fig)
@@ -2193,8 +2193,8 @@ class PlotGenerator:
             summary_params = ['pH', 'DO', 'BOD', 'COD', 'SS', 'TN', 'TP', 'EC', 'Turbidity', 'Ammonia_N']
             summary_params = [p for p in summary_params if p in latest.columns and latest[p].notna().any()]
 
-            fig = plt.figure(figsize=(14.2, 8.4), facecolor=self.FIG_BG)
-            gs = fig.add_gridspec(2, 2, height_ratios=[0.65, 1.35], hspace=0.34, wspace=0.24)
+            fig = plt.figure(figsize=(13.8, 7.2), facecolor=self.FIG_BG)
+            gs = fig.add_gridspec(2, 2, height_ratios=[0.34, 1.66], hspace=0.24, wspace=0.24)
             self._title_figure(fig, 'Water Quality Summary Dashboard', 'Daily monitoring coverage and latest parameter movement')
 
             ax_info = fig.add_subplot(gs[0, :])
@@ -2209,7 +2209,7 @@ class PlotGenerator:
                 f"Latest mean pH: {latest['pH'].mean():.2f}    Latest mean DO: {latest['DO'].mean():.2f} mg/L"
             )
             ax_info.text(
-                0.02, 0.54, info_text, va='center', ha='left', fontsize=12,
+                0.02, 0.48, info_text, va='center', ha='left', fontsize=11,
                 bbox=dict(boxstyle='round,pad=0.55', facecolor='white', edgecolor='#d8e3f1')
             )
 
@@ -2221,12 +2221,20 @@ class PlotGenerator:
                 latest_day = daily_means.iloc[-1]
                 changes = (((latest_day - previous) / previous) * 100).replace([np.inf, -np.inf], np.nan).dropna()
                 changes = changes.reindex(changes.abs().sort_values().index)
-                labels = [self._format_parameter_label(p) for p in changes.index]
-                colors = [self.BLUE if value < 0 else self.RED for value in changes.values]
-                ax_bar.barh(labels, changes.values, color=colors, edgecolor='white')
-                ax_bar.axvline(0, color='#26364c', linewidth=1.0)
-                ax_bar.set_title('Latest Daily Mean Change by Parameter', fontweight='bold', fontsize=13)
-                ax_bar.set_xlabel('Change from previous day (%)')
+                if changes.empty or float(changes.abs().max()) < 0.01:
+                    latest_means = latest[summary_params].mean()
+                    scaled = ((latest_means - latest_means.min()) / (latest_means.max() - latest_means.min())).fillna(0)
+                    labels = [self._format_parameter_label(p) for p in scaled.index]
+                    ax_bar.barh(labels, scaled.values, color=self.BLUE, edgecolor='white')
+                    ax_bar.set_title('Latest Normalized Parameter Means', fontweight='bold', fontsize=13)
+                    ax_bar.set_xlabel('Normalized mean')
+                else:
+                    labels = [self._format_parameter_label(p) for p in changes.index]
+                    colors = [self.BLUE if value < 0 else self.RED for value in changes.values]
+                    ax_bar.barh(labels, changes.values, color=colors, edgecolor='white')
+                    ax_bar.axvline(0, color='#26364c', linewidth=1.0)
+                    ax_bar.set_title('Latest Daily Mean Change by Parameter', fontweight='bold', fontsize=13)
+                    ax_bar.set_xlabel('Change from previous day (%)')
             else:
                 latest_means = latest[summary_params].mean()
                 scaled = ((latest_means - latest_means.min()) / (latest_means.max() - latest_means.min())).fillna(0)
@@ -4486,6 +4494,77 @@ class DashboardGenerator:
     }}
     @media (max-width: 980px) {{
       .page-actions {{
+        grid-template-columns: 1fr;
+      }}
+    }}
+
+    /* K-WaterGuard correction layer v9: clean scientific figures and calmer workspace. */
+    body {{
+      background:
+        linear-gradient(90deg, #071426 0 288px, transparent 288px),
+        linear-gradient(135deg, #eef5fb 0%, #f8fbff 54%, #fff7f8 100%);
+    }}
+    main.wrap {{
+      min-height: calc(100vh - 112px);
+    }}
+    .section {{
+      background: rgba(255,255,255,.97);
+    }}
+    .plot {{
+      background: #ffffff;
+      border: 1px solid rgba(219,230,243,.95);
+      box-shadow: 0 14px 34px rgba(9,24,45,.10);
+    }}
+    .plot h3 {{
+      background: linear-gradient(90deg, #eef6ff, #ffffff);
+      color: #0a1728;
+      border-bottom: 1px solid rgba(219,230,243,.95);
+    }}
+    .plot img {{
+      padding: 10px;
+      background: #ffffff;
+    }}
+    .plot:hover {{
+      box-shadow: 0 20px 42px rgba(9,24,45,.14);
+    }}
+    .plots {{
+      align-items: start;
+    }}
+    .spatial-maps {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    body.page-spatial .spatial-maps {{
+      grid-template-columns: repeat(2, minmax(420px, 1fr));
+    }}
+    body.page-spatial .plot img {{
+      padding: 12px;
+    }}
+    body.page-spatial #latestCharts .plots {{
+      grid-template-columns: repeat(2, minmax(420px, 1fr));
+    }}
+    body.page-spatial #latestCharts .plot:first-child,
+    body.page-spatial #latestCharts .plot:nth-child(2),
+    body.page-spatial #latestCharts .plot:nth-child(3) {{
+      min-height: auto;
+    }}
+    body.page-algal .plots,
+    body.page-trends .plots {{
+      grid-template-columns: repeat(2, minmax(420px, 1fr));
+    }}
+    .table-wrap {{
+      background: #ffffff;
+    }}
+    footer {{
+      color: #6b7b90;
+    }}
+    @media (max-width: 1320px) {{
+      body {{
+        background: linear-gradient(135deg, #eef5fb 0%, #f8fbff 58%, #fff7f8 100%);
+      }}
+      body.page-spatial .spatial-maps,
+      body.page-spatial #latestCharts .plots,
+      body.page-algal .plots,
+      body.page-trends .plots {{
         grid-template-columns: 1fr;
       }}
     }}
