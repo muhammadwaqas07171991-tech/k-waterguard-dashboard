@@ -117,6 +117,7 @@ class Config:
     DERIVED_HISTORICAL_STATIONS_FILE = STATIC_DASHBOARD_DATA_DIR / "south_korea_water_quality_station_metadata.csv"
     DERIVED_HISTORICAL_MANIFEST_FILE = STATIC_DASHBOARD_DATA_DIR / "download_manifest.json"
     HSPF_ALGAE_SCENARIO_DIR = Path(__file__).resolve().parent / "HSPF_Algae_Bloom_SKorea" / "05_analysis" / "algae_scenarios"
+    REQUIRE_DASHBOARD_SUPPORT_DATA = os.environ.get("REQUIRE_DASHBOARD_SUPPORT_DATA", "").lower() in {"1", "true", "yes"}
     SITE_DASHBOARD_DIR = DATA_DIR / "google_site_dashboard"
     # Optional: set this to your published GitHub Pages URL, for example:
     # "https://YOUR_GITHUB_USERNAME.github.io/k-waterguard-dashboard/"
@@ -2246,6 +2247,7 @@ class DashboardGenerator:
 
             latest_station_df = self._latest_station_records(latest_df)
             alerts_df = self._evaluate_alerts(latest_station_df)
+            self._assert_support_data_ready()
             html_text = self._render_html(dashboard_df, latest_df, latest_station_df, latest_date, alerts_df)
             Config.DASHBOARD_FILE.write_text(html_text, encoding='utf-8')
             self._write_local_dashboard_pages(html_text)
@@ -2257,7 +2259,44 @@ class DashboardGenerator:
             return Config.DASHBOARD_FILE
         except Exception as e:
             self.logger.error(f"Error generating dashboard: {str(e)}")
+            if Config.REQUIRE_DASHBOARD_SUPPORT_DATA:
+                raise
             return None
+
+    def _assert_support_data_ready(self):
+        historical_measurements = (
+            Config.HISTORICAL_MEASUREMENTS_FILE
+            if Config.HISTORICAL_MEASUREMENTS_FILE.exists()
+            else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
+        )
+        historical_stations = (
+            Config.HISTORICAL_STATIONS_FILE
+            if Config.HISTORICAL_STATIONS_FILE.exists()
+            else Config.DERIVED_HISTORICAL_STATIONS_FILE
+        )
+        historical_manifest = (
+            Config.HISTORICAL_MANIFEST_FILE
+            if Config.HISTORICAL_MANIFEST_FILE.exists()
+            else Config.DERIVED_HISTORICAL_MANIFEST_FILE
+        )
+        required = [
+            historical_measurements,
+            historical_stations,
+            historical_manifest,
+            Config.HSPF_ALGAE_SCENARIO_DIR / "observed_chla_scenario_screening.csv",
+            Config.HSPF_ALGAE_SCENARIO_DIR / "hspf_plnk_2010_scenario_summary.csv",
+        ]
+        missing = [str(path) for path in required if not path.exists() or path.stat().st_size == 0]
+        if not missing:
+            return
+        message = (
+            "Dashboard support data are missing, so historical trends and algal bloom pages would be empty. "
+            "Include dashboard_static_data/ and HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/ in the deployment. "
+            f"Missing: {', '.join(missing)}"
+        )
+        if Config.REQUIRE_DASHBOARD_SUPPORT_DATA:
+            raise RuntimeError(message)
+        self.logger.warning(message)
 
     def _prepare_dashboard_data(self, df):
         df = df.copy()
@@ -4574,6 +4613,8 @@ class WaterQualityAgent:
             
         except Exception as e:
             self.logger.error(f"Error in agent cycle: {str(e)}")
+            if Config.REQUIRE_DASHBOARD_SUPPORT_DATA:
+                raise
     
     def start_autonomous(self, interval_minutes=None):
         """Start agent to run autonomously on schedule"""

@@ -1,0 +1,7 @@
+scenario,mean_predicted_chlorophyll_a_ug_l,p90_predicted_chlorophyll_a_ug_l,days_or_samples_gt_25ug_l,relative_mean_vs_baseline,note
+baseline_observed_conditions,4.2822341705944105,6.028771021916434,0,1.0,Current observed monthly conditions.
+tp_reduction_20,4.088817933907516,5.67458935186096,0,0.954832867848503,Moderate phosphorus reduction.
+tp_reduction_40,3.9053371361331184,5.316894518600819,0,0.911985888803233,Strong phosphorus reduction.
+tn_tp_reduction_40,3.6513604181483936,5.006725773096793,0,0.8526764937849146,Combined nitrogen and phosphorus reduction.
+warming_plus_2c,4.616095314054336,6.473021211269729,0,1.0779642425331408,Climate warming sensitivity.
+warming_plus_2c_tp_reduction_40,4.215376678575733,5.716150886074295,0,0.984387240548922,Nutrient management under warmer water.
