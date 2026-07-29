@@ -3924,6 +3924,422 @@ class DashboardGenerator:
       .nav-tabs {{ position: static; grid-template-columns: 1fr; }}
       .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps, .three-col {{ grid-template-columns: 1fr; }}
     }}
+
+    /* K-WaterGuard dark mission-control template v7.
+       A true app-style dashboard: dark-first shell, fixed side navigation,
+       compact header, dense data surfaces, and restrained white/blue/red semantics. */
+    :root {{
+      --app-bg: #071426;
+      --app-bg-2: #0b1f38;
+      --surface: #ffffff;
+      --surface-2: #f4f8fd;
+      --surface-dark: rgba(10, 30, 56, .78);
+      --ink: #0a1728;
+      --ink-on-dark: #f7fbff;
+      --muted: #64748b;
+      --muted-on-dark: #b8c7db;
+      --line: #dbe6f3;
+      --line-dark: rgba(211, 227, 246, .16);
+      --blue: #0057c2;
+      --blue-deep: #003b87;
+      --blue-soft: #e9f3ff;
+      --red: #cd2e3a;
+      --red-soft: #fff1f3;
+      --black: #101828;
+      --shadow: 0 18px 48px rgba(0,0,0,.18);
+      --shadow-soft: 0 10px 28px rgba(0,0,0,.10);
+    }}
+    body {{
+      background:
+        radial-gradient(circle at 20% -10%, rgba(0,87,194,.34), transparent 34%),
+        radial-gradient(circle at 98% 6%, rgba(205,46,58,.22), transparent 28%),
+        linear-gradient(135deg, #071426 0%, #0c2039 42%, #eff6ff 42%, #f8fbff 100%);
+      color: var(--ink);
+    }}
+    header {{
+      min-height: 86px;
+      padding: 14px 22px;
+      position: sticky;
+      top: 0;
+      z-index: 35;
+      border-bottom: 1px solid var(--line-dark);
+      background:
+        linear-gradient(90deg, rgba(7,20,38,.98), rgba(11,31,56,.94) 58%, rgba(0,87,194,.72)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+      box-shadow: 0 18px 44px rgba(0,0,0,.20);
+    }}
+    header .wrap {{
+      width: min(1880px, calc(100% - 36px));
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+    }}
+    .topline {{ display: contents; }}
+    .brand {{
+      grid-column: 1;
+      min-height: 54px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: none;
+      backdrop-filter: blur(14px);
+    }}
+    .brand-logo {{
+      width: 36px;
+      height: 36px;
+      background: #fff;
+      border-radius: 6px;
+    }}
+    .brand-name {{
+      color: #fff;
+      font-size: 17px;
+      letter-spacing: 0;
+    }}
+    h1 {{
+      grid-column: 2;
+      grid-row: 1;
+      margin: 0;
+      font-size: clamp(28px, 2.2vw, 46px);
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 2px 18px rgba(0,0,0,.25);
+    }}
+    .subtitle {{
+      grid-column: 2;
+      grid-row: 2;
+      margin: -8px 0 0;
+      max-width: 1100px;
+      font-size: 14px;
+      line-height: 1.25;
+      color: var(--muted-on-dark);
+      font-weight: 700;
+    }}
+    .badge {{
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      justify-self: end;
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--red), #9f1d28);
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 12px 28px rgba(205,46,58,.25);
+    }}
+    main.wrap {{
+      width: min(1880px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 16px 0 30px 276px;
+    }}
+    .nav-tabs {{
+      position: fixed;
+      left: max(18px, calc((100vw - 1880px) / 2 + 18px));
+      top: 112px;
+      z-index: 30;
+      width: 238px;
+      height: calc(100vh - 132px);
+      margin: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-radius: 8px;
+      background: rgba(7,20,38,.86);
+      border: 1px solid var(--line-dark);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }}
+    .nav-tabs::before {{
+      content: "Dashboard Pages";
+      display: block;
+      padding: 4px 8px 10px;
+      color: var(--muted-on-dark);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }}
+    .nav-tabs a {{
+      width: 100%;
+      justify-content: flex-start;
+      min-height: 44px;
+      padding: 10px 12px;
+      border-radius: 7px;
+      background: rgba(255,255,255,.04);
+      color: #d8e8fb;
+      font-size: 15px;
+      border: 1px solid transparent;
+      box-shadow: none;
+    }}
+    .nav-tabs a:hover {{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.12);
+      transform: translateX(2px);
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-data .nav-tabs a[href="data.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"] {{
+      background: linear-gradient(135deg, #ffffff, #eaf3ff);
+      color: var(--blue-deep);
+      border-color: rgba(255,255,255,.70);
+      box-shadow: 0 12px 24px rgba(0,0,0,.20);
+    }}
+    .toolbar {{
+      position: sticky;
+      top: 100px;
+      z-index: 18;
+      grid-template-columns: minmax(320px, 1fr) auto auto;
+      margin: 0 0 10px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.90);
+      border: 1px solid rgba(219,230,243,.92);
+      box-shadow: 0 16px 40px rgba(9,24,45,.12);
+      backdrop-filter: blur(16px);
+    }}
+    .search {{
+      min-height: 42px;
+      border-radius: 7px;
+      background: #fff;
+      font-size: 15px;
+    }}
+    .button {{
+      min-height: 42px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+      box-shadow: 0 12px 26px rgba(0,87,194,.24);
+    }}
+    .card {{
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(219,230,243,.92);
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(9,24,45,.10);
+    }}
+    .section {{
+      margin-top: 12px;
+      padding: clamp(14px, 1.1vw, 20px);
+    }}
+    #agentOverview.card {{
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }}
+    .home-overview {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(310px, .52fr);
+      gap: 12px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 8px;
+      background: transparent;
+      box-shadow: none;
+    }}
+    .overview-panel {{
+      border-radius: 8px;
+      padding: clamp(16px, 1.6vw, 24px);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.07)),
+        linear-gradient(135deg, rgba(0,87,194,.52), rgba(205,46,58,.24));
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: var(--shadow);
+      color: #fff;
+      backdrop-filter: blur(16px);
+    }}
+    .overview-panel:first-child {{
+      background:
+        linear-gradient(115deg, rgba(7,20,38,.94), rgba(0,87,194,.74) 58%, rgba(205,46,58,.52)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    .overview-kicker {{
+      color: #d8e8fb;
+      font-size: 11px;
+      letter-spacing: .08em;
+    }}
+    .home-overview h2 {{
+      color: #fff;
+      font-size: clamp(26px, 2.15vw, 42px);
+    }}
+    .home-overview p,
+    .home-overview li,
+    .home-overview .muted {{
+      color: rgba(255,255,255,.88);
+    }}
+    .page-actions .button,
+    .home-overview .history-link {{
+      background: #fff;
+      color: var(--blue-deep);
+      box-shadow: 0 12px 24px rgba(0,0,0,.16);
+    }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }}
+    .stat {{
+      min-height: 84px;
+      padding: 12px 13px;
+      background: linear-gradient(180deg, #fff, #f7fbff);
+      border-radius: 8px;
+    }}
+    .stat::before {{
+      width: 3px;
+      background: var(--blue);
+    }}
+    .value {{
+      font-size: clamp(22px, 1.45vw, 32px);
+      color: var(--blue-deep);
+    }}
+    .label {{
+      font-size: 10px;
+      color: #66758a;
+    }}
+    .capability-grid,
+    .param-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .capability-card,
+    .param {{
+      min-height: 108px;
+      padding: 13px;
+    }}
+    .capability-card h3 {{ font-size: 16px; }}
+    .capability-card p {{ font-size: 13px; }}
+    .param-value {{ font-size: clamp(21px, 1.35vw, 28px); }}
+    .two-col {{
+      grid-template-columns: minmax(0, 1fr) minmax(380px, .88fr);
+      gap: 12px;
+    }}
+    .three-col {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .plots {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    body.page-trends .plots,
+    body.page-algal .plots {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    .spatial-maps {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    .plot {{
+      overflow: hidden;
+      background: #fff;
+    }}
+    .plot h3 {{
+      min-height: 40px;
+      padding: 10px 12px;
+      background: #fff;
+      border-bottom: 1px solid rgba(219,230,243,.9);
+      font-size: 14px;
+    }}
+    .plot img {{
+      padding: 6px;
+    }}
+    .table-wrap {{
+      max-height: 420px;
+      border-radius: 8px;
+      border: 1px solid rgba(219,230,243,.95);
+    }}
+    th {{
+      padding: 9px 10px;
+      background: #eef6ff;
+      font-size: 13px;
+    }}
+    td {{
+      padding: 8px 10px;
+      font-size: 13px;
+    }}
+    body.page-data main.wrap,
+    body.page-spatial main.wrap {{
+      display: grid;
+      grid-template-columns: minmax(370px, .72fr) minmax(0, 1.28fr);
+      gap: 12px;
+      align-items: start;
+    }}
+    body.page-data .nav-tabs,
+    body.page-data .toolbar,
+    body.page-data .search-status,
+    body.page-spatial .nav-tabs,
+    body.page-spatial .toolbar,
+    body.page-spatial .search-status {{
+      grid-column: 1 / -1;
+    }}
+    body.page-spatial #latestCharts,
+    body.page-spatial #spatialParameterMaps,
+    body.page-spatial #stationMeasurements {{
+      grid-column: 1 / -1;
+    }}
+    footer {{
+      width: min(1880px, calc(100% - 36px));
+      margin: 0 auto 20px;
+      padding: 12px 14px 12px 290px;
+      border: 0;
+      background: transparent;
+      color: #d4e2f2;
+      box-shadow: none;
+    }}
+    @media (max-width: 1320px) {{
+      main.wrap {{
+        padding-left: 0;
+      }}
+      .nav-tabs {{
+        position: sticky;
+        top: 96px;
+        width: 100%;
+        height: auto;
+        left: auto;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
+      }}
+      .nav-tabs::before {{ display: none; }}
+      body.page-data main.wrap,
+      body.page-spatial main.wrap {{
+        display: block;
+      }}
+      footer {{
+        padding-left: 14px;
+      }}
+    }}
+    @media (max-width: 980px) {{
+      header .wrap {{
+        grid-template-columns: 1fr;
+      }}
+      h1,
+      .subtitle,
+      .badge {{
+        grid-column: 1;
+        grid-row: auto;
+        justify-self: start;
+      }}
+      .toolbar,
+      .nav-tabs,
+      .stats,
+      .capability-grid,
+      .param-grid,
+      .plots,
+      body.page-trends .plots,
+      body.page-algal .plots,
+      .spatial-maps,
+      .two-col,
+      .three-col,
+      .home-overview {{
+        grid-template-columns: 1fr;
+      }}
+    }}
   </style>
 </head>
 <body class="page-home">
