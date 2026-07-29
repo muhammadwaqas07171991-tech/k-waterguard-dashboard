@@ -14,6 +14,7 @@ algal-bloom.html
 spatial.html
 dashboard.html
 Claude_dashboard.html
+AI_Water_Guard_Agent_dashboard.html
 manifest.webmanifest
 sw.js
 *_map_*.png
@@ -27,5 +28,7 @@ historical_*summary.png
 historical_trend_annual_means.png
 algal_*timeline.png
 algal_*chlorophyll.png
+algal_*cyanobacteria.png
+algal_cyanobacteria_watershed_map.png
 water_quality_signal_board.png
 water_quality_records_*.csv

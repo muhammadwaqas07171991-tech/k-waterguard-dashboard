@@ -51,19 +51,27 @@ jobs:
 
       - name: Verify dashboard support datasets
         run: |
-          test -s dashboard_static_data/historical_annual_station_measurements.csv
-          test -s dashboard_static_data/south_korea_water_quality_station_metadata.csv
-          test -s dashboard_static_data/download_manifest.json
-          test -s HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv
-          test -s HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv
+          test -s ai_water_guard_agent/dashboard_static_data/historical_annual_station_measurements.csv
+          test -s ai_water_guard_agent/dashboard_static_data/south_korea_water_quality_station_metadata.csv
+          test -s ai_water_guard_agent/dashboard_static_data/download_manifest.json
+          test -s ai_water_guard_agent/algal_bloom_data/cyanobacteria_station_cells_per_ml.csv
+          test -s ai_water_guard_agent/algal_bloom_data/harmful_cyanobacteria_lakewide_cells_per_ml.csv
+          test -s ai_water_guard_agent/algal_bloom_data/namgang_station_latlon.csv
+          test -s ai_water_guard_agent/watershed_shapes/korea_major_subbasins/korea_major_subbasins.shp
+          test -s ai_water_guard_agent/HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv
+          test -s ai_water_guard_agent/HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv
           python - <<'PY'
           from pathlib import Path
           files = [
-              Path("dashboard_static_data/historical_annual_station_measurements.csv"),
-              Path("dashboard_static_data/south_korea_water_quality_station_metadata.csv"),
-              Path("dashboard_static_data/download_manifest.json"),
-              Path("HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv"),
-              Path("HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv"),
+              Path("ai_water_guard_agent/dashboard_static_data/historical_annual_station_measurements.csv"),
+              Path("ai_water_guard_agent/dashboard_static_data/south_korea_water_quality_station_metadata.csv"),
+              Path("ai_water_guard_agent/dashboard_static_data/download_manifest.json"),
+              Path("ai_water_guard_agent/algal_bloom_data/cyanobacteria_station_cells_per_ml.csv"),
+              Path("ai_water_guard_agent/algal_bloom_data/harmful_cyanobacteria_lakewide_cells_per_ml.csv"),
+              Path("ai_water_guard_agent/algal_bloom_data/namgang_station_latlon.csv"),
+              Path("ai_water_guard_agent/watershed_shapes/korea_major_subbasins/korea_major_subbasins.shp"),
+              Path("ai_water_guard_agent/HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/observed_chla_scenario_screening.csv"),
+              Path("ai_water_guard_agent/HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/hspf_plnk_2010_scenario_summary.csv"),
           ]
           for path in files:
               print(f"{path}: {path.stat().st_size:,} bytes")
@@ -72,7 +80,7 @@ jobs:
       - name: Generate latest dashboard
         env:
           REQUIRE_DASHBOARD_SUPPORT_DATA: "1"
-        run: python Claude.py
+        run: python ai_water_guard_agent/AI_Water_Guard_Agent.py
 
       - name: Prepare GitHub Pages artifact
         run: |
