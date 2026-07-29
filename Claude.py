@@ -777,7 +777,7 @@ class DataManager:
             df_new['region'] = df_new['region'].fillna(df_new['location_name']).fillna('South Korea')
             df_new['station_identity'] = self._station_identity_series(df_new)
             df_new['location_key'] = df_new['station_identity']
-            df_new['hour'] = df_new['timestamp'].dt.floor('h')
+            df_new['day'] = df_new['timestamp'].dt.floor('D')
             run_archive_path = self._save_run_archive(df_new)
             
             # Load existing data
@@ -797,7 +797,7 @@ class DataManager:
                 df_existing['region'] = df_existing['region'].fillna(df_existing['location_name']).fillna('South Korea')
                 df_existing['station_identity'] = self._station_identity_series(df_existing)
                 df_existing['location_key'] = df_existing['station_identity']
-                df_existing['hour'] = df_existing['timestamp'].dt.floor('h')
+                df_existing['day'] = df_existing['timestamp'].dt.floor('D')
             else:
                 df_existing = pd.DataFrame(columns=list(df_new.columns))
 
@@ -810,10 +810,10 @@ class DataManager:
             combined['location_name'] = combined['location_name'].fillna(combined['region'])
             combined['station_identity'] = self._station_identity_series(combined)
             combined['location_key'] = combined['station_identity']
-            combined['hour'] = pd.to_datetime(combined['timestamp'], errors='coerce').dt.floor('h')
+            combined['day'] = pd.to_datetime(combined['timestamp'], errors='coerce').dt.floor('D')
 
             deduped_rows = []
-            for _, group in combined.groupby(['location_key', 'hour'], dropna=False):
+            for _, group in combined.groupby(['location_key', 'day'], dropna=False):
                 latest = group.iloc[-1].copy()
                 for column in Config.COORDINATE_COLUMNS:
                     if pd.isna(latest[column]) or latest[column] == '':
@@ -826,9 +826,9 @@ class DataManager:
 
             if deduped_rows:
                 df = pd.DataFrame(deduped_rows)
-                df = df.drop(columns=['hour', 'location_key'])
+                df = df.drop(columns=['day', 'location_key'])
             else:
-                df = combined.drop(columns=['hour', 'location_key'])
+                df = combined.drop(columns=['day', 'location_key'])
 
             # Replace the existing CSV completely with the deduped result.
             df['station_identity'] = self._station_identity_series(df)
@@ -874,7 +874,7 @@ class DataManager:
             if df_new is None or df_new.empty:
                 return None
             run_df = df_new.copy()
-            run_df = run_df.drop(columns=[column for column in ['hour', 'location_key'] if column in run_df.columns])
+            run_df = run_df.drop(columns=[column for column in ['day', 'hour', 'location_key'] if column in run_df.columns])
             run_df = self._prepare_export_dataframe(run_df)
             timestamps = pd.to_datetime(run_df.get('timestamp'), errors='coerce').dropna()
             run_time = timestamps.max() if not timestamps.empty else Config.now()
@@ -1233,6 +1233,8 @@ class PlotGenerator:
             self._plot_alert_hotspot_matrix(df)
             self._plot_station_coverage_map(df)
             self._plot_parameter_maps(df)
+            self._plot_historical_trend_dashboard()
+            self._plot_algal_bloom_dashboard()
             
             self.logger.info("All plots generated successfully")
         except Exception as e:
@@ -1662,6 +1664,148 @@ class PlotGenerator:
             return False
         except Exception:
             return False
+
+    def _load_historical_plot_data(self):
+        if not Config.HISTORICAL_MEASUREMENTS_FILE.exists():
+            return pd.DataFrame()
+        try:
+            df = pd.read_csv(Config.HISTORICAL_MEASUREMENTS_FILE)
+            df['sample_date'] = pd.to_datetime(df.get('sample_date'), errors='coerce')
+            for column in Config.HISTORICAL_VARIABLE_MAP:
+                if column in df.columns:
+                    df[column] = pd.to_numeric(df[column], errors='coerce')
+            if Config.HISTORICAL_STATIONS_FILE.exists():
+                stations = pd.read_csv(Config.HISTORICAL_STATIONS_FILE)
+                if 'station_code' in stations.columns and 'station_code' in df.columns:
+                    metadata_columns = [
+                        column for column in ['station_code', 'river_basin', 'large_watershed', 'middle_watershed']
+                        if column in stations.columns
+                    ]
+                    if len(metadata_columns) > 1:
+                        df = df.merge(stations[metadata_columns].drop_duplicates('station_code'), on='station_code', how='left')
+            return df.dropna(subset=['sample_date'])
+        except Exception as exc:
+            self.logger.warning(f"Historical plot data unavailable: {exc}")
+            return pd.DataFrame()
+
+    def _plot_historical_trend_dashboard(self):
+        try:
+            df = self._load_historical_plot_data()
+            if df.empty:
+                return
+            df['year'] = df['sample_date'].dt.year
+            variables = [column for column in Config.HISTORICAL_VARIABLE_MAP if column in df.columns]
+            variables = [column for column in variables if df[column].notna().any()]
+            if not variables:
+                return
+
+            annual = df.groupby('year')[variables].mean().sort_index()
+            selected = variables[:6]
+            fig, axes = plt.subplots(2, 3, figsize=(16, 8.8), facecolor='white')
+            axes = axes.ravel()
+            for ax, column in zip(axes, selected):
+                label, unit = Config.HISTORICAL_VARIABLE_MAP[column]
+                series = annual[column].dropna()
+                ax.plot(series.index, series.values, color='#2166ac', linewidth=2.0, marker='o', markersize=3.5)
+                if len(series) >= 3:
+                    slope = DashboardGenerator()._mann_kendall_sen(series.index.to_numpy(dtype=float), series.values.astype(float))['sen_slope']
+                    x = np.array([series.index.min(), series.index.max()], dtype=float)
+                    intercept = float(np.nanmedian(series.values - (series.index.to_numpy(dtype=float) * slope))) if pd.notna(slope) else np.nan
+                    if pd.notna(intercept):
+                        ax.plot(x, intercept + slope * x, color='#b2182b', linewidth=1.8, linestyle='--')
+                ax.set_title(f'{label} Annual Mean', fontweight='bold')
+                ax.set_xlabel('Year')
+                ax.set_ylabel(unit)
+                ax.grid(True, color='#e7eefb')
+            for ax in axes[len(selected):]:
+                ax.axis('off')
+            fig.suptitle('Historical Water Quality Time-Series Trends - South Korea', fontsize=18, fontweight='bold')
+            fig.tight_layout(rect=[0, 0, 1, 0.95])
+            fig.savefig(self._plots_dir() / 'historical_trend_annual_means.png', dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close(fig)
+
+            slope_rows = []
+            trend_helper = DashboardGenerator()
+            for column in variables:
+                label, unit = Config.HISTORICAL_VARIABLE_MAP[column]
+                series = annual[column].dropna()
+                if len(series) < 3:
+                    continue
+                stats = trend_helper._mann_kendall_sen(series.index.to_numpy(dtype=float), series.values.astype(float))
+                slope_rows.append({'variable': label, 'slope': stats['sen_slope'], 'p': stats['p'], 'unit': unit})
+            slope_df = pd.DataFrame(slope_rows).dropna(subset=['slope'])
+            if not slope_df.empty:
+                fig, ax = plt.subplots(figsize=(11, 6.2), facecolor='white')
+                colors = ['#b2182b' if value > 0 else '#2166ac' for value in slope_df['slope']]
+                ax.barh(slope_df['variable'], slope_df['slope'], color=colors, edgecolor='white')
+                ax.axvline(0, color='0.25', linewidth=0.9)
+                ax.set_title("Sen's Slope Summary By Variable", fontweight='bold', fontsize=17)
+                ax.set_xlabel('Median annual slope in native units per year')
+                ax.grid(True, axis='x', color='#e7eefb')
+                fig.tight_layout()
+                fig.savefig(self._plots_dir() / 'historical_sen_slope_summary.png', dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close(fig)
+        except Exception as exc:
+            self.logger.error(f"Error in historical trend plots: {exc}")
+
+    def _plot_algal_bloom_dashboard(self):
+        try:
+            df = self._load_historical_plot_data()
+            if df.empty or 'chlorophyll_a' not in df.columns:
+                return
+            df = df.dropna(subset=['chlorophyll_a']).copy()
+            if df.empty:
+                return
+            watershed_column = 'large_watershed' if 'large_watershed' in df.columns else 'river_basin' if 'river_basin' in df.columns else 'network_category'
+            if watershed_column not in df.columns:
+                df[watershed_column] = 'Unknown'
+            df[watershed_column] = df[watershed_column].fillna('Unknown').astype(str)
+            rule = Config.ALGAL_BLOOM_RULES['chlorophyll_a']
+
+            grouped = (
+                df.groupby(watershed_column)
+                .agg(max_chla=('chlorophyll_a', 'max'), mean_chla=('chlorophyll_a', 'mean'), stations=('station_code', 'nunique'))
+                .sort_values('max_chla', ascending=False)
+                .head(15)
+            )
+            if not grouped.empty:
+                fig, ax = plt.subplots(figsize=(12.5, 7.2), facecolor='white')
+                colors = plt.cm.coolwarm(np.linspace(0.15, 0.92, len(grouped)))
+                ax.barh(grouped.index[::-1], grouped['max_chla'].values[::-1], color=colors[::-1], edgecolor='white')
+                ax.axvline(rule['caution'], color='#2166ac', linestyle='--', linewidth=1.3, label='Caution')
+                ax.axvline(rule['warning'], color='#b2182b', linestyle='--', linewidth=1.3, label='Warning')
+                ax.axvline(rule['outbreak'], color='#67001f', linestyle=':', linewidth=1.3, label='Outbreak')
+                ax.set_title('Watershed Chlorophyll-a Algal Bloom Screening', fontweight='bold', fontsize=17)
+                ax.set_xlabel(f'Observed maximum chlorophyll-a ({rule["unit"]})')
+                ax.legend(loc='lower right')
+                ax.grid(True, axis='x', color='#e7eefb')
+                fig.tight_layout()
+                fig.savefig(self._plots_dir() / 'algal_watershed_chlorophyll.png', dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close(fig)
+
+            df['year'] = df['sample_date'].dt.year
+            annual_watershed = (
+                df.groupby([watershed_column, 'year'])['chlorophyll_a']
+                .max()
+                .reset_index()
+            )
+            top_watersheds = grouped.index.tolist()[:10] if not grouped.empty else annual_watershed[watershed_column].value_counts().head(10).index.tolist()
+            heatmap_data = (
+                annual_watershed[annual_watershed[watershed_column].isin(top_watersheds)]
+                .pivot_table(index=watershed_column, columns='year', values='chlorophyll_a', aggfunc='max')
+                .sort_index()
+            )
+            if not heatmap_data.empty:
+                fig, ax = plt.subplots(figsize=(14, 6.8), facecolor='white')
+                sns.heatmap(heatmap_data, ax=ax, cmap='coolwarm', linewidths=0.2, linecolor='white', cbar_kws={'label': f'Chlorophyll-a ({rule["unit"]})'})
+                ax.set_title('Annual Algal Bloom Signal By Watershed', fontweight='bold', fontsize=17)
+                ax.set_xlabel('Year')
+                ax.set_ylabel('Watershed / basin')
+                fig.tight_layout()
+                fig.savefig(self._plots_dir() / 'algal_status_timeline.png', dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close(fig)
+        except Exception as exc:
+            self.logger.error(f"Error in algal bloom plots: {exc}")
 
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
@@ -2097,6 +2241,7 @@ class DashboardGenerator:
             alerts_df = self._evaluate_alerts(latest_station_df)
             html_text = self._render_html(dashboard_df, latest_df, latest_station_df, latest_date, alerts_df)
             Config.DASHBOARD_FILE.write_text(html_text, encoding='utf-8')
+            self._write_local_dashboard_pages(html_text)
             shutil.copyfile(Config.DASHBOARD_FILE, Config.WORKSPACE_DASHBOARD_FILE)
             site_dashboard_path = self._write_google_site_bundle(html_text, str(latest_date))
             self.logger.info(f"Dashboard saved at: {Config.DASHBOARD_FILE}")
@@ -2163,6 +2308,8 @@ class DashboardGenerator:
         standard_rows = self._standard_rows()
         plot_cards = self._plot_cards(str(latest_date))
         spatial_map_cards = self._spatial_map_cards(str(latest_date))
+        trend_plot_cards = self._trend_plot_cards(str(latest_date))
+        algal_plot_cards = self._algal_plot_cards(str(latest_date))
         province_rows = self._province_rows(latest_df)
         history_rows = self._history_rows(limit=30)
         historical_option_rows = self._historical_option_rows()
@@ -2183,7 +2330,7 @@ class DashboardGenerator:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="3600">
+  <meta http-equiv="refresh" content="86400">
   <meta name="theme-color" content="#0047a0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2248,6 +2395,15 @@ class DashboardGenerator:
     .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
     .nav-tabs {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }}
     .nav-tabs a {{ padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--blue); text-decoration: none; font-weight: 800; }}
+    .page {{ display: block; }}
+    body.page-home .page-data, body.page-home .page-trends, body.page-home .page-algal, body.page-home .page-spatial {{ display: none; }}
+    body.page-data .page-home, body.page-data .page-trends, body.page-data .page-algal, body.page-data .page-spatial {{ display: none; }}
+    body.page-trends .page-home, body.page-trends .page-data, body.page-trends .page-algal, body.page-trends .page-spatial {{ display: none; }}
+    body.page-algal .page-home, body.page-algal .page-data, body.page-algal .page-trends, body.page-algal .page-spatial {{ display: none; }}
+    body.page-spatial .page-home, body.page-spatial .page-data, body.page-spatial .page-trends, body.page-spatial .page-algal {{ display: none; }}
+    .home-overview {{ display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; align-items: stretch; }}
+    .overview-list {{ margin: 10px 0 0; padding-left: 18px; color: #26364c; line-height: 1.45; }}
+    .page-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }}
     .install-button {{ display: none; border: 0; cursor: pointer; font: inherit; }}
     .install-button.ready {{ display: inline-flex; }}
     .grid {{ display: grid; gap: 14px; }}
@@ -2367,6 +2523,7 @@ class DashboardGenerator:
     .chat-send {{ border: 0; border-radius: 6px; background: var(--red); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
     @media (max-width: 980px) {{
       .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr 1fr; }}
+      .home-overview {{ grid-template-columns: 1fr; }}
     }}
     @media (min-width: 1840px) {{
       .insight-rail {{ display: grid; }}
@@ -2377,10 +2534,11 @@ class DashboardGenerator:
       .brand-logo {{ width: 44px; height: 44px; }}
       .brand-name {{ font-size: 16px; }}
       .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr; }}
+      .home-overview {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
-<body>
+<body class="page-home">
   {side_rail_html}
   <header>
     <div class="wrap">
@@ -2389,7 +2547,7 @@ class DashboardGenerator:
           <img class="brand-logo" src="{self._asset_uri('KwGAI logo.png')}" alt="K-Water Guard AI logo">
           <span class="brand-name">K-Water Guard AI</span>
         </div>
-        <span class="badge">Hourly update: Korea time</span>
+        <span class="badge">Daily update: Korea time</span>
       </div>
       <h1>Water Quality Dashboard</h1>
       <p class="subtitle">Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.</p>
@@ -2397,11 +2555,11 @@ class DashboardGenerator:
   </header>
   <main class="wrap">
     <nav class="nav-tabs" aria-label="Dashboard pages">
-      <a href="#overviewPage">Overview</a>
-      <a href="#historicalPage">Historical Trends</a>
-      <a href="#historicalDataPage">Station Data</a>
-      <a href="#algalBloomPage">Algal Bloom Status</a>
-      <a href="#spatialPage">Spatial Maps</a>
+      <a href="index.html">Home</a>
+      <a href="data.html">Data Downloads</a>
+      <a href="trends.html">Historical Trends</a>
+      <a href="algal-bloom.html">Algal Bloom Status</a>
+      <a href="spatial.html">Spatial Maps</a>
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
@@ -2410,7 +2568,33 @@ class DashboardGenerator:
     </div>
     <div class="search-status" id="searchStatus">Search filters the alert, province, and station tables below.</div>
 
-    <section class="grid stats" id="overviewPage">
+    <section class="card section page page-home" id="agentOverview">
+      <div class="home-overview">
+        <div>
+          <h2>K-WaterGuard AI Agent Overview</h2>
+          <p>K-WaterGuard AI is an autonomous water-quality intelligence dashboard for South Korea. It combines Korean monitoring data, historical station records, spatial maps, alert screening rules, trend analysis, and researcher-ready downloads into one decision-support system.</p>
+          <p>The agent supports farmers, watershed managers, lake and reservoir operators, researchers, extension officers, policy experts, and environmental agencies by turning raw water-quality records into practical signals for irrigation safety, nutrient pressure, algal-bloom risk, pollution screening, and long-term watershed planning.</p>
+          <ul class="overview-list">
+            <li>Farmers can review water-quality status before irrigation planning and understand nutrient or algal risk around nearby watersheds.</li>
+            <li>Researchers can download historical station datasets and inspect Mann-Kendall and Sen's slope trend outputs.</li>
+            <li>Water managers can track alerts, spatial hotspots, watershed status, and station coverage with consistent Korean units and standards.</li>
+          </ul>
+          <div class="page-actions">
+            <a class="button" href="data.html">Open Data Page</a>
+            <a class="button" href="trends.html">Open Trend Page</a>
+            <a class="button" href="algal-bloom.html">Open Algal Bloom Page</a>
+          </div>
+        </div>
+        <div>
+          <h2>Created By</h2>
+          <p>This dashboard is created for the Regional Water Environment System Lab, Department of Agricultural Engineering, Gyeongsang National University.</p>
+          <p class="muted">The lab works on water resource conservation, watershed management, agricultural water quality, AI, big-data analytics, remote sensing, and hydrological modeling for sustainable agriculture and evidence-based water policy.</p>
+          <p><a class="history-link" href="https://sites.google.com/view/rwer/k-waterguard-ai">K-WaterGuard AI project page</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid stats page page-home" id="overviewPage">
       {self._stat_card('Latest date', html.escape(str(latest_date)))}
       {self._stat_card('Last update', html.escape(latest_time_text))}
       {self._stat_card('Stations', f'{station_count:,}')}
@@ -2419,7 +2603,7 @@ class DashboardGenerator:
       {self._stat_card('Alert Stations', f'{alert_station_count:,}')}
     </section>
 
-    <section class="grid two-col">
+    <section class="grid two-col page page-home">
       <div class="card section">
         <h2>Water Quality Indicators</h2>
         <div class="grid param-grid">{parameter_cards}</div>
@@ -2439,7 +2623,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section" id="historicalDownloads">
+    <section class="card section page page-data" id="historicalDownloads">
       <h2>Historical Data Downloads</h2>
       <p class="muted">The downloaded NIER historical archive contains {int(historical_summary.get('measurement_rows') or 0):,} measurements and {station_count:,} unique stations from {html.escape(str(historical_summary.get('start_year', '')))} to {html.escape(str(historical_summary.get('end_year', '')))}.</p>
       <p><a class="history-link" href="{historical_measurements_link}">Download full historical measurements</a> &nbsp; <a class="history-link" href="{historical_stations_link}">Download station metadata</a></p>
@@ -2453,8 +2637,9 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section" id="historicalPage">
+    <section class="card section page page-trends" id="historicalPage">
       <h2>Historical Data Cleaning And Trends</h2>
+      <div class="grid plots">{trend_plot_cards}</div>
       <div class="grid two-col">
         <div>
           <h3>Cleaning Before And After</h3>
@@ -2471,7 +2656,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section" id="historicalDataPage">
+    <section class="card section page page-data" id="historicalDataPage">
       <h2>Historical Dataset By Station And Variable</h2>
       <p class="muted">Use the search box above to filter by station code, station name, province, watershed, or variable. The full CSV links above provide every historical record.</p>
       <div class="table-wrap">
@@ -2482,7 +2667,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section" id="algalBloomPage">
+    <section class="card section page page-algal" id="algalBloomPage">
       <h2>Algal Bloom Status In Korean Watersheds And Lakes</h2>
       <div class="grid three-col">
         {self._stat_card('Korean Caution', '1,000 cells/mL')}
@@ -2490,6 +2675,7 @@ class DashboardGenerator:
         {self._stat_card('Bloom Outbreak', '1,000,000 cells/mL')}
       </div>
       <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts on two consecutive monitoring events. Where the historical archive only contains chlorophyll-a, the dashboard marks chlorophyll-a proxy status and keeps units in mg/m3.</p>
+      <div class="grid plots">{algal_plot_cards}</div>
       <div class="grid two-col">
         <div>
           <h3>Current / Historical Alerts</h3>
@@ -2503,7 +2689,7 @@ class DashboardGenerator:
       <div class="table-wrap" style="margin-top: 14px;"><table><thead><tr><th>Rule</th><th>Caution</th><th>Warning</th><th>Bloom Outbreak</th><th>Unit</th></tr></thead><tbody>{algal_standard_rows}</tbody></table></div>
     </section>
 
-    <section class="card section" id="spatialPage">
+    <section class="card section page page-spatial" id="spatialPage">
       <h2>Latest Water Quality Alerts</h2>
       <div class="table-wrap">
         <table id="alertTable">
@@ -2515,7 +2701,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section" id="provinceCoverage">
+    <section class="card section page page-spatial" id="provinceCoverage">
         <h2>Province Coverage</h2>
         <div class="table-wrap">
           <table>
@@ -2525,17 +2711,17 @@ class DashboardGenerator:
         </div>
     </section>
 
-    <section class="card section" id="latestCharts">
+    <section class="card section page page-spatial" id="latestCharts">
       <h2>Latest Charts And Maps</h2>
       <div class="grid plots">{plot_cards}</div>
     </section>
 
-    <section class="card section">
+    <section class="card section page page-spatial">
       <h2>Spatial Parameter Maps</h2>
       <div class="grid spatial-maps">{spatial_map_cards}</div>
     </section>
 
-    <section class="card section">
+    <section class="card section page page-spatial">
       <h2>Latest Station Measurements</h2>
       <div class="table-wrap">
         <table id="stationTable">
@@ -2718,6 +2904,41 @@ class DashboardGenerator:
   </script>
 </body>
 </html>"""
+
+    def _page_variants(self, html_text):
+        return {
+            'index.html': 'page-home',
+            'data.html': 'page-data',
+            'trends.html': 'page-trends',
+            'algal-bloom.html': 'page-algal',
+            'spatial.html': 'page-spatial',
+        }
+
+    def _page_html(self, html_text, page_class):
+        page_html = re.sub(r'<body class="[^"]*">', f'<body class="{page_class}">', html_text, count=1)
+        if page_class != 'page-home':
+            page_title = {
+                'page-data': 'Data Downloads',
+                'page-trends': 'Historical Trends',
+                'page-algal': 'Algal Bloom Status',
+                'page-spatial': 'Spatial Maps',
+            }.get(page_class, 'Dashboard')
+            page_html = page_html.replace(
+                '<h1>Water Quality Dashboard</h1>',
+                f'<h1>{html.escape(page_title)}</h1>',
+                1,
+            )
+        return page_html
+
+    def _write_local_dashboard_pages(self, html_text):
+        try:
+            workspace_dir = Path(__file__).resolve().parent
+            for directory in [Config.DATA_DIR, workspace_dir]:
+                for filename, page_class in self._page_variants(html_text).items():
+                    page_path = directory / filename
+                    page_path.write_text(self._page_html(html_text, page_class), encoding='utf-8')
+        except Exception as exc:
+            self.logger.warning(f"Could not write separate local dashboard pages: {exc}")
 
     def _chatbot_html(self):
         if not getattr(Config, 'CHATBOT_ENABLED', True):
@@ -3594,6 +3815,39 @@ class DashboardGenerator:
             return '<p class="muted">Charts will appear here after plots are generated.</p>'
         return ''.join(cards)
 
+    def _trend_plot_cards(self, date_label):
+        return self._named_plot_cards(
+            date_label,
+            [
+                ('historical_trend_annual_means.png', 'Historical Annual Means And Sen Slope Lines'),
+                ('historical_sen_slope_summary.png', "Sen's Slope Summary By Variable"),
+            ],
+            'Historical trend plots will appear here after plots are generated.'
+        )
+
+    def _algal_plot_cards(self, date_label):
+        return self._named_plot_cards(
+            date_label,
+            [
+                ('algal_watershed_chlorophyll.png', 'Watershed Chlorophyll-a Screening'),
+                ('algal_status_timeline.png', 'Annual Algal Bloom Signal By Watershed'),
+            ],
+            'Algal bloom plots will appear here after plots are generated.'
+        )
+
+    def _named_plot_cards(self, date_label, plot_specs, empty_message):
+        plots_dir = Config.daily_plots_dir(date_label)
+        cards = []
+        for filename, title in plot_specs:
+            path = plots_dir / filename
+            if path.exists():
+                cards.append(
+                    f'<article class="card plot"><h3>{html.escape(title)}</h3>'
+                    f'<img src="{self._file_uri(path)}" alt="{html.escape(title)}" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';">'
+                    f'<div class="image-missing">Image file not found. Check the matching file in the plots folder.</div></article>'
+                )
+        return ''.join(cards) if cards else f'<p class="muted">{html.escape(empty_message)}</p>'
+
     def _spatial_map_cards(self, date_label):
         plots_dir = Config.daily_plots_dir(date_label)
         if not plots_dir.exists():
@@ -3685,6 +3939,17 @@ class DashboardGenerator:
             shutil.copyfile(daily_csv, root_target)
             replacements[self._file_uri(daily_csv)] = self._site_asset_url(daily_csv.name)
 
+        historical_files = [
+            Config.HISTORICAL_MEASUREMENTS_FILE,
+            Config.HISTORICAL_STATIONS_FILE,
+            Config.HISTORICAL_MANIFEST_FILE,
+        ]
+        for source in historical_files:
+            if source.exists():
+                target = data_dir / source.name
+                shutil.copyfile(source, target)
+                replacements[self._file_uri(source)] = self._site_asset_url(f"data/{source.name}")
+
         run_files = []
         if Config.DAILY_OUTPUTS_DIR.exists():
             run_files.extend(Config.DAILY_OUTPUTS_DIR.glob("*/runs/water_quality_run_*.csv"))
@@ -3708,7 +3973,8 @@ class DashboardGenerator:
         )
         self._write_pwa_files(bundle_dir)
         output_path = bundle_dir / "index.html"
-        output_path.write_text(site_html, encoding='utf-8')
+        for filename, page_class in self._page_variants(site_html).items():
+            (bundle_dir / filename).write_text(self._page_html(site_html, page_class), encoding='utf-8')
         (bundle_dir / ".nojekyll").write_text("", encoding='utf-8')
         return output_path
 
@@ -3716,7 +3982,7 @@ class DashboardGenerator:
         manifest = {
             "name": "K-Water Guard AI Dashboard",
             "short_name": "K-Water AI",
-            "description": "Hourly South Korea water quality monitoring dashboard.",
+            "description": "Daily South Korea water quality monitoring dashboard.",
             "start_url": "./",
             "scope": "./",
             "display": "standalone",
@@ -3748,6 +4014,10 @@ class DashboardGenerator:
         cache_files = [
             "./",
             "./index.html",
+            "./data.html",
+            "./trends.html",
+            "./algal-bloom.html",
+            "./spatial.html",
             "./manifest.webmanifest",
             "./assets/logo.png",
             "./assets/icon-192.png",
