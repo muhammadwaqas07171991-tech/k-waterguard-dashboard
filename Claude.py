@@ -112,6 +112,11 @@ class Config:
     HISTORICAL_MEASUREMENTS_FILE = HISTORICAL_DATA_DIR / "south_korea_water_quality_historical_measurements.csv"
     HISTORICAL_STATIONS_FILE = HISTORICAL_DATA_DIR / "south_korea_water_quality_station_metadata.csv"
     HISTORICAL_MANIFEST_FILE = HISTORICAL_DATA_DIR / "download_manifest.json"
+    STATIC_DASHBOARD_DATA_DIR = Path(__file__).resolve().parent / "dashboard_static_data"
+    DERIVED_HISTORICAL_MEASUREMENTS_FILE = STATIC_DASHBOARD_DATA_DIR / "historical_annual_station_measurements.csv"
+    DERIVED_HISTORICAL_STATIONS_FILE = STATIC_DASHBOARD_DATA_DIR / "south_korea_water_quality_station_metadata.csv"
+    DERIVED_HISTORICAL_MANIFEST_FILE = STATIC_DASHBOARD_DATA_DIR / "download_manifest.json"
+    HSPF_ALGAE_SCENARIO_DIR = Path(__file__).resolve().parent / "HSPF_Algae_Bloom_SKorea" / "05_analysis" / "algae_scenarios"
     SITE_DASHBOARD_DIR = DATA_DIR / "google_site_dashboard"
     # Optional: set this to your published GitHub Pages URL, for example:
     # "https://YOUR_GITHUB_USERNAME.github.io/k-waterguard-dashboard/"
@@ -1666,16 +1671,18 @@ class PlotGenerator:
             return False
 
     def _load_historical_plot_data(self):
-        if not Config.HISTORICAL_MEASUREMENTS_FILE.exists():
+        measurements_path = Config.HISTORICAL_MEASUREMENTS_FILE if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
+        stations_path = Config.HISTORICAL_STATIONS_FILE if Config.HISTORICAL_STATIONS_FILE.exists() else Config.DERIVED_HISTORICAL_STATIONS_FILE
+        if not measurements_path.exists():
             return pd.DataFrame()
         try:
-            df = pd.read_csv(Config.HISTORICAL_MEASUREMENTS_FILE)
+            df = pd.read_csv(measurements_path)
             df['sample_date'] = pd.to_datetime(df.get('sample_date'), errors='coerce')
             for column in Config.HISTORICAL_VARIABLE_MAP:
                 if column in df.columns:
                     df[column] = pd.to_numeric(df[column], errors='coerce')
-            if Config.HISTORICAL_STATIONS_FILE.exists():
-                stations = pd.read_csv(Config.HISTORICAL_STATIONS_FILE)
+            if stations_path.exists():
+                stations = pd.read_csv(stations_path)
                 if 'station_code' in stations.columns and 'station_code' in df.columns:
                     metadata_columns = [
                         column for column in ['station_code', 'river_basin', 'large_watershed', 'middle_watershed']
@@ -1756,7 +1763,7 @@ class PlotGenerator:
             df = df.dropna(subset=['chlorophyll_a']).copy()
             if df.empty:
                 return
-            watershed_column = 'large_watershed' if 'large_watershed' in df.columns else 'river_basin' if 'river_basin' in df.columns else 'network_category'
+            watershed_column = 'river_basin' if 'river_basin' in df.columns else 'large_watershed' if 'large_watershed' in df.columns else 'network_category'
             if watershed_column not in df.columns:
                 df[watershed_column] = 'Unknown'
             df[watershed_column] = df[watershed_column].fillna('Unknown').astype(str)
@@ -2318,10 +2325,14 @@ class DashboardGenerator:
         algal_rows = self._algal_bloom_rows()
         algal_standard_rows = self._algal_standard_rows()
         watershed_rows = self._watershed_status_rows()
+        algal_scenario_rows = self._algal_scenario_rows()
         side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count, station_count)
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
-        historical_measurements_link = self._file_uri(Config.HISTORICAL_MEASUREMENTS_FILE) if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else '#'
-        historical_stations_link = self._file_uri(Config.HISTORICAL_STATIONS_FILE) if Config.HISTORICAL_STATIONS_FILE.exists() else '#'
+        historical_measurements_path = Config.HISTORICAL_MEASUREMENTS_FILE if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
+        historical_stations_path = Config.HISTORICAL_STATIONS_FILE if Config.HISTORICAL_STATIONS_FILE.exists() else Config.DERIVED_HISTORICAL_STATIONS_FILE
+        historical_measurements_link = self._file_uri(historical_measurements_path) if historical_measurements_path.exists() else '#'
+        historical_stations_link = self._file_uri(historical_stations_path) if historical_stations_path.exists() else '#'
+        historical_measurements_label = 'Download full historical measurements' if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else 'Download derived annual historical dataset'
         chatbot_html = self._chatbot_html()
         chatbot_script = self._chatbot_script()
 
@@ -2401,9 +2412,28 @@ class DashboardGenerator:
     body.page-trends .page-home, body.page-trends .page-data, body.page-trends .page-algal, body.page-trends .page-spatial {{ display: none; }}
     body.page-algal .page-home, body.page-algal .page-data, body.page-algal .page-trends, body.page-algal .page-spatial {{ display: none; }}
     body.page-spatial .page-home, body.page-spatial .page-data, body.page-spatial .page-trends, body.page-spatial .page-algal {{ display: none; }}
-    .home-overview {{ display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; align-items: stretch; }}
+    body.page-home .toolbar, body.page-home .search-status, body.page-home .insight-rail {{ display: none !important; }}
+    .home-overview {{
+      display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; align-items: stretch;
+      background:
+        linear-gradient(135deg, rgba(0, 71, 160, .96), rgba(23, 64, 112, .90) 46%, rgba(205, 46, 58, .88)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover; background-position: center;
+      color: white; border: 0; padding: 28px; overflow: hidden;
+    }}
+    .home-overview h2 {{ color: white; font-size: 28px; }}
+    .home-overview p, .home-overview .muted, .home-overview .overview-list {{ color: rgba(255,255,255,.90); }}
+    .home-overview .history-link {{ color: white; }}
+    .overview-panel {{ background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.20); border-radius: 8px; padding: 18px; backdrop-filter: blur(6px); }}
+    .overview-kicker {{ margin: 0 0 8px; color: rgba(255,255,255,.78); font-weight: 800; text-transform: uppercase; font-size: 12px; letter-spacing: .08em; }}
     .overview-list {{ margin: 10px 0 0; padding-left: 18px; color: #26364c; line-height: 1.45; }}
     .page-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }}
+    .home-overview .button {{ background: white; color: var(--blue); font-weight: 800; }}
+    .capability-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }}
+    .capability-card {{ padding: 18px; border-top: 4px solid var(--blue); min-height: 150px; }}
+    .capability-card:nth-child(even) {{ border-top-color: var(--red); }}
+    .capability-card h3 {{ margin: 0 0 8px; font-size: 18px; }}
+    .capability-card p {{ margin: 0; color: var(--muted); line-height: 1.42; }}
     .install-button {{ display: none; border: 0; cursor: pointer; font: inherit; }}
     .install-button.ready {{ display: inline-flex; }}
     .grid {{ display: grid; gap: 14px; }}
@@ -2522,7 +2552,7 @@ class DashboardGenerator:
     .chat-input {{ flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: inherit; }}
     .chat-send {{ border: 0; border-radius: 6px; background: var(--red); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
     @media (max-width: 980px) {{
-      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr 1fr; }}
+      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col, .capability-grid {{ grid-template-columns: 1fr 1fr; }}
       .home-overview {{ grid-template-columns: 1fr; }}
     }}
     @media (min-width: 1840px) {{
@@ -2533,7 +2563,7 @@ class DashboardGenerator:
       header {{ min-height: 330px; background-position: center right; }}
       .brand-logo {{ width: 44px; height: 44px; }}
       .brand-name {{ font-size: 16px; }}
-      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr; }}
+      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col, .capability-grid {{ grid-template-columns: 1fr; }}
       .home-overview {{ grid-template-columns: 1fr; }}
     }}
   </style>
@@ -2570,7 +2600,8 @@ class DashboardGenerator:
 
     <section class="card section page page-home" id="agentOverview">
       <div class="home-overview">
-        <div>
+        <div class="overview-panel">
+          <p class="overview-kicker">Daily Water Intelligence For South Korea</p>
           <h2>K-WaterGuard AI Agent Overview</h2>
           <p>K-WaterGuard AI is an autonomous water-quality intelligence dashboard for South Korea. It combines Korean monitoring data, historical station records, spatial maps, alert screening rules, trend analysis, and researcher-ready downloads into one decision-support system.</p>
           <p>The agent supports farmers, watershed managers, lake and reservoir operators, researchers, extension officers, policy experts, and environmental agencies by turning raw water-quality records into practical signals for irrigation safety, nutrient pressure, algal-bloom risk, pollution screening, and long-term watershed planning.</p>
@@ -2585,7 +2616,8 @@ class DashboardGenerator:
             <a class="button" href="algal-bloom.html">Open Algal Bloom Page</a>
           </div>
         </div>
-        <div>
+        <div class="overview-panel">
+          <p class="overview-kicker">Research Lab And Creator</p>
           <h2>Created By</h2>
           <p>This dashboard is created for the Regional Water Environment System Lab, Department of Agricultural Engineering, Gyeongsang National University.</p>
           <p class="muted">The lab works on water resource conservation, watershed management, agricultural water quality, AI, big-data analytics, remote sensing, and hydrological modeling for sustainable agriculture and evidence-based water policy.</p>
@@ -2601,6 +2633,27 @@ class DashboardGenerator:
       {self._stat_card('Records', f'{record_count:,}')}
       {self._stat_card('Cities / Provinces', f'{city_count:,} / {province_count:,}')}
       {self._stat_card('Alert Stations', f'{alert_station_count:,}')}
+    </section>
+
+    <section class="page page-home">
+      <div class="capability-grid">
+        <article class="card capability-card">
+          <h3>Farm Decisions</h3>
+          <p>Review water-quality status, nutrient pressure, and algal risk signals before irrigation and agricultural water planning.</p>
+        </article>
+        <article class="card capability-card">
+          <h3>Research Trends</h3>
+          <p>Use Mann-Kendall, Sen's slope, annual plots, and downloadable station datasets for long-term water-quality analysis.</p>
+        </article>
+        <article class="card capability-card">
+          <h3>Watershed Alerts</h3>
+          <p>Screen Korean water-quality standards, latest monitoring alerts, province coverage, and watershed-level algal bloom status.</p>
+        </article>
+        <article class="card capability-card">
+          <h3>Spatial Evidence</h3>
+          <p>Inspect one-point-per-station spatial maps with corrected station identity and coolwarm parameter visualization.</p>
+        </article>
+      </div>
     </section>
 
     <section class="grid two-col page page-home">
@@ -2626,7 +2679,7 @@ class DashboardGenerator:
     <section class="card section page page-data" id="historicalDownloads">
       <h2>Historical Data Downloads</h2>
       <p class="muted">The downloaded NIER historical archive contains {int(historical_summary.get('measurement_rows') or 0):,} measurements and {station_count:,} unique stations from {html.escape(str(historical_summary.get('start_year', '')))} to {html.escape(str(historical_summary.get('end_year', '')))}.</p>
-      <p><a class="history-link" href="{historical_measurements_link}">Download full historical measurements</a> &nbsp; <a class="history-link" href="{historical_stations_link}">Download station metadata</a></p>
+      <p><a class="history-link" href="{historical_measurements_link}">{html.escape(historical_measurements_label)}</a> &nbsp; <a class="history-link" href="{historical_stations_link}">Download station metadata</a></p>
       <div class="table-wrap">
         <table id="historyTable">
           <thead>
@@ -2687,6 +2740,8 @@ class DashboardGenerator:
         </div>
       </div>
       <div class="table-wrap" style="margin-top: 14px;"><table><thead><tr><th>Rule</th><th>Caution</th><th>Warning</th><th>Bloom Outbreak</th><th>Unit</th></tr></thead><tbody>{algal_standard_rows}</tbody></table></div>
+      <h3>Scenario And HSPF Support Data</h3>
+      <div class="table-wrap"><table><thead><tr><th>Source</th><th>Scenario</th><th>Mean Chlorophyll-a</th><th>P90/P95</th><th>Threshold Exceedance</th><th>Management Note</th></tr></thead><tbody>{algal_scenario_rows}</tbody></table></div>
     </section>
 
     <section class="card section page page-spatial" id="spatialPage">
@@ -2745,7 +2800,7 @@ class DashboardGenerator:
       </div>
     </div>
   </div>
-  <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt after each agent run. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
+  <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt on the daily agent cycle. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
   <script>
     const search = document.getElementById('stationSearch');
     const searchStatus = document.getElementById('searchStatus');
@@ -3117,8 +3172,9 @@ class DashboardGenerator:
         if self._historical_manifest_cache is not None:
             return self._historical_manifest_cache
         try:
-            if Config.HISTORICAL_MANIFEST_FILE.exists():
-                self._historical_manifest_cache = json.loads(Config.HISTORICAL_MANIFEST_FILE.read_text(encoding='utf-8'))
+            manifest_path = Config.HISTORICAL_MANIFEST_FILE if Config.HISTORICAL_MANIFEST_FILE.exists() else Config.DERIVED_HISTORICAL_MANIFEST_FILE
+            if manifest_path.exists():
+                self._historical_manifest_cache = json.loads(manifest_path.read_text(encoding='utf-8'))
             else:
                 self._historical_manifest_cache = {}
         except Exception as exc:
@@ -3129,11 +3185,12 @@ class DashboardGenerator:
     def _load_historical_measurements(self):
         if self._historical_cache is not None:
             return self._historical_cache
-        if not Config.HISTORICAL_MEASUREMENTS_FILE.exists():
+        measurements_path = Config.HISTORICAL_MEASUREMENTS_FILE if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
+        if not measurements_path.exists():
             self._historical_cache = pd.DataFrame()
             return self._historical_cache
         try:
-            df = pd.read_csv(Config.HISTORICAL_MEASUREMENTS_FILE)
+            df = pd.read_csv(measurements_path)
             df['sample_date'] = pd.to_datetime(df.get('sample_date'), errors='coerce')
             for column in Config.HISTORICAL_VARIABLE_MAP:
                 if column in df.columns:
@@ -3158,11 +3215,12 @@ class DashboardGenerator:
     def _load_historical_stations(self):
         if self._historical_station_cache is not None:
             return self._historical_station_cache
-        if not Config.HISTORICAL_STATIONS_FILE.exists():
+        stations_path = Config.HISTORICAL_STATIONS_FILE if Config.HISTORICAL_STATIONS_FILE.exists() else Config.DERIVED_HISTORICAL_STATIONS_FILE
+        if not stations_path.exists():
             self._historical_station_cache = pd.DataFrame()
             return self._historical_station_cache
         try:
-            self._historical_station_cache = pd.read_csv(Config.HISTORICAL_STATIONS_FILE)
+            self._historical_station_cache = pd.read_csv(stations_path)
         except Exception as exc:
             self.logger.error(f"Could not load historical station metadata: {exc}")
             self._historical_station_cache = pd.DataFrame()
@@ -3238,7 +3296,7 @@ class DashboardGenerator:
                 for source_column, (label, unit) in Config.HISTORICAL_VARIABLE_MAP.items():
                     if source_column in variable_summary.columns and int(variable_summary.loc[station_code, source_column]) > 0:
                         available.append(f'{label} ({unit})'.strip())
-            watershed = row.get('large_watershed') or row.get('river_basin') or ''
+            watershed = row.get('river_basin') or row.get('large_watershed') or ''
             rows.append(
                 '<tr>'
                 f'<td>{html.escape(str(station_code))}</td>'
@@ -3379,7 +3437,7 @@ class DashboardGenerator:
         for _, row in latest.sort_values(['_priority', 'chlorophyll_a'], ascending=[True, False]).head(limit).iterrows():
             status = str(row.get('status', 'Normal'))
             pill = 'critical' if status in {'Bloom outbreak', 'Warning'} else 'warning' if status == 'Caution' else 'ok'
-            watershed = row.get('large_watershed') or row.get('river_basin') or row.get('network_category') or ''
+            watershed = row.get('river_basin') or row.get('large_watershed') or row.get('network_category') or ''
             station_label = f"{row.get('station_code', '')} - {row.get('station_name', '')}"
             rows.append(
                 '<tr>'
@@ -3398,7 +3456,7 @@ class DashboardGenerator:
         if df.empty or 'chlorophyll_a' not in df.columns:
             return '<tr><td colspan="4">Watershed algal status is not available.</td></tr>'
         working = df.dropna(subset=['chlorophyll_a']).copy()
-        watershed_column = 'large_watershed' if 'large_watershed' in working.columns else 'river_basin' if 'river_basin' in working.columns else 'network_category'
+        watershed_column = 'river_basin' if 'river_basin' in working.columns else 'large_watershed' if 'large_watershed' in working.columns else 'network_category'
         if watershed_column not in working.columns:
             working[watershed_column] = 'Unknown'
         grouped = working.groupby(working[watershed_column].fillna('Unknown')).agg(
@@ -3418,6 +3476,41 @@ class DashboardGenerator:
                 f'<td><span class="alert-pill {pill}">{html.escape(status)}</span></td>'
                 '</tr>'
             )
+        return ''.join(rows)
+
+    def _algal_scenario_rows(self):
+        scenario_files = [
+            ('Observed model', Config.HSPF_ALGAE_SCENARIO_DIR / 'observed_chla_scenario_screening.csv'),
+            ('HSPF PLNK 2010', Config.HSPF_ALGAE_SCENARIO_DIR / 'hspf_plnk_2010_scenario_summary.csv'),
+        ]
+        rows = []
+        for source_label, path in scenario_files:
+            if not path.exists():
+                continue
+            try:
+                df = pd.read_csv(path)
+            except Exception:
+                continue
+            for _, row in df.head(12).iterrows():
+                scenario = row.get('scenario', '')
+                mean_value = row.get('mean_predicted_chlorophyll_a_ug_l', row.get('mean_chla_ug_l', np.nan))
+                p_value = row.get('p90_predicted_chlorophyll_a_ug_l', row.get('p95_chla_ug_l', np.nan))
+                exceedance = row.get('days_or_samples_gt_25ug_l', row.get('hours_gt_25ug_l', ''))
+                note = row.get('note', '')
+                mean_text = '' if pd.isna(mean_value) else f"{float(mean_value):.2f} ug/L"
+                p_text = '' if pd.isna(p_value) else f"{float(p_value):.2f} ug/L"
+                rows.append(
+                    '<tr>'
+                    f'<td>{html.escape(source_label)}</td>'
+                    f'<td>{html.escape(str(scenario))}</td>'
+                    f'<td>{html.escape(mean_text)}</td>'
+                    f'<td>{html.escape(p_text)}</td>'
+                    f'<td>{html.escape(str(exceedance))}</td>'
+                    f'<td>{html.escape(str(note))}</td>'
+                    '</tr>'
+                )
+        if not rows:
+            return '<tr><td colspan="6">Scenario support files are not available in this dashboard build.</td></tr>'
         return ''.join(rows)
 
     def _evaluate_alerts(self, df):
@@ -3943,12 +4036,25 @@ class DashboardGenerator:
             Config.HISTORICAL_MEASUREMENTS_FILE,
             Config.HISTORICAL_STATIONS_FILE,
             Config.HISTORICAL_MANIFEST_FILE,
+            Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE,
+            Config.DERIVED_HISTORICAL_STATIONS_FILE,
+            Config.DERIVED_HISTORICAL_MANIFEST_FILE,
         ]
-        for source in historical_files:
+        for source in dict.fromkeys(historical_files):
             if source.exists():
                 target = data_dir / source.name
                 shutil.copyfile(source, target)
                 replacements[self._file_uri(source)] = self._site_asset_url(f"data/{source.name}")
+
+        hspf_data_dir = data_dir / "hspf_algae"
+        for source in [
+            Config.HSPF_ALGAE_SCENARIO_DIR / 'observed_chla_scenario_screening.csv',
+            Config.HSPF_ALGAE_SCENARIO_DIR / 'hspf_plnk_2010_scenario_summary.csv',
+        ]:
+            if source.exists():
+                hspf_data_dir.mkdir(parents=True, exist_ok=True)
+                target = hspf_data_dir / source.name
+                shutil.copyfile(source, target)
 
         run_files = []
         if Config.DAILY_OUTPUTS_DIR.exists():
