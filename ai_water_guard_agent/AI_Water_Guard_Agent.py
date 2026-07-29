@@ -122,6 +122,12 @@ class Config:
     CYANOBACTERIA_STATION_FILE = ALGAL_BLOOM_DATA_DIR / "cyanobacteria_station_cells_per_ml.csv"
     CYANOBACTERIA_LAKEWIDE_FILE = ALGAL_BLOOM_DATA_DIR / "harmful_cyanobacteria_lakewide_cells_per_ml.csv"
     CYANOBACTERIA_STATION_COORDS_FILE = ALGAL_BLOOM_DATA_DIR / "namgang_station_latlon.csv"
+    NATIONAL_CYANOBACTERIA_FILE = DATA_DIR / "national_cyanobacteria_recent.csv"
+    NIER_ALGAE_PAGE = "https://water.nier.go.kr/mobile/link/?pMENU_NO=132"
+    NIER_CODE_LIST_URL = "https://water.nier.go.kr/web/codeUtil/codeListAjax"
+    NIER_ALGAE_POSITION_URL = "https://water.nier.go.kr/mobile/waterRecent_1/positionList"
+    NIER_ALGAE_RESULT_URL = "https://water.nier.go.kr/mobile/waterRecent_1/resultList"
+    ENABLE_NIER_ALGAE_DOWNLOAD = os.environ.get("ENABLE_NIER_ALGAE_DOWNLOAD", "true").lower() not in {"0", "false", "no"}
     WATERSHED_SHAPEFILE = AGENT_DIR / "watershed_shapes" / "korea_major_subbasins" / "korea_major_subbasins.shp"
     WATERSHED_SHAPEFILE_CRS = "EPSG:4326"
     REQUIRE_DASHBOARD_SUPPORT_DATA = os.environ.get("REQUIRE_DASHBOARD_SUPPORT_DATA", "").lower() in {"1", "true", "yes"}
@@ -341,11 +347,21 @@ class Config:
 
 
 def load_cyanobacteria_records(logger=None):
-    """Load harmful cyanobacteria cell-count support data for Jinyang Lake."""
+    """Load harmful cyanobacteria cell-count data from national NIER and local support files."""
+    rows = []
+    national_df = download_nier_recent_cyanobacteria(logger)
+    if not national_df.empty:
+        rows.extend(national_df.to_dict('records'))
+
     if not Config.CYANOBACTERIA_STATION_FILE.exists():
         if logger:
             logger.warning(f"Cyanobacteria station data missing: {Config.CYANOBACTERIA_STATION_FILE}")
-        return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return df
+        df['sample_date'] = pd.to_datetime(df['sample_date'], errors='coerce')
+        df['cyanobacteria_cells_ml'] = pd.to_numeric(df['cyanobacteria_cells_ml'], errors='coerce')
+        return df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).sort_values('sample_date')
 
     coord_lookup = {
         'Naedong': {'longitude': 128.020003, 'latitude': 35.149339},
@@ -366,7 +382,6 @@ def load_cyanobacteria_records(logger=None):
             if logger:
                 logger.warning(f"Cyanobacteria coordinate metadata could not be loaded: {exc}")
 
-    rows = []
     try:
         station_df = pd.read_csv(Config.CYANOBACTERIA_STATION_FILE)
         station_df['Date'] = pd.to_datetime(station_df.get('Date'), errors='coerce')
@@ -437,6 +452,183 @@ def load_cyanobacteria_records(logger=None):
     df['sample_date'] = pd.to_datetime(df['sample_date'], errors='coerce')
     df['cyanobacteria_cells_ml'] = pd.to_numeric(df['cyanobacteria_cells_ml'], errors='coerce')
     return df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).sort_values('sample_date')
+
+
+def _to_number(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return np.nan
+    text = str(value).replace(',', '').strip()
+    if not text or text in {'-', 'None', 'nan'}:
+        return np.nan
+    return pd.to_numeric(text, errors='coerce')
+
+
+def _parse_nier_mmdd(value, now=None):
+    text = str(value or '').strip()
+    match = re.search(r'(\d{1,2})[/-](\d{1,2})', text)
+    if not match:
+        return pd.NaT
+    now = now or Config.now()
+    month = int(match.group(1))
+    day = int(match.group(2))
+    year = now.year
+    parsed = pd.Timestamp(year=year, month=month, day=day)
+    if parsed > pd.Timestamp(now) + pd.Timedelta(days=45):
+        parsed = pd.Timestamp(year=year - 1, month=month, day=day)
+    return parsed
+
+
+def _clean_portal_text(value, fallback=''):
+    text = str(value or '').strip()
+    if not text or '�' in text:
+        return fallback
+    return text
+
+
+def _basin_metadata(basin_code, group_index=0, position_index=0):
+    basin_lookup = {
+        'R01': ('Han River', 'Han River', 127.45, 37.45),
+        'R02': ('Nakdong River', 'Nakdong River', 128.45, 35.75),
+        'R03': ('Geum River', 'Geum River', 127.05, 36.25),
+        'R04': ('Yeongsan / Seomjin River', 'Yeongsan-Seomjin River', 126.85, 35.05),
+    }
+    river_basin, large_watershed, lon, lat = basin_lookup.get(str(basin_code), ('Korea', 'Korea', 127.8, 36.2))
+    # Stable, tiny offsets keep stations clickable when source coordinates are unavailable.
+    dx = ((int(group_index) % 7) - 3) * 0.055 + ((int(position_index) % 3) - 1) * 0.018
+    dy = ((int(group_index) // 7) % 7 - 3) * 0.045 + ((int(position_index) // 3) % 3 - 1) * 0.016
+    return {
+        'river_basin': river_basin,
+        'large_watershed': large_watershed,
+        'longitude': lon + dx,
+        'latitude': lat + dy,
+    }
+
+
+def _cyanobacteria_threshold_status(cells):
+    if pd.isna(cells):
+        return 'No data'
+    if cells >= Config.ALGAL_BLOOM_RULES['cyanobacteria_cells_ml']['outbreak']:
+        return 'Bloom outbreak'
+    if cells >= Config.ALGAL_BLOOM_RULES['cyanobacteria_cells_ml']['warning']:
+        return 'Warning'
+    if cells >= Config.ALGAL_BLOOM_RULES['cyanobacteria_cells_ml']['caution']:
+        return 'Caution'
+    return 'Normal'
+
+
+def download_nier_recent_cyanobacteria(logger=None):
+    """Download latest national algae-warning harmful cyanobacteria data from NIER mobile endpoints."""
+    cache_path = Config.NATIONAL_CYANOBACTERIA_FILE
+    if cache_path.exists():
+        try:
+            modified = datetime.fromtimestamp(cache_path.stat().st_mtime)
+            if modified.date() == Config.now().date():
+                return pd.read_csv(cache_path, parse_dates=['sample_date'])
+        except Exception:
+            pass
+    if not getattr(Config, 'ENABLE_NIER_ALGAE_DOWNLOAD', True) or requests is None:
+        if cache_path.exists():
+            try:
+                return pd.read_csv(cache_path, parse_dates=['sample_date'])
+            except Exception:
+                return pd.DataFrame()
+        return pd.DataFrame()
+
+    headers = {
+        'User-Agent': 'K-WaterGuard-AI/1.0',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Referer': Config.NIER_ALGAE_PAGE,
+    }
+    basin_codes = ['R01', 'R02', 'R03', 'R04']
+    rows = []
+    try:
+        session = requests.Session()
+        session.headers.update(headers)
+        session.get(Config.NIER_ALGAE_PAGE, timeout=25)
+        for basin_code in basin_codes:
+            code_response = session.post(
+                Config.NIER_CODE_LIST_URL,
+                data={'pType': '7', 'ATTR_1': '2187', 'ATTR_3': basin_code},
+                timeout=25,
+            )
+            code_response.raise_for_status()
+            code_response.encoding = 'utf-8'
+            groups = code_response.json().get('list', [])
+            for group_index, group in enumerate(groups):
+                group_code = group.get('CODE')
+                if not group_code:
+                    continue
+                group_eng_name = _clean_portal_text(group.get('CODE_ENG_NM'), group_code)
+                group_name = group_eng_name
+                position_response = session.post(
+                    Config.NIER_ALGAE_POSITION_URL,
+                    data={'groupCode': group_code},
+                    timeout=25,
+                )
+                position_response.raise_for_status()
+                position_response.encoding = 'utf-8'
+                positions = position_response.json().get('list', [])
+                for position_index, position in enumerate(positions):
+                    station_code = position.get('SWMN_CODE')
+                    if not station_code:
+                        continue
+                    station_name = str(station_code)
+                    result_response = session.post(
+                        Config.NIER_ALGAE_RESULT_URL,
+                        data={'ATTR_1': basin_code, 'ATTR_2': group_code, 'ATTR_3': station_code},
+                        timeout=25,
+                    )
+                    result_response.raise_for_status()
+                    result_response.encoding = 'utf-8'
+                    meta = _basin_metadata(basin_code, group_index, position_index)
+                    for result in result_response.json().get('list', []):
+                        cells = _to_number(result.get('IEM_TOT_BGALAGE_CELL_CO'))
+                        sample_date = _parse_nier_mmdd(result.get('WTRSMPLE_DE'))
+                        if pd.isna(cells) or pd.isna(sample_date):
+                            continue
+                        clean_status = _cyanobacteria_threshold_status(cells)
+                        rows.append({
+                            'sample_date': sample_date,
+                            'station_code': str(station_code),
+                            'station_name': str(station_name),
+                            'lake_name': str(group_name),
+                            'river_basin': meta['river_basin'],
+                            'large_watershed': meta['large_watershed'],
+                            'middle_watershed': str(group_name),
+                            'watershed_code': str(group_code),
+                            'cyanobacteria_cells_ml': float(cells),
+                            'temperature_c': _to_number(result.get('IEM_SURLYR_WTRTP')),
+                            'pH': _to_number(result.get('IEM_AVRG_PH')),
+                            'DO_mg_l': _to_number(result.get('IEM_AVRG_DOC')),
+                            'chlorophyll_a_mg_m3': _to_number(result.get('ITEM_CLOA')),
+                            'algae_alarm_stage': clean_status,
+                            'latitude': meta['latitude'],
+                            'longitude': meta['longitude'],
+                            'basis': 'NIER mobile algae-warning recent measurement: harmful cyanobacteria cell count',
+                            'source': 'water.nier.go.kr mobile waterRecent_1',
+                            'source_url': Config.NIER_ALGAE_PAGE,
+                            'site_group_code': str(group_code),
+                            'site_group_name_english': str(group_eng_name),
+                        })
+        df = pd.DataFrame(rows)
+        if not df.empty:
+            df = df.drop_duplicates(['sample_date', 'station_code', 'cyanobacteria_cells_ml']).sort_values(['sample_date', 'river_basin', 'lake_name'])
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(cache_path, index=False, encoding='utf-8-sig')
+            if logger:
+                logger.info(f"Downloaded {len(df):,} NIER national cyanobacteria records from {df['station_code'].nunique():,} stations")
+            return df
+    except Exception as exc:
+        if logger:
+            logger.warning(f"NIER national cyanobacteria download unavailable, using cached/local support data: {exc}")
+        if cache_path.exists():
+            try:
+                return pd.read_csv(cache_path, parse_dates=['sample_date'])
+            except Exception as cache_exc:
+                if logger:
+                    logger.warning(f"Cached NIER cyanobacteria file could not be loaded: {cache_exc}")
+    return pd.DataFrame()
 
 
 # ==================== SETUP ====================
@@ -1882,6 +2074,7 @@ class PlotGenerator:
                 ax.axis('off')
             self._title_figure(fig, 'Historical Water Quality Time-Series Trends', "Annual means with Sen's slope reference line")
             self._save_figure(fig, self._plots_dir() / 'historical_trend_annual_means.png')
+            self._write_historical_trend_interactive(annual, variables)
 
             slope_rows = []
             trend_helper = DashboardGenerator()
@@ -1904,6 +2097,109 @@ class PlotGenerator:
                 self._save_figure(fig, self._plots_dir() / 'historical_sen_slope_summary.png', rect=[0, 0, 1, 0.98])
         except Exception as exc:
             self.logger.error(f"Error in historical trend plots: {exc}")
+
+    def _write_historical_trend_interactive(self, annual, variables):
+        traces = []
+        trace_groups = []
+        for column in variables:
+            label, unit = Config.HISTORICAL_VARIABLE_MAP[column]
+            series = annual[column].dropna()
+            if series.empty:
+                continue
+            trace_index = len(traces)
+            group_indices = [trace_index]
+            visible = trace_index == 0
+            traces.append({
+                'type': 'scatter',
+                'mode': 'lines+markers',
+                'name': label,
+                'x': [str(int(year)) for year in series.index],
+                'y': series.round(5).tolist(),
+                'visible': visible,
+                'line': {'color': '#0057b8', 'width': 3},
+                'marker': {'size': 8, 'color': '#ffffff', 'line': {'color': '#0057b8', 'width': 2}},
+                'fill': 'tozeroy',
+                'fillcolor': 'rgba(0, 87, 184, 0.10)',
+                'hovertemplate': (
+                    f'<b>{html.escape(label)}</b><br>'
+                    'Year: %{x}<br>'
+                    f'Annual mean: %{{y}} {html.escape(unit)}<extra></extra>'
+                ),
+            })
+            if len(series) >= 3:
+                stats = DashboardGenerator()._mann_kendall_sen(
+                    series.index.to_numpy(dtype=float),
+                    series.values.astype(float),
+                )
+                slope = stats.get('sen_slope', np.nan)
+                if pd.notna(slope):
+                    x_values = series.index.to_numpy(dtype=float)
+                    intercept = float(np.nanmedian(series.values - (x_values * slope)))
+                    traces.append({
+                        'type': 'scatter',
+                        'mode': 'lines',
+                        'name': f"{label} Sen slope",
+                        'x': [str(int(series.index.min())), str(int(series.index.max()))],
+                        'y': [intercept + slope * float(series.index.min()), intercept + slope * float(series.index.max())],
+                        'visible': visible,
+                        'line': {'color': '#d7263d', 'width': 2.4, 'dash': 'dash'},
+                        'hovertemplate': (
+                            f'<b>{html.escape(label)} Sen slope</b><br>'
+                            f'Slope: {slope:.5g} {html.escape(unit)}/year<extra></extra>'
+                        ),
+                    })
+                    group_indices.append(len(traces) - 1)
+            trace_groups.append((label, unit, group_indices))
+
+        if not traces:
+            return
+
+        buttons = []
+        for label, unit, group_indices in trace_groups:
+            visibility = [False] * len(traces)
+            for trace_index in group_indices:
+                visibility[trace_index] = True
+            buttons.append({
+                'label': label,
+                'method': 'update',
+                'args': [
+                    {'visible': visibility},
+                    {
+                        'title.text': f'Clickable Historical Annual Trend - {label}',
+                        'yaxis.title.text': unit,
+                    },
+                ],
+            })
+
+        layout = {
+            'title': {'text': f'Clickable Historical Annual Trend - {traces[0]["name"]}', 'x': 0.02, 'xanchor': 'left'},
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
+            'paper_bgcolor': '#ffffff',
+            'plot_bgcolor': '#f7fbff',
+            'margin': {'l': 76, 'r': 34, 't': 92, 'b': 74},
+            'xaxis': {'title': 'Year', 'gridcolor': '#dbe7f3', 'zeroline': False},
+            'yaxis': {'title': 'Annual mean', 'gridcolor': '#dbe7f3', 'zeroline': False},
+            'hovermode': 'closest',
+            'updatemenus': [{
+                'buttons': buttons,
+                'direction': 'down',
+                'x': 0.99,
+                'xanchor': 'right',
+                'y': 1.18,
+                'yanchor': 'top',
+                'bgcolor': '#ffffff',
+                'bordercolor': '#c8d7e8',
+                'font': {'color': '#071426'},
+            }],
+            'showlegend': True,
+            'legend': {'orientation': 'h', 'y': -0.22},
+        }
+        self._write_plotly_html(
+            'historical_trend_annual_means_interactive.html',
+            'Interactive Historical Annual Trends',
+            traces,
+            layout,
+        )
 
     def _plot_algal_bloom_dashboard(self):
         try:
@@ -2016,8 +2312,156 @@ class PlotGenerator:
                 colorbar = fig.colorbar(scatter, cax=cax)
                 colorbar.set_label(f'log10 maximum cyanobacteria ({rule["unit"]})')
                 self._save_figure(fig, self._plots_dir() / 'algal_cyanobacteria_watershed_map.png', rect=[0, 0, 1, 0.96])
+
+            self._write_algal_interactive_plots(df, grouped if 'grouped' in locals() else pd.DataFrame(), heatmap_data if 'heatmap_data' in locals() else pd.DataFrame(), rule)
         except Exception as exc:
             self.logger.error(f"Error in algal bloom plots: {exc}")
+
+    def _write_plotly_html(self, filename, title, traces, layout):
+        path = self._plots_dir() / filename
+        html_text = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; }}
+    #plot {{ width: 100%; height: 100vh; min-height: 440px; }}
+  </style>
+</head>
+<body>
+  <div id="plot"></div>
+  <script>
+    const traces = {json.dumps(traces, ensure_ascii=False)};
+    const layout = {json.dumps(layout, ensure_ascii=False)};
+    const config = {{responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d']}};
+    Plotly.newPlot('plot', traces, layout, config);
+  </script>
+</body>
+</html>"""
+        path.write_text(html_text, encoding='utf-8')
+        return path
+
+    def _write_algal_interactive_plots(self, df, grouped, heatmap_data, rule):
+        if df is None or df.empty:
+            return
+        plot_df = df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).copy()
+        plot_df['sample_date'] = pd.to_datetime(plot_df['sample_date'], errors='coerce')
+        plot_df = plot_df.dropna(subset=['sample_date'])
+        if plot_df.empty:
+            return
+        base_layout = {
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
+            'paper_bgcolor': '#ffffff',
+            'plot_bgcolor': '#f6faff',
+            'margin': {'l': 70, 'r': 30, 't': 70, 'b': 70},
+            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif'}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+        }
+
+        if grouped is not None and not grouped.empty:
+            top = grouped.sort_values('max_cells', ascending=True).tail(22)
+            traces = [{
+                'type': 'bar',
+                'orientation': 'h',
+                'y': top.index.astype(str).tolist(),
+                'x': top['max_cells'].round(2).tolist(),
+                'marker': {'color': top['max_cells'].tolist(), 'colorscale': 'RdBu', 'reversescale': True, 'line': {'color': '#ffffff', 'width': 1}},
+                'customdata': np.column_stack([
+                    top['stations'].astype(int).astype(str).to_numpy(),
+                    pd.to_datetime(top['latest_date']).dt.strftime('%Y-%m-%d').to_numpy(),
+                ]).tolist(),
+                'hovertemplate': '<b>%{y}</b><br>Max cyanobacteria: %{x:,.0f} cells/mL<br>Stations: %{customdata[0]}<br>Latest date: %{customdata[1]}<extra></extra>',
+            }]
+            layout = dict(base_layout)
+            layout.update({
+                'title': {'text': 'Clickable Watershed Cyanobacteria Screening', 'x': 0.02, 'xanchor': 'left'},
+                'xaxis': {'title': f'Cyanobacteria ({rule["unit"]})', 'type': 'log', 'gridcolor': '#d8e3f1'},
+                'yaxis': {'title': 'Watershed / lake group'},
+                'shapes': [
+                    {'type': 'line', 'xref': 'x', 'yref': 'paper', 'x0': rule['caution'], 'x1': rule['caution'], 'y0': 0, 'y1': 1, 'line': {'color': '#0047a0', 'dash': 'dot', 'width': 2}},
+                    {'type': 'line', 'xref': 'x', 'yref': 'paper', 'x0': rule['warning'], 'x1': rule['warning'], 'y0': 0, 'y1': 1, 'line': {'color': '#cd2e3a', 'dash': 'dash', 'width': 2}},
+                ],
+            })
+            self._write_plotly_html('algal_watershed_cyanobacteria_interactive.html', 'Interactive Watershed Cyanobacteria Screening', traces, layout)
+
+        spatial = plot_df.dropna(subset=['latitude', 'longitude']).copy()
+        if not spatial.empty:
+            latest = spatial.sort_values('sample_date').groupby('station_code', as_index=False).tail(1)
+            traces = [{
+                'type': 'scattergeo',
+                'mode': 'markers',
+                'lon': latest['longitude'].round(5).tolist(),
+                'lat': latest['latitude'].round(5).tolist(),
+                'text': latest['station_name'].astype(str).tolist(),
+                'customdata': np.column_stack([
+                    latest['lake_name'].fillna('').astype(str).to_numpy(),
+                    latest['river_basin'].fillna('').astype(str).to_numpy(),
+                    latest['middle_watershed'].fillna('').astype(str).to_numpy(),
+                    latest['cyanobacteria_cells_ml'].round(2).astype(str).to_numpy(),
+                    latest['sample_date'].dt.strftime('%Y-%m-%d').to_numpy(),
+                    latest.get('algae_alarm_stage', pd.Series('', index=latest.index)).fillna('').astype(str).to_numpy(),
+                ]).tolist(),
+                'marker': {
+                    'size': np.clip(np.log10(latest['cyanobacteria_cells_ml'].clip(lower=1)) * 6 + 7, 8, 30).round(2).tolist(),
+                    'color': latest['cyanobacteria_cells_ml'].clip(lower=1).tolist(),
+                    'colorscale': 'RdBu',
+                    'reversescale': True,
+                    'cmin': 1,
+                    'cmax': max(10000, float(latest['cyanobacteria_cells_ml'].max())),
+                    'colorbar': {'title': 'cells/mL'},
+                    'line': {'color': '#ffffff', 'width': 1},
+                    'opacity': 0.9,
+                },
+                'hovertemplate': '<b>%{text}</b><br>Lake/river: %{customdata[0]}<br>Basin: %{customdata[1]}<br>Watershed: %{customdata[2]}<br>Cyanobacteria: %{customdata[3]} cells/mL<br>Date: %{customdata[4]}<br>NIER stage: %{customdata[5]}<extra></extra>',
+            }]
+            layout = dict(base_layout)
+            layout.update({
+                'title': {'text': 'Clickable National Cyanobacteria Map', 'x': 0.02, 'xanchor': 'left'},
+                'geo': {
+                    'scope': 'asia',
+                    'projection': {'type': 'mercator'},
+                    'lonaxis': {'range': [124.5, 131.8]},
+                    'lataxis': {'range': [33.0, 39.6]},
+                    'showland': True,
+                    'landcolor': '#f4f8fc',
+                    'showocean': True,
+                    'oceancolor': '#edf5ff',
+                    'showlakes': True,
+                    'lakecolor': '#edf5ff',
+                    'countrycolor': '#93a9c4',
+                    'subunitcolor': '#d8e3f1',
+                },
+            })
+            self._write_plotly_html('algal_cyanobacteria_watershed_map_interactive.html', 'Interactive National Cyanobacteria Map', traces, layout)
+
+        if heatmap_data is not None and not heatmap_data.empty:
+            z = np.log10(heatmap_data.clip(lower=1)).replace([np.inf, -np.inf], np.nan)
+            custom = []
+            for watershed in heatmap_data.index:
+                custom.append([
+                    '' if pd.isna(heatmap_data.loc[watershed, year]) else f"{float(heatmap_data.loc[watershed, year]):,.0f}"
+                    for year in heatmap_data.columns
+                ])
+            traces = [{
+                'type': 'heatmap',
+                'z': z.values.tolist(),
+                'x': [str(int(year)) for year in heatmap_data.columns],
+                'y': heatmap_data.index.astype(str).tolist(),
+                'customdata': custom,
+                'colorscale': 'RdBu',
+                'reversescale': True,
+                'colorbar': {'title': 'log10 cells/mL'},
+                'hovertemplate': '<b>%{y}</b><br>Year: %{x}<br>Maximum: %{customdata} cells/mL<extra></extra>',
+            }]
+            layout = dict(base_layout)
+            layout.update({
+                'title': {'text': 'Clickable Annual Cyanobacteria Signal By Watershed', 'x': 0.02, 'xanchor': 'left'},
+                'xaxis': {'title': 'Year'},
+                'yaxis': {'title': 'Watershed / lake group'},
+            })
+            self._write_plotly_html('algal_status_timeline_interactive.html', 'Interactive Annual Cyanobacteria Signal', traces, layout)
 
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
@@ -2053,6 +2497,7 @@ class PlotGenerator:
                 day_label = day.strftime('%Y-%m-%d')
                 station_layer = self._prepare_station_layer(day_df)
                 self.logger.info(f"Map station coverage for {day_label}: {len(station_layer)} stations with coordinates")
+                self._write_latest_station_interactive_map(day_df, day_label, (min_lon, min_lat, max_lon, max_lat))
                 for param in Config.WATER_QUALITY_COLUMNS:
                     plot_df = day_df.dropna(subset=[param, 'latitude', 'longitude'])
                     if plot_df.empty:
@@ -2116,6 +2561,105 @@ class PlotGenerator:
             self.logger.info("Daily parameter map plots saved")
         except Exception as e:
             self.logger.error(f"Error in parameter map plots: {str(e)}")
+
+    def _write_latest_station_interactive_map(self, day_df, day_label, bounds):
+        traces = []
+        for param in Config.WATER_QUALITY_COLUMNS:
+            if param not in day_df.columns:
+                continue
+            plot_df = self._prepare_map_points(day_df, param)
+            if plot_df.empty:
+                continue
+            label = self._format_parameter_label(param)
+            values = pd.to_numeric(plot_df[param], errors='coerce')
+            customdata = np.column_stack([
+                plot_df['station_name'].fillna('').astype(str).to_numpy(),
+                values.round(5).astype(str).to_numpy(),
+            ]).tolist()
+            trace_index = len(traces)
+            visible = trace_index == 0
+            traces.append({
+                'type': 'scattergeo',
+                'mode': 'markers',
+                'name': label,
+                'lon': plot_df['longitude'].round(6).tolist(),
+                'lat': plot_df['latitude'].round(6).tolist(),
+                'customdata': customdata,
+                'visible': visible,
+                'marker': {
+                    'size': 7.5,
+                    'color': values.round(5).tolist(),
+                    'colorscale': 'RdBu',
+                    'reversescale': True,
+                    'colorbar': {'title': label},
+                    'line': {'color': '#ffffff', 'width': 0.7},
+                    'opacity': 0.9,
+                },
+                'hovertemplate': (
+                    '<b>%{customdata[0]}</b><br>'
+                    f'{html.escape(label)}: %{{customdata[1]}}<br>'
+                    'Lon: %{lon}<br>Lat: %{lat}<extra></extra>'
+                ),
+            })
+
+        if not traces:
+            return
+
+        buttons = []
+        for trace_index, trace in enumerate(traces):
+            visibility = [False] * len(traces)
+            visibility[trace_index] = True
+            buttons.append({
+                'label': trace['name'],
+                'method': 'update',
+                'args': [
+                    {'visible': visibility},
+                    {'title.text': f'Clickable South Korea Station Map - {trace["name"]} ({day_label})'},
+                ],
+            })
+
+        min_lon, min_lat, max_lon, max_lat = bounds
+        layout = {
+            'title': {'text': f'Clickable South Korea Station Map - {traces[0]["name"]} ({day_label})', 'x': 0.02, 'xanchor': 'left'},
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
+            'paper_bgcolor': '#ffffff',
+            'plot_bgcolor': '#ffffff',
+            'margin': {'l': 20, 'r': 24, 't': 88, 'b': 18},
+            'geo': {
+                'scope': 'asia',
+                'projection': {'type': 'mercator'},
+                'showland': True,
+                'landcolor': '#f5f9fd',
+                'showocean': True,
+                'oceancolor': '#e9f3fb',
+                'showlakes': True,
+                'lakecolor': '#dcecff',
+                'showrivers': True,
+                'rivercolor': '#b9d3ea',
+                'showcountries': True,
+                'countrycolor': '#9fb2c5',
+                'lonaxis': {'range': [min_lon - 0.2, max_lon + 0.2]},
+                'lataxis': {'range': [min_lat - 0.2, max_lat + 0.2]},
+            },
+            'updatemenus': [{
+                'buttons': buttons,
+                'direction': 'down',
+                'x': 0.99,
+                'xanchor': 'right',
+                'y': 1.13,
+                'yanchor': 'top',
+                'bgcolor': '#ffffff',
+                'bordercolor': '#c8d7e8',
+                'font': {'color': '#071426'},
+            }],
+            'showlegend': False,
+        }
+        self._write_plotly_html(
+            'latest_station_parameter_map_interactive.html',
+            'Interactive South Korea Station Parameter Map',
+            traces,
+            layout,
+        )
 
     def _plot_station_coverage_map(self, df):
         """Plot all available station coordinates so coverage gaps are explicit."""
@@ -2587,6 +3131,7 @@ class DashboardGenerator:
         historical_measurements_link = self._file_uri(historical_measurements_path) if historical_measurements_path.exists() else '#'
         historical_stations_link = self._file_uri(historical_stations_path) if historical_stations_path.exists() else '#'
         historical_measurements_label = 'Download full historical measurements' if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else 'Download derived annual historical dataset'
+        national_cyanobacteria_link = self._file_uri(Config.NATIONAL_CYANOBACTERIA_FILE) if Config.NATIONAL_CYANOBACTERIA_FILE.exists() else '#'
         cyanobacteria_station_link = self._file_uri(Config.CYANOBACTERIA_STATION_FILE) if Config.CYANOBACTERIA_STATION_FILE.exists() else '#'
         cyanobacteria_lakewide_link = self._file_uri(Config.CYANOBACTERIA_LAKEWIDE_FILE) if Config.CYANOBACTERIA_LAKEWIDE_FILE.exists() else '#'
         chatbot_html = self._chatbot_html()
@@ -3368,6 +3913,24 @@ class DashboardGenerator:
     .plot img {{
       border-top: 1px solid rgba(216,227,241,.9);
       background: #fff;
+    }}
+    .interactive-plot iframe {{
+      width: 100%;
+      min-height: 520px;
+      border: 0;
+      display: block;
+      background: #ffffff;
+      border-top: 1px solid rgba(216,227,241,.9);
+    }}
+    .open-interactive {{
+      margin: 12px 14px 14px;
+    }}
+    .install-button {{
+      display: inline-flex;
+      background: linear-gradient(135deg, var(--red), #9f1f2a);
+    }}
+    .install-button.ready {{
+      box-shadow: 0 16px 34px rgba(205,46,58,.26);
     }}
     .table-wrap {{
       border-radius: 8px;
@@ -4772,7 +5335,7 @@ class DashboardGenerator:
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
-      <button class="button install-button" id="installAppButton" type="button">Install App</button>
+      <button class="button install-button ready" id="installAppButton" type="button">Download App</button>
       <a class="button" href="{csv_link}">Open latest CSV</a>
     </div>
     <div class="search-status" id="searchStatus">Search filters the alert, province, and station tables below.</div>
@@ -4906,8 +5469,8 @@ class DashboardGenerator:
         {self._stat_card('Korean Warning', '10,000 cells/mL')}
         {self._stat_card('Bloom Outbreak', '1,000,000 cells/mL')}
       </div>
-      <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts in cells/mL. This page uses the local cyanobacteria monitoring archive for Naedong, Panmun, and lakewide Jinyang Lake summaries, with warning levels based on Korean algae-alert thresholds.</p>
-      <p><a class="history-link" href="{cyanobacteria_station_link}">Download station cyanobacteria dataset</a> &nbsp; <a class="history-link" href="{cyanobacteria_lakewide_link}">Download lakewide cyanobacteria dataset</a></p>
+      <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts in cells/mL. This page combines the national NIER recent algae-warning feed for Han, Nakdong, Geum, and Yeongsan/Seomjin basins with the local historical cyanobacteria archive for Jinyang Lake / Namgang Dam.</p>
+      <p><a class="history-link" href="{national_cyanobacteria_link}">Download national NIER cyanobacteria feed</a> &nbsp; <a class="history-link" href="{cyanobacteria_station_link}">Download local station cyanobacteria archive</a> &nbsp; <a class="history-link" href="{cyanobacteria_lakewide_link}">Download local lakewide archive</a></p>
       <div class="grid plots">{algal_plot_cards}</div>
       <div class="grid two-col">
         <div>
@@ -5124,16 +5687,23 @@ class DashboardGenerator:
     }});
 
     installAppButton?.addEventListener('click', async () => {{
-      if (!deferredInstallPrompt) return;
+      if (!deferredInstallPrompt) {{
+        const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+        const message = isiOS
+          ? 'To install on iPhone or iPad: tap Share, then Add to Home Screen.'
+          : 'To install: use your browser menu and choose Install app or Add to Home screen. Chrome/Edge will show the install prompt when available.';
+        alert(message);
+        return;
+      }}
       deferredInstallPrompt.prompt();
       await deferredInstallPrompt.userChoice.catch(() => null);
       deferredInstallPrompt = null;
-      installAppButton.classList.remove('ready');
+      installAppButton.classList.add('ready');
     }});
 
     window.addEventListener('appinstalled', () => {{
       deferredInstallPrompt = null;
-      installAppButton?.classList.remove('ready');
+      installAppButton?.classList.add('ready');
     }});
     {chatbot_script}
   </script>
@@ -6111,6 +6681,7 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
+                ('historical_trend_annual_means_interactive.html', 'Clickable Historical Annual Trend Explorer'),
                 ('historical_trend_annual_means.png', 'Historical Annual Means And Sen Slope Lines'),
                 ('historical_sen_slope_summary.png', "Sen's Slope Summary By Variable"),
             ],
@@ -6121,6 +6692,9 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
+                ('algal_watershed_cyanobacteria_interactive.html', 'Clickable Watershed Cyanobacteria Screening'),
+                ('algal_cyanobacteria_watershed_map_interactive.html', 'Clickable National Cyanobacteria Map'),
+                ('algal_status_timeline_interactive.html', 'Clickable Annual Cyanobacteria Signal'),
                 ('algal_watershed_cyanobacteria.png', 'Watershed Cyanobacteria Screening'),
                 ('algal_cyanobacteria_watershed_map.png', 'Cyanobacteria Watershed Spatial Map'),
                 ('algal_status_timeline.png', 'Annual Cyanobacteria Signal By Watershed'),
@@ -6134,6 +6708,13 @@ class DashboardGenerator:
         for filename, title in plot_specs:
             path = plots_dir / filename
             if path.exists():
+                if path.suffix.lower() == '.html':
+                    cards.append(
+                        f'<article class="card plot interactive-plot"><h3>{html.escape(title)}</h3>'
+                        f'<iframe src="{self._file_uri(path)}" title="{html.escape(title)}" loading="lazy"></iframe>'
+                        f'<a class="history-link open-interactive" href="{self._file_uri(path)}">Open full interactive view</a></article>'
+                    )
+                    continue
                 cards.append(
                     f'<article class="card plot"><h3>{html.escape(title)}</h3>'
                     f'<img src="{self._file_uri(path)}" alt="{html.escape(title)}" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';">'
@@ -6152,6 +6733,13 @@ class DashboardGenerator:
             return '<p class="muted">Spatial parameter maps are not available for the latest date yet.</p>'
 
         cards = []
+        interactive_path = plots_dir / 'latest_station_parameter_map_interactive.html'
+        if interactive_path.exists():
+            cards.append(
+                f'<article class="card plot interactive-plot wide-plot"><h3>Clickable South Korea Station Parameter Map</h3>'
+                f'<iframe src="{self._file_uri(interactive_path)}" title="Clickable South Korea Station Parameter Map" loading="lazy"></iframe>'
+                f'<a class="history-link open-interactive" href="{self._file_uri(interactive_path)}">Open full interactive view</a></article>'
+            )
         for path in map_paths:
             parameter_key = path.name.replace(f'_map_{safe_day}.png', '')
             title = f"{self._format_map_title(parameter_key)} Spatial Map"
@@ -6217,7 +6805,7 @@ class DashboardGenerator:
 
         daily_plots_dir = Config.daily_plots_dir(date_label)
         if daily_plots_dir.exists():
-            for source in daily_plots_dir.glob("*.png"):
+            for source in list(daily_plots_dir.glob("*.png")) + list(daily_plots_dir.glob("*.html")):
                 target = plots_dir / source.name
                 shutil.copyfile(source, target)
                 root_target = bundle_dir / source.name
@@ -6248,6 +6836,7 @@ class DashboardGenerator:
 
         algal_data_dir = data_dir / "algal_bloom"
         for source in [
+            Config.NATIONAL_CYANOBACTERIA_FILE,
             Config.CYANOBACTERIA_STATION_FILE,
             Config.CYANOBACTERIA_LAKEWIDE_FILE,
             Config.CYANOBACTERIA_STATION_COORDS_FILE,
@@ -6347,6 +6936,11 @@ class DashboardGenerator:
             "regional_comparison.png",
             "quality_heatmap.png",
             "distributions.png",
+            "historical_trend_annual_means_interactive.html",
+            "latest_station_parameter_map_interactive.html",
+            "algal_watershed_cyanobacteria_interactive.html",
+            "algal_cyanobacteria_watershed_map_interactive.html",
+            "algal_status_timeline_interactive.html",
         ]:
             if (bundle_dir / filename).exists():
                 cache_files.append(f"./{filename}")
