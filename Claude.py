@@ -17,6 +17,7 @@ import shutil
 import html
 import base64
 import argparse
+import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -107,6 +108,10 @@ class Config:
     RUN_ARCHIVES_DIR = DATA_DIR / "run_archives"
     DASHBOARD_FILE = DATA_DIR / "dashboard.html"
     WORKSPACE_DASHBOARD_FILE = Path(__file__).resolve().parent / "Claude_dashboard.html"
+    HISTORICAL_DATA_DIR = Path(__file__).resolve().parent / "south_korea_water_quality_history"
+    HISTORICAL_MEASUREMENTS_FILE = HISTORICAL_DATA_DIR / "south_korea_water_quality_historical_measurements.csv"
+    HISTORICAL_STATIONS_FILE = HISTORICAL_DATA_DIR / "south_korea_water_quality_station_metadata.csv"
+    HISTORICAL_MANIFEST_FILE = HISTORICAL_DATA_DIR / "download_manifest.json"
     SITE_DASHBOARD_DIR = DATA_DIR / "google_site_dashboard"
     # Optional: set this to your published GitHub Pages URL, for example:
     # "https://YOUR_GITHUB_USERNAME.github.io/k-waterguard-dashboard/"
@@ -226,6 +231,31 @@ class Config:
         'Chlorophyll_a', 'Fecal_Coliform', 'E_coli', 'Alkalinity', 'Hardness',
         'Ammonia_N', 'Nitrate_N', 'Phosphate_P'
     ]
+    HISTORICAL_VARIABLE_MAP = {
+        'dissolved_oxygen': ('DO', 'mg/L'),
+        'biochemical_oxygen_demand': ('BOD', 'mg/L'),
+        'chemical_oxygen_demand': ('COD', 'mg/L'),
+        'total_nitrogen': ('TN', 'mg/L'),
+        'total_phosphorus': ('TP', 'mg/L'),
+        'total_organic_carbon': ('TOC', 'mg/L'),
+        'chlorophyll_a': ('Chlorophyll a', 'mg/m3'),
+    }
+    ALGAL_BLOOM_RULES = {
+        'cyanobacteria_cells_ml': {
+            'unit': 'cells/mL',
+            'caution': 1000.0,
+            'warning': 10000.0,
+            'outbreak': 1000000.0,
+            'basis': 'Korean algae alert system for harmful cyanobacteria, triggered on two consecutive monitoring events',
+        },
+        'chlorophyll_a': {
+            'unit': 'mg/m3',
+            'caution': 15.0,
+            'warning': 25.0,
+            'outbreak': 100.0,
+            'basis': 'Korean lake/reservoir chlorophyll-a screening framework used as a proxy when cyanobacteria counts are unavailable',
+        },
+    }
     LOCATION_COLUMNS = [
         'date', 'display_location', 'location_name', 'city', 'district', 'province',
         'country', 'station_name', 'station_code', 'monitoring_point_id', 'region'
@@ -324,6 +354,9 @@ class WaterQualityCollector:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self._historical_cache = None
+        self._historical_station_cache = None
+        self._historical_manifest_cache = None
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -1714,16 +1747,7 @@ class PlotGenerator:
                             )
 
                     ax.set_title(f'{display_label} - South Korea Map ({day_label})', pad=10, fontweight='bold')
-                    ax.set_xlabel('Longitude')
-                    ax.set_ylabel('Latitude')
-                    ax.set_xlim(min_lon - 0.15, max_lon + 0.15)
-                    ax.set_ylim(min_lat - 0.15, max_lat + 0.15)
-                    ax.set_aspect('equal', adjustable='box')
-                    ax.grid(True, color='0.90', linewidth=0.55)
-                    for spine in ax.spines.values():
-                        spine.set_color('0.72')
-                        spine.set_linewidth(0.8)
-                    ax.tick_params(colors='0.15', direction='out', length=3, width=0.7)
+                    self._apply_lat_long_box(ax, min_lon, min_lat, max_lon, max_lat)
 
                     colorbar = fig.colorbar(scatter, cax=cax)
                     colorbar.set_label(display_label, rotation=90, labelpad=14, fontweight='bold')
@@ -1767,20 +1791,54 @@ class PlotGenerator:
                 zorder=4,
             )
             ax.set_title(f'Station Coverage - South Korea ({len(station_layer)} stations)', pad=10, fontweight='bold')
-            ax.set_xlabel('Longitude')
-            ax.set_ylabel('Latitude')
-            ax.set_xlim(min_lon - 0.15, max_lon + 0.15)
-            ax.set_ylim(min_lat - 0.15, max_lat + 0.15)
-            ax.set_aspect('equal', adjustable='box')
-            ax.grid(True, color='0.90', linewidth=0.55)
-            for spine in ax.spines.values():
-                spine.set_color('0.72')
-                spine.set_linewidth(0.8)
+            self._apply_lat_long_box(ax, min_lon, min_lat, max_lon, max_lat)
             fig.savefig(self._plots_dir() / 'station_coverage_map.png', dpi=300, facecolor='white')
             plt.close(fig)
             self.logger.info(f"Station coverage map saved with {len(station_layer)} stations")
         except Exception as e:
             self.logger.error(f"Error in station coverage map: {str(e)}")
+
+    def _apply_lat_long_box(self, ax, min_lon, min_lat, max_lon, max_lat):
+        """Add a boxed latitude/longitude frame to South Korea map axes."""
+        lon_pad = 0.15
+        lat_pad = 0.15
+        x_min = min_lon - lon_pad
+        x_max = max_lon + lon_pad
+        y_min = min_lat - lat_pad
+        y_max = max_lat + lat_pad
+
+        lon_ticks = np.arange(np.floor(x_min), np.ceil(x_max) + 0.1, 2.0)
+        lat_ticks = np.arange(np.floor(y_min), np.ceil(y_max) + 0.1, 1.0)
+        lon_ticks = lon_ticks[(lon_ticks >= x_min) & (lon_ticks <= x_max)]
+        lat_ticks = lat_ticks[(lat_ticks >= y_min) & (lat_ticks <= y_max)]
+
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        ax.set_xticks(lon_ticks)
+        ax.set_yticks(lat_ticks)
+        ax.set_xticklabels([f'{tick:.0f}$^\\circ$E' for tick in lon_ticks])
+        ax.set_yticklabels([f'{tick:.0f}$^\\circ$N' for tick in lat_ticks])
+        ax.grid(True, color='0.88', linewidth=0.55)
+        ax.tick_params(
+            axis='both',
+            which='both',
+            colors='0.15',
+            direction='out',
+            length=3.5,
+            width=0.7,
+            top=True,
+            right=True,
+            labeltop=True,
+            labelright=True,
+            pad=3,
+        )
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color('0.25')
+            spine.set_linewidth(0.9)
 
     def _fill_missing_station_coordinates(self, df):
         """Fill missing coordinates from other rows for the same station."""
@@ -1790,12 +1848,7 @@ class PlotGenerator:
                 df[column] = np.nan
             df[column] = pd.to_numeric(df[column], errors='coerce')
 
-        if 'station_name' in df.columns:
-            station_key = df['station_name'].fillna(df.get('region', 'station')).astype(str)
-        elif 'region' in df.columns:
-            station_key = df['region'].fillna('station').astype(str)
-        else:
-            station_key = pd.Series(['station'] * len(df), index=df.index)
+        station_key = self._station_key_series(df)
         df['_station_key_for_coords'] = station_key
 
         coordinate_lookup = (
@@ -1811,34 +1864,45 @@ class PlotGenerator:
         return df.drop(columns=['_station_key_for_coords'])
 
     def _prepare_station_layer(self, df):
-        station_column = 'station_name' if 'station_name' in df.columns else 'region'
-        if station_column not in df.columns:
-            return df[['latitude', 'longitude']].dropna().drop_duplicates()
+        point_df = df.dropna(subset=['latitude', 'longitude']).copy()
+        if point_df.empty:
+            return point_df[['latitude', 'longitude']]
+        point_df['_station_key'] = self._station_key_series(point_df)
         return (
-            df.dropna(subset=['latitude', 'longitude'])
+            point_df
             .sort_values('timestamp')
-            .groupby(station_column, as_index=False)
+            .groupby('_station_key', as_index=False)
             .agg({'longitude': 'last', 'latitude': 'last'})
         )
 
     def _prepare_map_points(self, df, param):
         """Average repeated rows per station while preserving one plotted point per station."""
         point_df = df.copy()
-        station_column = 'station_name' if 'station_name' in point_df.columns else 'region'
-        if station_column not in point_df.columns:
-            station_column = '_station_id'
-            point_df[station_column] = np.arange(len(point_df))
+        point_df['_station_key'] = self._station_key_series(point_df)
         return (
             point_df
             .dropna(subset=[param, 'latitude', 'longitude'])
-            .groupby(station_column, as_index=False)
+            .groupby('_station_key', as_index=False)
             .agg({
                 'longitude': 'mean',
                 'latitude': 'mean',
                 param: 'mean',
             })
-            .rename(columns={station_column: 'station_name'})
+            .rename(columns={'_station_key': 'station_name'})
         )
+
+    def _station_key_series(self, df):
+        if df is None or df.empty:
+            return pd.Series(dtype=str)
+        identity = pd.Series('', index=df.index, dtype='object')
+        for column in ['station_code', 'monitoring_point_id', 'station_name', 'display_location', 'region']:
+            if column not in df.columns:
+                continue
+            values = df[column].fillna('').astype(str).str.strip()
+            identity = identity.where(identity.str.strip().ne(''), values)
+        identity = identity.str.strip().replace('', np.nan)
+        fallback = pd.Series(np.arange(len(df)), index=df.index).astype(str).radd('row_')
+        return identity.fillna(fallback)
 
     def _format_parameter_label(self, param):
         return str(param).replace('_', ' ')
@@ -2008,6 +2072,9 @@ class DashboardGenerator:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self._historical_cache = None
+        self._historical_station_cache = None
+        self._historical_manifest_cache = None
 
     def generate(self):
         try:
@@ -2052,6 +2119,10 @@ class DashboardGenerator:
             if column not in df.columns:
                 df[column] = ''
             df[column] = df[column].fillna('').astype(str)
+        for column in ['station_code', 'monitoring_point_id']:
+            if column not in df.columns:
+                df[column] = ''
+            df[column] = df[column].fillna('').astype(str)
 
         if 'display_location' not in df.columns or df['display_location'].str.strip().eq('').all():
             df['display_location'] = df['location_name'].where(
@@ -2062,17 +2133,21 @@ class DashboardGenerator:
         for column in Config.WATER_QUALITY_COLUMNS:
             if column in df.columns:
                 df[column] = pd.to_numeric(df[column], errors='coerce')
+        df['station_identity'] = self._station_key_series(df)
         return df.sort_values('timestamp', ascending=False)
 
     def _latest_station_records(self, df):
         if df is None or df.empty:
             return df
-        station_column = 'display_location' if 'display_location' in df.columns else 'station_name'
+        station_column = 'station_identity' if 'station_identity' in df.columns else 'display_location'
         return df.sort_values('timestamp').groupby(station_column, dropna=False).tail(1)
 
     def _render_html(self, all_df, latest_df, latest_station_df, latest_date, alerts_df):
         generated_at = Config.now().strftime('%Y-%m-%d %H:%M:%S KST')
-        station_count = latest_df['display_location'].nunique()
+        historical_summary = self._historical_summary()
+        historical_station_count = int(historical_summary.get('station_count') or 0)
+        latest_station_count = latest_df['station_identity'].nunique() if 'station_identity' in latest_df.columns else latest_df['display_location'].nunique()
+        station_count = historical_station_count or latest_station_count
         record_count = len(latest_df)
         city_count = latest_df['city'].replace('', np.nan).nunique()
         province_count = latest_df['province'].replace('', np.nan).nunique()
@@ -2090,8 +2165,16 @@ class DashboardGenerator:
         spatial_map_cards = self._spatial_map_cards(str(latest_date))
         province_rows = self._province_rows(latest_df)
         history_rows = self._history_rows(limit=30)
-        side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count)
+        historical_option_rows = self._historical_option_rows()
+        trend_rows = self._historical_trend_rows()
+        cleaning_rows = self._cleaning_rows()
+        algal_rows = self._algal_bloom_rows()
+        algal_standard_rows = self._algal_standard_rows()
+        watershed_rows = self._watershed_status_rows()
+        side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count, station_count)
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
+        historical_measurements_link = self._file_uri(Config.HISTORICAL_MEASUREMENTS_FILE) if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else '#'
+        historical_stations_link = self._file_uri(Config.HISTORICAL_STATIONS_FILE) if Config.HISTORICAL_STATIONS_FILE.exists() else '#'
         chatbot_html = self._chatbot_html()
         chatbot_script = self._chatbot_script()
 
@@ -2128,7 +2211,7 @@ class DashboardGenerator:
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
-      font-family: "Segoe UI", Arial, sans-serif;
+      font-family: "Times New Roman", Times, serif;
       background:
         radial-gradient(circle at 16% 0%, rgba(205, 46, 58, 0.10), transparent 28%),
         radial-gradient(circle at 88% 8%, rgba(0, 71, 160, 0.12), transparent 30%),
@@ -2163,6 +2246,8 @@ class DashboardGenerator:
     .search-status {{ margin: -4px 0 14px; color: var(--muted); font-size: 13px; min-height: 18px; }}
     tr.search-match {{ background: #fff1f3; }}
     .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
+    .nav-tabs {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }}
+    .nav-tabs a {{ padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--blue); text-decoration: none; font-weight: 800; }}
     .install-button {{ display: none; border: 0; cursor: pointer; font: inherit; }}
     .install-button.ready {{ display: inline-flex; }}
     .grid {{ display: grid; gap: 14px; }}
@@ -2255,6 +2340,7 @@ class DashboardGenerator:
     .history-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
     .history-link:hover {{ text-decoration: underline; }}
     .two-col {{ grid-template-columns: 1.2fr 0.8fr; align-items: start; }}
+    .three-col {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
     footer {{ color: var(--muted); padding: 20px 0; font-size: 13px; }}
     .chat-launch {{
       position: fixed; right: 22px; bottom: 22px; z-index: 30;
@@ -2280,7 +2366,7 @@ class DashboardGenerator:
     .chat-input {{ flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: inherit; }}
     .chat-send {{ border: 0; border-radius: 6px; background: var(--red); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
     @media (max-width: 980px) {{
-      .stats, .param-grid, .plots, .spatial-maps, .two-col {{ grid-template-columns: 1fr 1fr; }}
+      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr 1fr; }}
     }}
     @media (min-width: 1840px) {{
       .insight-rail {{ display: grid; }}
@@ -2290,7 +2376,7 @@ class DashboardGenerator:
       header {{ min-height: 330px; background-position: center right; }}
       .brand-logo {{ width: 44px; height: 44px; }}
       .brand-name {{ font-size: 16px; }}
-      .stats, .param-grid, .plots, .spatial-maps, .two-col {{ grid-template-columns: 1fr; }}
+      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
@@ -2310,6 +2396,13 @@ class DashboardGenerator:
     </div>
   </header>
   <main class="wrap">
+    <nav class="nav-tabs" aria-label="Dashboard pages">
+      <a href="#overviewPage">Overview</a>
+      <a href="#historicalPage">Historical Trends</a>
+      <a href="#historicalDataPage">Station Data</a>
+      <a href="#algalBloomPage">Algal Bloom Status</a>
+      <a href="#spatialPage">Spatial Maps</a>
+    </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
       <button class="button install-button" id="installAppButton" type="button">Install App</button>
@@ -2317,7 +2410,7 @@ class DashboardGenerator:
     </div>
     <div class="search-status" id="searchStatus">Search filters the alert, province, and station tables below.</div>
 
-    <section class="grid stats">
+    <section class="grid stats" id="overviewPage">
       {self._stat_card('Latest date', html.escape(str(latest_date)))}
       {self._stat_card('Last update', html.escape(latest_time_text))}
       {self._stat_card('Stations', f'{station_count:,}')}
@@ -2348,7 +2441,8 @@ class DashboardGenerator:
 
     <section class="card section" id="historicalDownloads">
       <h2>Historical Data Downloads</h2>
-      <p class="muted">Each hourly GitHub Actions run is archived as a separate CSV, so users can download past snapshots without losing the latest dashboard view.</p>
+      <p class="muted">The downloaded NIER historical archive contains {int(historical_summary.get('measurement_rows') or 0):,} measurements and {station_count:,} unique stations from {html.escape(str(historical_summary.get('start_year', '')))} to {html.escape(str(historical_summary.get('end_year', '')))}.</p>
+      <p><a class="history-link" href="{historical_measurements_link}">Download full historical measurements</a> &nbsp; <a class="history-link" href="{historical_stations_link}">Download station metadata</a></p>
       <div class="table-wrap">
         <table id="historyTable">
           <thead>
@@ -2359,7 +2453,57 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section">
+    <section class="card section" id="historicalPage">
+      <h2>Historical Data Cleaning And Trends</h2>
+      <div class="grid two-col">
+        <div>
+          <h3>Cleaning Before And After</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>Step</th><th>Rows</th><th>Stations</th><th>Notes</th></tr></thead><tbody>{cleaning_rows}</tbody></table>
+          </div>
+        </div>
+        <div>
+          <h3>Mann-Kendall And Sen's Slope</h3>
+          <div class="table-wrap">
+            <table id="trendTable"><thead><tr><th>Station</th><th>Variable</th><th>Years</th><th>N</th><th>Tau</th><th>Z</th><th>p</th><th>Sen slope / year</th><th>Trend</th></tr></thead><tbody>{trend_rows}</tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section" id="historicalDataPage">
+      <h2>Historical Dataset By Station And Variable</h2>
+      <p class="muted">Use the search box above to filter by station code, station name, province, watershed, or variable. The full CSV links above provide every historical record.</p>
+      <div class="table-wrap">
+        <table id="historicalOptionTable">
+          <thead><tr><th>Station Code</th><th>Station</th><th>Province</th><th>Watershed</th><th>Records</th><th>Variables Available</th></tr></thead>
+          <tbody>{historical_option_rows}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card section" id="algalBloomPage">
+      <h2>Algal Bloom Status In Korean Watersheds And Lakes</h2>
+      <div class="grid three-col">
+        {self._stat_card('Korean Caution', '1,000 cells/mL')}
+        {self._stat_card('Korean Warning', '10,000 cells/mL')}
+        {self._stat_card('Bloom Outbreak', '1,000,000 cells/mL')}
+      </div>
+      <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts on two consecutive monitoring events. Where the historical archive only contains chlorophyll-a, the dashboard marks chlorophyll-a proxy status and keeps units in mg/m3.</p>
+      <div class="grid two-col">
+        <div>
+          <h3>Current / Historical Alerts</h3>
+          <div class="table-wrap"><table id="algalTable"><thead><tr><th>Status</th><th>Station</th><th>Watershed</th><th>Value</th><th>Unit</th><th>Basis</th></tr></thead><tbody>{algal_rows}</tbody></table></div>
+        </div>
+        <div>
+          <h3>Watershed And Lake Focus</h3>
+          <div class="table-wrap"><table><thead><tr><th>Watershed / Basin</th><th>Stations</th><th>Max Chlorophyll-a</th><th>Status</th></tr></thead><tbody>{watershed_rows}</tbody></table></div>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top: 14px;"><table><thead><tr><th>Rule</th><th>Caution</th><th>Warning</th><th>Bloom Outbreak</th><th>Unit</th></tr></thead><tbody>{algal_standard_rows}</tbody></table></div>
+    </section>
+
+    <section class="card section" id="spatialPage">
       <h2>Latest Water Quality Alerts</h2>
       <div class="table-wrap">
         <table id="alertTable">
@@ -2735,6 +2879,326 @@ class DashboardGenerator:
       });
     }"""
 
+    def _station_key_series(self, df):
+        if df is None or df.empty:
+            return pd.Series(dtype=str)
+        identity = pd.Series('', index=df.index, dtype='object')
+        for column in ['station_code', 'monitoring_point_id', 'station_name', 'display_location', 'region']:
+            if column not in df.columns:
+                continue
+            values = df[column].fillna('').astype(str).str.strip()
+            identity = identity.where(identity.str.strip().ne(''), values)
+        identity = identity.str.strip().replace('', np.nan)
+        fallback = pd.Series(np.arange(len(df)), index=df.index).astype(str).radd('row_')
+        return identity.fillna(fallback)
+
+    def _load_historical_manifest(self):
+        if self._historical_manifest_cache is not None:
+            return self._historical_manifest_cache
+        try:
+            if Config.HISTORICAL_MANIFEST_FILE.exists():
+                self._historical_manifest_cache = json.loads(Config.HISTORICAL_MANIFEST_FILE.read_text(encoding='utf-8'))
+            else:
+                self._historical_manifest_cache = {}
+        except Exception as exc:
+            self.logger.warning(f"Historical manifest unavailable: {exc}")
+            self._historical_manifest_cache = {}
+        return self._historical_manifest_cache
+
+    def _load_historical_measurements(self):
+        if self._historical_cache is not None:
+            return self._historical_cache
+        if not Config.HISTORICAL_MEASUREMENTS_FILE.exists():
+            self._historical_cache = pd.DataFrame()
+            return self._historical_cache
+        try:
+            df = pd.read_csv(Config.HISTORICAL_MEASUREMENTS_FILE)
+            df['sample_date'] = pd.to_datetime(df.get('sample_date'), errors='coerce')
+            for column in Config.HISTORICAL_VARIABLE_MAP:
+                if column in df.columns:
+                    df[column] = pd.to_numeric(df[column], errors='coerce')
+            stations = self._load_historical_stations()
+            if not stations.empty and 'station_code' in stations.columns and 'station_code' in df.columns:
+                metadata_columns = ['station_code'] + [
+                    column for column in [
+                        'latitude', 'longitude', 'river_basin',
+                        'large_watershed', 'middle_watershed', 'operation_status'
+                    ]
+                    if column in stations.columns and column not in df.columns
+                ]
+                if metadata_columns:
+                    df = df.merge(stations[metadata_columns].drop_duplicates('station_code'), on='station_code', how='left')
+            self._historical_cache = df
+        except Exception as exc:
+            self.logger.error(f"Could not load historical measurements: {exc}")
+            self._historical_cache = pd.DataFrame()
+        return self._historical_cache
+
+    def _load_historical_stations(self):
+        if self._historical_station_cache is not None:
+            return self._historical_station_cache
+        if not Config.HISTORICAL_STATIONS_FILE.exists():
+            self._historical_station_cache = pd.DataFrame()
+            return self._historical_station_cache
+        try:
+            self._historical_station_cache = pd.read_csv(Config.HISTORICAL_STATIONS_FILE)
+        except Exception as exc:
+            self.logger.error(f"Could not load historical station metadata: {exc}")
+            self._historical_station_cache = pd.DataFrame()
+        return self._historical_station_cache
+
+    def _historical_summary(self):
+        manifest = self._load_historical_manifest()
+        measurements = self._load_historical_measurements()
+        stations = self._load_historical_stations()
+        station_count = manifest.get('station_count')
+        if not station_count:
+            if not stations.empty and 'station_code' in stations.columns:
+                station_count = stations['station_code'].dropna().astype(str).str.strip().nunique()
+            elif not measurements.empty and 'station_code' in measurements.columns:
+                station_count = measurements['station_code'].dropna().astype(str).str.strip().nunique()
+        measurement_rows = manifest.get('measurement_rows') or len(measurements)
+        start_year = manifest.get('start_year')
+        end_year = manifest.get('end_year')
+        if not measurements.empty and 'sample_date' in measurements.columns:
+            years = measurements['sample_date'].dropna().dt.year
+            if not years.empty:
+                start_year = start_year or int(years.min())
+                end_year = end_year or int(years.max())
+        return {
+            'station_count': int(station_count or 0),
+            'measurement_rows': int(measurement_rows or 0),
+            'start_year': start_year or '',
+            'end_year': end_year or '',
+        }
+
+    def _cleaning_rows(self):
+        df = self._load_historical_measurements()
+        if df.empty:
+            return '<tr><td colspan="4">Historical measurements were not found.</td></tr>'
+        raw_rows = len(df)
+        raw_stations = df['station_code'].dropna().astype(str).str.strip().nunique() if 'station_code' in df.columns else 0
+        date_clean = df.dropna(subset=['sample_date']).copy()
+        numeric_columns = [column for column in Config.HISTORICAL_VARIABLE_MAP if column in date_clean.columns]
+        numeric_clean = date_clean.dropna(subset=numeric_columns, how='all') if numeric_columns else date_clean
+        dedup_columns = [column for column in ['station_code', 'sample_date', 'sample_round'] if column in numeric_clean.columns]
+        dedup = numeric_clean.drop_duplicates(subset=dedup_columns, keep='last') if dedup_columns else numeric_clean
+        cleaned_stations = dedup['station_code'].dropna().astype(str).str.strip().nunique() if 'station_code' in dedup.columns else 0
+        rows = [
+            ('Raw historical download', raw_rows, raw_stations, 'As downloaded from NIER historical archive'),
+            ('Valid sample dates', len(date_clean), raw_stations, 'Rows with parseable sampling dates'),
+            ('Numeric water-quality rows', len(numeric_clean), raw_stations, 'Rows with at least one measured variable'),
+            ('After duplicate removal', len(dedup), cleaned_stations, 'Unique station-date-round records used for trend summaries'),
+        ]
+        return ''.join(
+            f'<tr><td>{html.escape(step)}</td><td>{count:,}</td><td>{stations:,}</td><td>{html.escape(note)}</td></tr>'
+            for step, count, stations, note in rows
+        )
+
+    def _historical_option_rows(self, limit=350):
+        measurements = self._load_historical_measurements()
+        stations = self._load_historical_stations()
+        if measurements.empty:
+            return '<tr><td colspan="6">Historical station data are not available.</td></tr>'
+        numeric_columns = [column for column in Config.HISTORICAL_VARIABLE_MAP if column in measurements.columns]
+        station_counts = measurements.groupby('station_code', dropna=False).size().rename('records')
+        variable_summary = measurements.groupby('station_code', dropna=False)[numeric_columns].count() if numeric_columns else pd.DataFrame(index=station_counts.index)
+        rows_df = station_counts.to_frame()
+        if not stations.empty and 'station_code' in stations.columns:
+            metadata_columns = [column for column in ['station_code', 'station_name', 'province', 'large_watershed', 'river_basin'] if column in stations.columns]
+            rows_df = rows_df.reset_index().merge(stations[metadata_columns].drop_duplicates('station_code'), on='station_code', how='left').set_index('station_code')
+        else:
+            names = measurements.groupby('station_code')['station_name'].first()
+            rows_df['station_name'] = names
+        rows = []
+        for station_code, row in rows_df.sort_values('records', ascending=False).head(limit).iterrows():
+            available = []
+            if not variable_summary.empty and station_code in variable_summary.index:
+                for source_column, (label, unit) in Config.HISTORICAL_VARIABLE_MAP.items():
+                    if source_column in variable_summary.columns and int(variable_summary.loc[station_code, source_column]) > 0:
+                        available.append(f'{label} ({unit})'.strip())
+            watershed = row.get('large_watershed') or row.get('river_basin') or ''
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(str(station_code))}</td>'
+                f'<td>{html.escape(str(row.get("station_name", "")))}</td>'
+                f'<td>{html.escape(str(row.get("province", "")))}</td>'
+                f'<td>{html.escape(str(watershed))}</td>'
+                f'<td>{int(row.get("records", 0)):,}</td>'
+                f'<td>{html.escape(", ".join(available))}</td>'
+                '</tr>'
+            )
+        return ''.join(rows)
+
+    def _historical_trend_rows(self, max_station_rows=180):
+        df = self._load_historical_measurements()
+        if df.empty:
+            return '<tr><td colspan="9">Historical trends are not available.</td></tr>'
+        rows = []
+        trend_source = df.dropna(subset=['sample_date']).copy()
+        trend_source['year'] = trend_source['sample_date'].dt.year
+        for source_column, (label, unit) in Config.HISTORICAL_VARIABLE_MAP.items():
+            if source_column not in trend_source.columns:
+                continue
+            annual = trend_source.groupby('year', as_index=False)[source_column].mean().dropna()
+            stats = self._mann_kendall_sen(annual['year'].to_numpy(dtype=float), annual[source_column].to_numpy(dtype=float))
+            rows.append(self._trend_row_html('All stations', label, unit, annual, stats))
+
+        numeric_columns = [column for column in Config.HISTORICAL_VARIABLE_MAP if column in trend_source.columns]
+        station_sizes = trend_source.groupby('station_code').size().sort_values(ascending=False).head(30)
+        for station_code in station_sizes.index:
+            station_df = trend_source[trend_source['station_code'] == station_code]
+            station_name = station_df['station_name'].dropna().astype(str).head(1)
+            station_label = f"{station_code} - {station_name.iloc[0]}" if not station_name.empty else str(station_code)
+            for source_column in numeric_columns:
+                label, unit = Config.HISTORICAL_VARIABLE_MAP[source_column]
+                annual = station_df.groupby('year', as_index=False)[source_column].mean().dropna()
+                if len(annual) < 8:
+                    continue
+                stats = self._mann_kendall_sen(annual['year'].to_numpy(dtype=float), annual[source_column].to_numpy(dtype=float))
+                rows.append(self._trend_row_html(station_label, label, unit, annual, stats))
+                if len(rows) >= max_station_rows:
+                    return ''.join(rows)
+        return ''.join(rows) or '<tr><td colspan="9">Not enough annual historical values for trend testing.</td></tr>'
+
+    def _trend_row_html(self, station_label, variable_label, unit, annual, stats):
+        years = f"{int(annual['year'].min())}-{int(annual['year'].max())}" if not annual.empty else ''
+        slope = stats.get('sen_slope')
+        slope_text = '' if slope is None or pd.isna(slope) else f"{slope:.4g} {unit}/yr".strip()
+        return (
+            '<tr>'
+            f'<td>{html.escape(str(station_label))}</td>'
+            f'<td>{html.escape(str(variable_label))}</td>'
+            f'<td>{html.escape(years)}</td>'
+            f'<td>{int(stats.get("n", 0))}</td>'
+            f'<td>{stats.get("tau", 0):.3f}</td>'
+            f'<td>{stats.get("z", 0):.2f}</td>'
+            f'<td>{stats.get("p", 1):.3f}</td>'
+            f'<td>{html.escape(slope_text)}</td>'
+            f'<td>{html.escape(stats.get("trend", "no trend"))}</td>'
+            '</tr>'
+        )
+
+    def _mann_kendall_sen(self, x_values, y_values):
+        mask = np.isfinite(x_values) & np.isfinite(y_values)
+        x = x_values[mask]
+        y = y_values[mask]
+        n = len(y)
+        if n < 3:
+            return {'n': n, 'tau': 0.0, 'z': 0.0, 'p': 1.0, 'sen_slope': np.nan, 'trend': 'insufficient data'}
+        s_value = 0
+        slopes = []
+        for i in range(n - 1):
+            dy = y[i + 1:] - y[i]
+            dx = x[i + 1:] - x[i]
+            s_value += int(np.sign(dy).sum())
+            valid_dx = dx != 0
+            if valid_dx.any():
+                slopes.extend((dy[valid_dx] / dx[valid_dx]).tolist())
+        _, counts = np.unique(y, return_counts=True)
+        tie_term = sum(count * (count - 1) * (2 * count + 5) for count in counts if count > 1)
+        variance = (n * (n - 1) * (2 * n + 5) - tie_term) / 18
+        if variance <= 0:
+            z_value = 0.0
+        elif s_value > 0:
+            z_value = (s_value - 1) / np.sqrt(variance)
+        elif s_value < 0:
+            z_value = (s_value + 1) / np.sqrt(variance)
+        else:
+            z_value = 0.0
+        p_value = float(math.erfc(abs(z_value) / math.sqrt(2)))
+        tau = s_value / (0.5 * n * (n - 1))
+        sen_slope = float(np.median(slopes)) if slopes else np.nan
+        if p_value < 0.05 and sen_slope > 0:
+            trend = 'increasing'
+        elif p_value < 0.05 and sen_slope < 0:
+            trend = 'decreasing'
+        else:
+            trend = 'no significant trend'
+        return {'n': n, 'tau': float(tau), 'z': float(z_value), 'p': p_value, 'sen_slope': sen_slope, 'trend': trend}
+
+    def _algal_standard_rows(self):
+        rows = []
+        for key, rule in Config.ALGAL_BLOOM_RULES.items():
+            label = 'Harmful cyanobacteria' if key == 'cyanobacteria_cells_ml' else 'Chlorophyll-a proxy'
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(label)}</td>'
+                f'<td>{rule["caution"]:,.0f}</td>'
+                f'<td>{rule["warning"]:,.0f}</td>'
+                f'<td>{rule["outbreak"]:,.0f}</td>'
+                f'<td>{html.escape(rule["unit"])}</td>'
+                '</tr>'
+            )
+        return ''.join(rows)
+
+    def _algal_status(self, value, rule):
+        if pd.isna(value):
+            return 'No data'
+        if value >= rule.get('outbreak', np.inf):
+            return 'Bloom outbreak'
+        if value >= rule.get('warning', np.inf):
+            return 'Warning'
+        if value >= rule.get('caution', np.inf):
+            return 'Caution'
+        return 'Normal'
+
+    def _algal_bloom_rows(self, limit=80):
+        df = self._load_historical_measurements()
+        if df.empty or 'chlorophyll_a' not in df.columns:
+            return '<tr><td colspan="6">Algal bloom data are not available in the historical archive.</td></tr>'
+        latest = df.dropna(subset=['sample_date', 'chlorophyll_a']).sort_values('sample_date').groupby('station_code', as_index=False).tail(1)
+        if latest.empty:
+            return '<tr><td colspan="6">No chlorophyll-a records are available.</td></tr>'
+        rule = Config.ALGAL_BLOOM_RULES['chlorophyll_a']
+        latest['status'] = latest['chlorophyll_a'].apply(lambda value: self._algal_status(value, rule))
+        priority = {'Bloom outbreak': 0, 'Warning': 1, 'Caution': 2, 'Normal': 3, 'No data': 4}
+        latest['_priority'] = latest['status'].map(priority).fillna(9)
+        rows = []
+        for _, row in latest.sort_values(['_priority', 'chlorophyll_a'], ascending=[True, False]).head(limit).iterrows():
+            status = str(row.get('status', 'Normal'))
+            pill = 'critical' if status in {'Bloom outbreak', 'Warning'} else 'warning' if status == 'Caution' else 'ok'
+            watershed = row.get('large_watershed') or row.get('river_basin') or row.get('network_category') or ''
+            station_label = f"{row.get('station_code', '')} - {row.get('station_name', '')}"
+            rows.append(
+                '<tr>'
+                f'<td><span class="alert-pill {pill}">{html.escape(status)}</span></td>'
+                f'<td>{html.escape(str(station_label))}</td>'
+                f'<td>{html.escape(str(watershed))}</td>'
+                f'<td>{float(row.get("chlorophyll_a", 0)):.2f}</td>'
+                f'<td>{html.escape(rule["unit"])}</td>'
+                f'<td>{html.escape(rule["basis"])}</td>'
+                '</tr>'
+            )
+        return ''.join(rows)
+
+    def _watershed_status_rows(self):
+        df = self._load_historical_measurements()
+        if df.empty or 'chlorophyll_a' not in df.columns:
+            return '<tr><td colspan="4">Watershed algal status is not available.</td></tr>'
+        working = df.dropna(subset=['chlorophyll_a']).copy()
+        watershed_column = 'large_watershed' if 'large_watershed' in working.columns else 'river_basin' if 'river_basin' in working.columns else 'network_category'
+        if watershed_column not in working.columns:
+            working[watershed_column] = 'Unknown'
+        grouped = working.groupby(working[watershed_column].fillna('Unknown')).agg(
+            stations=('station_code', 'nunique'),
+            max_chla=('chlorophyll_a', 'max'),
+        ).sort_values('max_chla', ascending=False).head(30)
+        rule = Config.ALGAL_BLOOM_RULES['chlorophyll_a']
+        rows = []
+        for watershed, row in grouped.iterrows():
+            status = self._algal_status(float(row.max_chla), rule)
+            pill = 'critical' if status in {'Bloom outbreak', 'Warning'} else 'warning' if status == 'Caution' else 'ok'
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(str(watershed))}</td>'
+                f'<td>{int(row.stations):,}</td>'
+                f'<td>{float(row.max_chla):.2f} {html.escape(rule["unit"])}</td>'
+                f'<td><span class="alert-pill {pill}">{html.escape(status)}</span></td>'
+                '</tr>'
+            )
+        return ''.join(rows)
+
     def _evaluate_alerts(self, df):
         rows = []
         if df is None or df.empty:
@@ -2882,9 +3346,10 @@ class DashboardGenerator:
     def _province_rows(self, df):
         province = df.copy()
         province['province'] = province['province'].replace('', 'Unknown')
+        station_column = 'station_identity' if 'station_identity' in province.columns else 'display_location'
         grouped = (
             province.groupby('province', dropna=False)
-            .agg(stations=('display_location', 'nunique'), records=('display_location', 'size'))
+            .agg(stations=(station_column, 'nunique'), records=(station_column, 'size'))
             .sort_values(['stations', 'records'], ascending=False)
         )
         rows = []
@@ -2894,8 +3359,9 @@ class DashboardGenerator:
             )
         return ''.join(rows)
 
-    def _side_rail_html(self, latest_df, latest_station_df, alerts_df, date_label, city_count, province_count):
-        station_count = latest_df['display_location'].nunique() if 'display_location' in latest_df.columns else len(latest_df)
+    def _side_rail_html(self, latest_df, latest_station_df, alerts_df, date_label, city_count, province_count, station_count=None):
+        if station_count is None:
+            station_count = latest_df['station_identity'].nunique() if 'station_identity' in latest_df.columns else latest_df['display_location'].nunique() if 'display_location' in latest_df.columns else len(latest_df)
         record_count = len(latest_df)
         alert_count = len(alerts_df) if alerts_df is not None else 0
         alert_station_count = alerts_df['display_location'].nunique() if alerts_df is not None and not alerts_df.empty else 0
@@ -2944,12 +3410,13 @@ class DashboardGenerator:
   </aside>"""
 
     def _province_bar_rows(self, df):
-        if 'province' not in df.columns or 'display_location' not in df.columns:
+        station_column = 'station_identity' if 'station_identity' in df.columns else 'display_location'
+        if 'province' not in df.columns or station_column not in df.columns:
             return '<p class="muted">Province coverage is not available yet.</p>'
         province = df.copy()
         province['province'] = province['province'].replace('', 'Unknown').fillna('Unknown')
         grouped = (
-            province.groupby('province', dropna=False)['display_location']
+            province.groupby('province', dropna=False)[station_column]
             .nunique()
             .sort_values(ascending=False)
             .head(6)
@@ -2984,7 +3451,10 @@ class DashboardGenerator:
     def _mini_korea_map(self, latest_station_df, alerts_df):
         if not {'latitude', 'longitude'}.issubset(latest_station_df.columns):
             return '<p class="muted" style="padding: 13px;">Station coordinates are not available yet.</p>'
-        points = latest_station_df[['display_location', 'latitude', 'longitude']].dropna().copy()
+        point_columns = ['display_location', 'latitude', 'longitude']
+        if 'station_identity' in latest_station_df.columns:
+            point_columns.insert(0, 'station_identity')
+        points = latest_station_df[point_columns].dropna(subset=['latitude', 'longitude']).copy()
         if points.empty:
             return '<p class="muted" style="padding: 13px;">Station coordinates are not available yet.</p>'
 
@@ -3029,7 +3499,8 @@ class DashboardGenerator:
         if alerts_df is not None and not alerts_df.empty and 'display_location' in alerts_df.columns:
             alert_locations = set(alerts_df['display_location'].dropna().astype(str))
         svg_points = []
-        sampled = points.drop_duplicates('display_location').head(90)
+        sample_column = 'station_identity' if 'station_identity' in points.columns else 'display_location'
+        sampled = points.drop_duplicates(sample_column).head(90)
         for _, row in sampled.iterrows():
             try:
                 lon = float(row.get('longitude'))

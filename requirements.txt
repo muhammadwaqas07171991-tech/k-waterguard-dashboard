@@ -6,3 +6,14 @@ seaborn
 apscheduler
 pyproj
 reverse_geocoder
+scikit-learn
+xarray
+netCDF4
+h5netcdf
+cdsapi
+earthaccess
+tqdm
+paramiko
+torch
+shap
+pypdf
