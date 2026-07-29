@@ -39,7 +39,8 @@ https://sites.google.com/view/rwer/k-waterguard-ai
 │   └── supporting scenario summaries
 ├── ctprvn.shp / ctprvn.shx / ctprvn.dbf
 ├── Kwater.png
-└── KwGAI logo.png
+├── KwGAI logo.png
+└── social-preview.png
 ```
 
 Generated pages, plots, daily records, logs, caches, and local `water_quality_data/` outputs are intentionally not committed. GitHub Actions rebuilds the deployable site automatically.
@@ -74,4 +75,5 @@ water_quality_data/google_site_dashboard/
 - Historical support data should remain in `dashboard_static_data/`.
 - Algal-bloom scenario support files should remain in `HSPF_Algae_Bloom_SKorea/05_analysis/algae_scenarios/`.
 - The visual system is defined inside `Claude.py` so each daily build produces consistent pages.
-
+- `social-preview.png` is prepared for the GitHub repository Social preview setting.
+- Issue templates and pull request templates are stored in `.github/`.

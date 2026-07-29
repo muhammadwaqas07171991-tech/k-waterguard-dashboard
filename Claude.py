@@ -1217,6 +1217,50 @@ class PlotGenerator:
         'Nitrate_N': 'mg/L',
         'Phosphate_P': 'mg/L',
     }
+
+    FIG_BG = '#f7fbff'
+    AX_BG = '#ffffff'
+    BLUE = '#0047a0'
+    BLUE_DARK = '#052e66'
+    RED = '#cd2e3a'
+    INK = '#071426'
+    MUTED = '#5f6b7a'
+    GRID = '#dce7f4'
+
+    def _new_figure(self, *args, **kwargs):
+        kwargs.setdefault('facecolor', self.FIG_BG)
+        fig, axes = plt.subplots(*args, **kwargs)
+        return fig, axes
+
+    def _style_axis(self, ax, grid_axis='y'):
+        ax.set_facecolor(self.AX_BG)
+        ax.grid(True, axis=grid_axis, color=self.GRID, linewidth=0.85, alpha=0.95)
+        ax.set_axisbelow(True)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#c8d5e6')
+        ax.spines['bottom'].set_color('#c8d5e6')
+        ax.tick_params(colors='#26364c', labelsize=10)
+
+    def _title_figure(self, fig, title, subtitle=''):
+        fig.suptitle(title, fontsize=20, fontweight='bold', color=self.INK, y=0.985)
+        if subtitle:
+            fig.text(0.5, 0.948, subtitle, ha='center', va='top', fontsize=11, color=self.MUTED)
+
+    def _save_figure(self, fig, path, rect=None):
+        if rect is None:
+            rect = [0, 0, 1, 0.93]
+        fig.tight_layout(rect=rect)
+        fig.savefig(path, dpi=320, bbox_inches='tight', facecolor=self.FIG_BG)
+        plt.close(fig)
+
+    def _coolwarm_values(self, values):
+        series = pd.to_numeric(pd.Series(values), errors='coerce')
+        if series.dropna().empty:
+            return [self.BLUE] * len(series)
+        normalizer = plt.Normalize(float(series.min()), float(series.max()))
+        cmap = plt.get_cmap('coolwarm')
+        return [cmap(normalizer(value)) if pd.notna(value) else '#d9e1ee' for value in series]
     
     def generate_all_plots(self):
         """Generate all visualization plots"""
@@ -1412,8 +1456,12 @@ class PlotGenerator:
                 self.logger.warning("No latest station data available for comparison plot")
                 return
             comparisons = ['pH', 'DO', 'BOD', 'TP', 'EC', 'Turbidity', 'Chlorophyll_a', 'Ammonia_N']
-            fig, axes = plt.subplots(2, 4, figsize=(14, 8), facecolor='white')
-            fig.suptitle('Latest Station Measurement Distributions - South Korea', fontsize=18, fontweight='bold')
+            fig, axes = self._new_figure(2, 4, figsize=(15.5, 8.8))
+            self._title_figure(
+                fig,
+                'Latest Station Measurement Distributions',
+                'One latest record per station; box = interquartile range, red line = median'
+            )
 
             for idx, param in enumerate(comparisons):
                 ax = axes.flatten()[idx]
@@ -1421,24 +1469,22 @@ class PlotGenerator:
                 if values.empty:
                     ax.axis('off')
                     continue
-                ax.boxplot(values, vert=True, patch_artist=True, widths=0.45, showfliers=False,
-                           boxprops=dict(facecolor='#d1e5f0', color='#2166ac', linewidth=1.1),
-                           medianprops=dict(color='#b2182b', linewidth=1.6),
-                           whiskerprops=dict(color='0.35'),
-                           capprops=dict(color='0.35'))
+                self._style_axis(ax)
+                ax.boxplot(values, vert=True, patch_artist=True, widths=0.50, showfliers=False,
+                           boxprops=dict(facecolor='#edf5ff', color=self.BLUE, linewidth=1.4),
+                           medianprops=dict(color=self.RED, linewidth=2.0),
+                           whiskerprops=dict(color='#506177', linewidth=1.1),
+                           capprops=dict(color='#506177', linewidth=1.1))
                 jitter = np.random.default_rng(42).normal(1, 0.025, size=len(values))
-                ax.scatter(jitter, values, s=9, color='#404040', alpha=0.24, linewidth=0)
-                ax.set_title(self._format_axis_label(param), fontweight='bold', fontsize=11)
+                ax.scatter(jitter, values, s=11, color=self.BLUE_DARK, alpha=0.20, linewidth=0)
+                ax.set_title(self._format_axis_label(param), fontweight='bold', fontsize=12, color=self.INK)
                 ax.set_xticks([])
                 ax.set_ylabel('Value')
-                ax.grid(True, color='0.90', axis='y')
                 ax.text(0.04, 0.96, f"n={len(values)}\nmean={values.mean():.2f}",
                         transform=ax.transAxes, va='top', ha='left', fontsize=8,
-                        bbox=dict(facecolor='white', edgecolor='0.85', alpha=0.85, boxstyle='round,pad=0.25'))
+                        bbox=dict(facecolor='white', edgecolor='#d8e3f1', alpha=0.92, boxstyle='round,pad=0.30'))
 
-            fig.tight_layout(rect=[0, 0, 1, 0.94])
-            fig.savefig(self._plots_dir() / 'regional_comparison.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'regional_comparison.png')
             self.logger.info("Regional comparison plot saved")
         except Exception as e:
             self.logger.error(f"Error in regional comparison: {str(e)}")
@@ -1457,18 +1503,16 @@ class PlotGenerator:
                 lambda row: (row - row.min()) / (row.max() - row.min()) if row.max() != row.min() else row * 0,
                 axis=1,
             )
-            fig, ax = plt.subplots(figsize=(11, 6), facecolor='white')
+            fig, ax = self._new_figure(figsize=(12.5, 6.8))
             sns.heatmap(normalized, annot=heatmap_data, fmt='.2f', cmap='coolwarm',
-                        linewidths=0.5, linecolor='white',
+                        linewidths=0.8, linecolor='white',
                         cbar_kws={'label': 'Normalized daily mean'}, ax=ax)
-            ax.set_title('Daily Mean Water Quality Heatmap - South Korea', fontsize=16, fontweight='bold')
+            ax.set_title('Daily Mean Water Quality Heatmap', fontsize=18, fontweight='bold', color=self.INK, pad=14)
             ax.set_xlabel('Date')
             ax.set_ylabel('Parameter')
             ax.set_xticklabels([str(label) for label in heatmap_data.columns], rotation=30, ha='right')
             ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-            fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'quality_heatmap.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'quality_heatmap.png', rect=[0, 0, 1, 0.98])
             self.logger.info("Heatmap plot saved")
         except Exception as e:
             self.logger.error(f"Error in heatmap: {str(e)}")
@@ -1478,8 +1522,8 @@ class PlotGenerator:
         try:
             plot_df = self._prepare_plot_dataframe(df)
             distributions = ['pH', 'DO', 'BOD', 'SS', 'EC', 'Turbidity', 'Ammonia_N', 'Nitrate_N']
-            fig, axes = plt.subplots(2, 4, figsize=(14, 8), facecolor='white')
-            fig.suptitle('Parameter Distributions - South Korea Monitoring Network', fontsize=18, fontweight='bold')
+            fig, axes = self._new_figure(2, 4, figsize=(15.5, 8.8))
+            self._title_figure(fig, 'Parameter Distributions', 'Latest daily network spread with mean and median reference lines')
 
             for idx, param in enumerate(distributions):
                 ax = axes.flatten()[idx]
@@ -1487,18 +1531,16 @@ class PlotGenerator:
                 if values.empty:
                     ax.axis('off')
                     continue
-                ax.hist(values, bins=24, color='#67a9cf', edgecolor='white', alpha=0.9)
-                ax.axvline(values.mean(), color='#b2182b', linewidth=1.6, label='Mean')
-                ax.axvline(values.median(), color='#2166ac', linewidth=1.4, linestyle='--', label='Median')
-                ax.set_title(f'{self._format_parameter_label(param)} Distribution', fontweight='bold', fontsize=11)
+                self._style_axis(ax)
+                ax.hist(values, bins=28, color='#73a9df', edgecolor='white', alpha=0.92)
+                ax.axvline(values.mean(), color=self.RED, linewidth=1.9, label='Mean')
+                ax.axvline(values.median(), color=self.BLUE_DARK, linewidth=1.6, linestyle='--', label='Median')
+                ax.set_title(f'{self._format_parameter_label(param)} Distribution', fontweight='bold', fontsize=12, color=self.INK)
                 ax.set_xlabel(self.PARAMETER_UNITS.get(param, '') or 'Value')
                 ax.set_ylabel('Frequency')
                 ax.legend(frameon=False, fontsize=8)
-                ax.grid(True, color='0.90', axis='y')
 
-            fig.tight_layout(rect=[0, 0, 1, 0.94])
-            fig.savefig(self._plots_dir() / 'distributions.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'distributions.png')
             self.logger.info("Distribution plot saved")
         except Exception as e:
             self.logger.error(f"Error in distributions: {str(e)}")
@@ -1537,9 +1579,8 @@ class PlotGenerator:
             parameters = ['pH', 'DO', 'BOD', 'COD', 'SS', 'TN', 'TP', 'temperature']
             parameters = [param for param in parameters if param in latest.columns and pd.to_numeric(latest[param], errors='coerce').notna().any()]
 
-            fig, axes = plt.subplots(2, 4, figsize=(14, 7), facecolor='white')
-            fig.suptitle('Water Quality Signal Board', fontsize=20, fontweight='bold', color='#121826')
-            fig.text(0.5, 0.925, 'Latest station averages with screening-rule status', ha='center', fontsize=11, color='#5f6b7a')
+            fig, axes = self._new_figure(2, 4, figsize=(15.5, 7.8))
+            self._title_figure(fig, 'Water Quality Signal Board', 'Latest station averages with screening-rule status')
 
             if not parameters:
                 for ax in axes.flatten():
@@ -1552,23 +1593,23 @@ class PlotGenerator:
                 mean_value = values.mean()
                 rule = Config.WATER_QUALITY_ALERT_RULES.get(param, {})
                 status = 'OK'
-                color = '#0047a0'
+                color = self.BLUE
                 if self._violates_plot_rule(mean_value, rule):
                     status = 'ATTENTION' if rule.get('severity') != 'critical' else 'CRITICAL'
-                    color = '#191919' if status == 'ATTENTION' else '#cd2e3a'
+                    color = '#101828' if status == 'ATTENTION' else self.RED
 
-                ax.set_facecolor('#f9fbff')
+                ax.set_facecolor(self.FIG_BG)
                 ax.add_patch(plt.Rectangle((0.02, 0.02), 0.96, 0.96, transform=ax.transAxes,
-                                           facecolor='white', edgecolor='#d9e1ee', linewidth=1.2))
-                ax.add_patch(plt.Rectangle((0.02, 0.02), 0.025, 0.96, transform=ax.transAxes,
+                                           facecolor='white', edgecolor='#d8e3f1', linewidth=1.4))
+                ax.add_patch(plt.Rectangle((0.02, 0.02), 0.030, 0.96, transform=ax.transAxes,
                                            facecolor=color, edgecolor=color))
                 ax.text(0.10, 0.78, self._format_parameter_label(param), transform=ax.transAxes,
-                        fontsize=13, fontweight='bold', color='#121826')
+                        fontsize=13, fontweight='bold', color=self.INK)
                 ax.text(0.10, 0.48, f'{mean_value:.2f}', transform=ax.transAxes,
-                        fontsize=26, fontweight='bold', color=color)
+                        fontsize=29, fontweight='bold', color=color)
                 unit = self.PARAMETER_UNITS.get(param, '')
                 ax.text(0.10, 0.30, f'Average {unit}'.strip(), transform=ax.transAxes,
-                        fontsize=10, color='#5f6b7a')
+                        fontsize=10, color=self.MUTED)
                 ax.text(0.10, 0.14, status, transform=ax.transAxes,
                         fontsize=10, fontweight='bold', color='white',
                         bbox=dict(boxstyle='round,pad=0.35', facecolor=color, edgecolor=color))
@@ -1580,9 +1621,7 @@ class PlotGenerator:
             for ax in axes.flatten()[len(parameters[:8]):]:
                 ax.axis('off')
 
-            fig.tight_layout(rect=[0, 0, 1, 0.90])
-            fig.savefig(self._plots_dir() / 'water_quality_signal_board.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'water_quality_signal_board.png')
             self.logger.info("Water quality signal board plot saved")
         except Exception as e:
             self.logger.error(f"Error in water quality signal board plot: {str(e)}")
@@ -1608,12 +1647,12 @@ class PlotGenerator:
                             'severity': rule.get('severity', 'warning'),
                         })
 
-            fig, ax = plt.subplots(figsize=(13, 7), facecolor='white')
+            fig, ax = self._new_figure(figsize=(14, 7.8))
             if not rows:
                 ax.text(0.5, 0.55, 'No current alert hotspots', ha='center', va='center',
-                        fontsize=20, fontweight='bold', color='#0047a0')
+                        fontsize=20, fontweight='bold', color=self.BLUE)
                 ax.text(0.5, 0.42, 'Hotspot bubbles will appear when station values exceed configured rules.',
-                        ha='center', va='center', fontsize=12, color='#5f6b7a')
+                        ha='center', va='center', fontsize=12, color=self.MUTED)
                 ax.axis('off')
             else:
                 hotspot_df = pd.DataFrame(rows)
@@ -1631,10 +1670,10 @@ class PlotGenerator:
                 grouped['x'] = grouped['parameter'].map(parameter_lookup)
                 grouped['y'] = grouped['province'].map(province_lookup)
                 grouped['size'] = grouped['count'].clip(lower=1) * 65
-                grouped['color'] = grouped['severity'].map({'critical': '#cd2e3a'}).fillna('#191919')
+                grouped['color'] = grouped['severity'].map({'critical': self.RED}).fillna(self.BLUE_DARK)
 
                 ax.scatter(grouped['x'], grouped['y'], s=grouped['size'], c=grouped['color'],
-                           alpha=0.78, edgecolor='white', linewidth=1.2)
+                           alpha=0.84, edgecolor='white', linewidth=1.4)
                 for row in grouped.itertuples():
                     ax.text(row.x, row.y, str(int(row.count)), ha='center', va='center',
                             fontsize=9, fontweight='bold', color='white')
@@ -1643,18 +1682,14 @@ class PlotGenerator:
                 ax.set_xticklabels(top_parameters, rotation=30, ha='right')
                 ax.set_yticks(range(len(top_provinces)))
                 ax.set_yticklabels(top_provinces)
-                ax.set_title('Alert Hotspot Matrix', fontsize=18, fontweight='bold')
+                self._style_axis(ax, grid_axis='both')
+                ax.set_title('Alert Hotspot Matrix', fontsize=20, fontweight='bold', color=self.INK, pad=14)
                 ax.set_xlabel('Parameter')
                 ax.set_ylabel('Province')
-                ax.grid(True, color='#e7eefb', linewidth=0.8)
-                ax.set_axisbelow(True)
-                ax.spines[['top', 'right']].set_visible(False)
                 ax.text(0.99, 1.02, 'Bubble size = alert rows', transform=ax.transAxes,
-                        ha='right', va='bottom', fontsize=10, color='#5f6b7a')
+                        ha='right', va='bottom', fontsize=10, color=self.MUTED)
 
-            fig.tight_layout()
-            fig.savefig(self._plots_dir() / 'alert_hotspot_matrix.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'alert_hotspot_matrix.png', rect=[0, 0, 1, 0.98])
             self.logger.info("Alert hotspot matrix plot saved")
         except Exception as e:
             self.logger.error(f"Error in alert hotspot matrix plot: {str(e)}")
@@ -1709,28 +1744,28 @@ class PlotGenerator:
 
             annual = df.groupby('year')[variables].mean().sort_index()
             selected = variables[:6]
-            fig, axes = plt.subplots(2, 3, figsize=(16, 8.8), facecolor='white')
+            fig, axes = self._new_figure(2, 3, figsize=(17, 9.4))
             axes = axes.ravel()
             for ax, column in zip(axes, selected):
                 label, unit = Config.HISTORICAL_VARIABLE_MAP[column]
                 series = annual[column].dropna()
-                ax.plot(series.index, series.values, color='#2166ac', linewidth=2.0, marker='o', markersize=3.5)
+                self._style_axis(ax)
+                ax.plot(series.index, series.values, color=self.BLUE, linewidth=2.4, marker='o', markersize=4.2,
+                        markerfacecolor='white', markeredgewidth=1.3)
+                ax.fill_between(series.index, series.values, series.values.min(), color=self.BLUE, alpha=0.08)
                 if len(series) >= 3:
                     slope = DashboardGenerator()._mann_kendall_sen(series.index.to_numpy(dtype=float), series.values.astype(float))['sen_slope']
                     x = np.array([series.index.min(), series.index.max()], dtype=float)
                     intercept = float(np.nanmedian(series.values - (series.index.to_numpy(dtype=float) * slope))) if pd.notna(slope) else np.nan
                     if pd.notna(intercept):
-                        ax.plot(x, intercept + slope * x, color='#b2182b', linewidth=1.8, linestyle='--')
-                ax.set_title(f'{label} Annual Mean', fontweight='bold')
+                        ax.plot(x, intercept + slope * x, color=self.RED, linewidth=2.0, linestyle='--')
+                ax.set_title(f'{label} Annual Mean', fontweight='bold', color=self.INK)
                 ax.set_xlabel('Year')
                 ax.set_ylabel(unit)
-                ax.grid(True, color='#e7eefb')
             for ax in axes[len(selected):]:
                 ax.axis('off')
-            fig.suptitle('Historical Water Quality Time-Series Trends - South Korea', fontsize=18, fontweight='bold')
-            fig.tight_layout(rect=[0, 0, 1, 0.95])
-            fig.savefig(self._plots_dir() / 'historical_trend_annual_means.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._title_figure(fig, 'Historical Water Quality Time-Series Trends', "Annual means with Sen's slope reference line")
+            self._save_figure(fig, self._plots_dir() / 'historical_trend_annual_means.png')
 
             slope_rows = []
             trend_helper = DashboardGenerator()
@@ -1743,16 +1778,14 @@ class PlotGenerator:
                 slope_rows.append({'variable': label, 'slope': stats['sen_slope'], 'p': stats['p'], 'unit': unit})
             slope_df = pd.DataFrame(slope_rows).dropna(subset=['slope'])
             if not slope_df.empty:
-                fig, ax = plt.subplots(figsize=(11, 6.2), facecolor='white')
-                colors = ['#b2182b' if value > 0 else '#2166ac' for value in slope_df['slope']]
+                fig, ax = self._new_figure(figsize=(12, 6.6))
+                colors = [self.RED if value > 0 else self.BLUE for value in slope_df['slope']]
                 ax.barh(slope_df['variable'], slope_df['slope'], color=colors, edgecolor='white')
-                ax.axvline(0, color='0.25', linewidth=0.9)
-                ax.set_title("Sen's Slope Summary By Variable", fontweight='bold', fontsize=17)
+                self._style_axis(ax, grid_axis='x')
+                ax.axvline(0, color='#26364c', linewidth=1.0)
+                ax.set_title("Sen's Slope Summary By Variable", fontweight='bold', fontsize=19, color=self.INK, pad=14)
                 ax.set_xlabel('Median annual slope in native units per year')
-                ax.grid(True, axis='x', color='#e7eefb')
-                fig.tight_layout()
-                fig.savefig(self._plots_dir() / 'historical_sen_slope_summary.png', dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close(fig)
+                self._save_figure(fig, self._plots_dir() / 'historical_sen_slope_summary.png', rect=[0, 0, 1, 0.98])
         except Exception as exc:
             self.logger.error(f"Error in historical trend plots: {exc}")
 
@@ -1777,19 +1810,17 @@ class PlotGenerator:
                 .head(15)
             )
             if not grouped.empty:
-                fig, ax = plt.subplots(figsize=(12.5, 7.2), facecolor='white')
-                colors = plt.cm.coolwarm(np.linspace(0.15, 0.92, len(grouped)))
+                fig, ax = self._new_figure(figsize=(13.4, 7.6))
+                colors = self._coolwarm_values(grouped['max_chla'].values)
                 ax.barh(grouped.index[::-1], grouped['max_chla'].values[::-1], color=colors[::-1], edgecolor='white')
-                ax.axvline(rule['caution'], color='#2166ac', linestyle='--', linewidth=1.3, label='Caution')
-                ax.axvline(rule['warning'], color='#b2182b', linestyle='--', linewidth=1.3, label='Warning')
+                self._style_axis(ax, grid_axis='x')
+                ax.axvline(rule['caution'], color=self.BLUE, linestyle='--', linewidth=1.5, label='Caution')
+                ax.axvline(rule['warning'], color=self.RED, linestyle='--', linewidth=1.5, label='Warning')
                 ax.axvline(rule['outbreak'], color='#67001f', linestyle=':', linewidth=1.3, label='Outbreak')
-                ax.set_title('Watershed Chlorophyll-a Algal Bloom Screening', fontweight='bold', fontsize=17)
+                ax.set_title('Watershed Chlorophyll-a Algal Bloom Screening', fontweight='bold', fontsize=19, color=self.INK, pad=14)
                 ax.set_xlabel(f'Observed maximum chlorophyll-a ({rule["unit"]})')
-                ax.legend(loc='lower right')
-                ax.grid(True, axis='x', color='#e7eefb')
-                fig.tight_layout()
-                fig.savefig(self._plots_dir() / 'algal_watershed_chlorophyll.png', dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close(fig)
+                ax.legend(loc='lower right', frameon=True, facecolor='white', edgecolor='#d8e3f1')
+                self._save_figure(fig, self._plots_dir() / 'algal_watershed_chlorophyll.png', rect=[0, 0, 1, 0.98])
 
             df['year'] = df['sample_date'].dt.year
             annual_watershed = (
@@ -1804,14 +1835,12 @@ class PlotGenerator:
                 .sort_index()
             )
             if not heatmap_data.empty:
-                fig, ax = plt.subplots(figsize=(14, 6.8), facecolor='white')
-                sns.heatmap(heatmap_data, ax=ax, cmap='coolwarm', linewidths=0.2, linecolor='white', cbar_kws={'label': f'Chlorophyll-a ({rule["unit"]})'})
-                ax.set_title('Annual Algal Bloom Signal By Watershed', fontweight='bold', fontsize=17)
+                fig, ax = self._new_figure(figsize=(15, 7.2))
+                sns.heatmap(heatmap_data, ax=ax, cmap='coolwarm', linewidths=0.45, linecolor='white', cbar_kws={'label': f'Chlorophyll-a ({rule["unit"]})'})
+                ax.set_title('Annual Algal Bloom Signal By Watershed', fontweight='bold', fontsize=19, color=self.INK, pad=14)
                 ax.set_xlabel('Year')
                 ax.set_ylabel('Watershed / basin')
-                fig.tight_layout()
-                fig.savefig(self._plots_dir() / 'algal_status_timeline.png', dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close(fig)
+                self._save_figure(fig, self._plots_dir() / 'algal_status_timeline.png', rect=[0, 0, 1, 0.98])
         except Exception as exc:
             self.logger.error(f"Error in algal bloom plots: {exc}")
 
@@ -1856,19 +1885,19 @@ class PlotGenerator:
                     plot_df = self._prepare_map_points(plot_df, param)
                     self.logger.info(f"{param} map for {day_label}: plotting {len(plot_df)} colored station points")
 
-                    fig = plt.figure(figsize=(9.8, 6.8), facecolor='white')
+                    fig = plt.figure(figsize=(10.6, 7.3), facecolor=self.FIG_BG)
                     ax = fig.add_axes([0.07, 0.13, 0.77, 0.72])
                     cax = fig.add_axes([0.88, 0.13, 0.024, 0.72])
-                    ax.set_facecolor('white')
+                    ax.set_facecolor(self.AX_BG)
                     self._draw_south_korea_map(ax, map_rings)
                     display_label = self._format_parameter_label(param)
                     if not station_layer.empty:
                         ax.scatter(
                             station_layer['longitude'],
                             station_layer['latitude'],
-                            s=9,
-                            color='0.70',
-                            alpha=0.32,
+                            s=10,
+                            color='#9aa9bb',
+                            alpha=0.30,
                             linewidth=0,
                             zorder=3,
                             label='All stations',
@@ -1879,10 +1908,10 @@ class PlotGenerator:
                         plot_df['latitude'],
                         c=plot_df[param],
                         cmap='coolwarm',
-                        s=18,
+                        s=24,
                         edgecolor='white',
-                        linewidth=0.22,
-                        alpha=0.86,
+                        linewidth=0.35,
+                        alpha=0.90,
                         zorder=4,
                     )
                     if Config.MAP_POINT_LABELS:
@@ -1898,7 +1927,7 @@ class PlotGenerator:
                                 zorder=5,
                             )
 
-                    ax.set_title(f'{display_label} - South Korea Map ({day_label})', pad=10, fontweight='bold')
+                    ax.set_title(f'{display_label} - South Korea ({day_label})', pad=12, fontweight='bold', fontsize=17, color=self.INK)
                     self._apply_lat_long_box(ax, min_lon, min_lat, max_lon, max_lat)
 
                     colorbar = fig.colorbar(scatter, cax=cax)
@@ -1907,7 +1936,7 @@ class PlotGenerator:
                     colorbar.outline.set_edgecolor('0.72')
                     colorbar.ax.tick_params(colors='0.15', length=3, width=0.7)
                     safe_day = day_label.replace('-', '_')
-                    plt.savefig(self._plots_dir(day_label) / f'{param.lower()}_map_{safe_day}.png', dpi=300, facecolor='white')
+                    plt.savefig(self._plots_dir(day_label) / f'{param.lower()}_map_{safe_day}.png', dpi=320, facecolor=self.FIG_BG)
                     plt.close()
             self.logger.info("Daily parameter map plots saved")
         except Exception as e:
@@ -1928,23 +1957,23 @@ class PlotGenerator:
             south_korea_map = self._load_south_korea_map()
             min_lon, min_lat, max_lon, max_lat = south_korea_map['bounds']
 
-            fig = plt.figure(figsize=(9.8, 6.8), facecolor='white')
+            fig = plt.figure(figsize=(10.6, 7.3), facecolor=self.FIG_BG)
             ax = fig.add_axes([0.07, 0.13, 0.86, 0.72])
-            ax.set_facecolor('white')
+            ax.set_facecolor(self.AX_BG)
             self._draw_south_korea_map(ax, south_korea_map['rings'])
             ax.scatter(
                 station_layer['longitude'],
                 station_layer['latitude'],
-                s=13,
-                color='#2166ac',
-                alpha=0.72,
+                s=18,
+                color=self.BLUE,
+                alpha=0.78,
                 edgecolor='white',
-                linewidth=0.18,
+                linewidth=0.35,
                 zorder=4,
             )
-            ax.set_title(f'Station Coverage - South Korea ({len(station_layer)} stations)', pad=10, fontweight='bold')
+            ax.set_title(f'Station Coverage - South Korea ({len(station_layer)} stations)', pad=12, fontweight='bold', fontsize=17, color=self.INK)
             self._apply_lat_long_box(ax, min_lon, min_lat, max_lon, max_lat)
-            fig.savefig(self._plots_dir() / 'station_coverage_map.png', dpi=300, facecolor='white')
+            fig.savefig(self._plots_dir() / 'station_coverage_map.png', dpi=320, facecolor=self.FIG_BG)
             plt.close(fig)
             self.logger.info(f"Station coverage map saved with {len(station_layer)} stations")
         except Exception as e:
@@ -2141,9 +2170,9 @@ class PlotGenerator:
     def _draw_south_korea_map(self, ax, rings):
         collection = LineCollection(
             rings,
-            colors='#8f9a96',
-            linewidths=0.32,
-            alpha=1.0,
+            colors='#8da0b5',
+            linewidths=0.42,
+            alpha=0.95,
             zorder=1,
         )
         ax.add_collection(collection)
@@ -2160,9 +2189,9 @@ class PlotGenerator:
             summary_params = ['pH', 'DO', 'BOD', 'COD', 'SS', 'TN', 'TP', 'EC', 'Turbidity', 'Ammonia_N']
             summary_params = [p for p in summary_params if p in latest.columns and latest[p].notna().any()]
 
-            fig = plt.figure(figsize=(13, 8), facecolor='white')
+            fig = plt.figure(figsize=(14.2, 8.4), facecolor=self.FIG_BG)
             gs = fig.add_gridspec(2, 2, height_ratios=[0.65, 1.35], hspace=0.34, wspace=0.24)
-            fig.suptitle('Water Quality Summary Dashboard - South Korea', fontsize=18, fontweight='bold')
+            self._title_figure(fig, 'Water Quality Summary Dashboard', 'Daily monitoring coverage and latest parameter movement')
 
             ax_info = fig.add_subplot(gs[0, :])
             ax_info.axis('off')
@@ -2177,10 +2206,11 @@ class PlotGenerator:
             )
             ax_info.text(
                 0.02, 0.54, info_text, va='center', ha='left', fontsize=12,
-                bbox=dict(boxstyle='round,pad=0.45', facecolor='#f7f7f7', edgecolor='0.80')
+                bbox=dict(boxstyle='round,pad=0.55', facecolor='white', edgecolor='#d8e3f1')
             )
 
             ax_bar = fig.add_subplot(gs[1, 0])
+            self._style_axis(ax_bar, grid_axis='x')
             daily_means = plot_df.groupby('date')[summary_params].mean().sort_index()
             if len(daily_means) >= 2:
                 previous = daily_means.iloc[-2].replace(0, np.nan)
@@ -2188,32 +2218,30 @@ class PlotGenerator:
                 changes = (((latest_day - previous) / previous) * 100).replace([np.inf, -np.inf], np.nan).dropna()
                 changes = changes.reindex(changes.abs().sort_values().index)
                 labels = [self._format_parameter_label(p) for p in changes.index]
-                colors = ['#2166ac' if value < 0 else '#b2182b' for value in changes.values]
+                colors = [self.BLUE if value < 0 else self.RED for value in changes.values]
                 ax_bar.barh(labels, changes.values, color=colors, edgecolor='white')
-                ax_bar.axvline(0, color='0.25', linewidth=0.8)
+                ax_bar.axvline(0, color='#26364c', linewidth=1.0)
                 ax_bar.set_title('Latest Daily Mean Change by Parameter', fontweight='bold', fontsize=13)
                 ax_bar.set_xlabel('Change from previous day (%)')
             else:
                 latest_means = latest[summary_params].mean()
                 scaled = ((latest_means - latest_means.min()) / (latest_means.max() - latest_means.min())).fillna(0)
                 labels = [self._format_parameter_label(p) for p in scaled.index]
-                ax_bar.barh(labels, scaled.values, color='#67a9cf', edgecolor='white')
+                ax_bar.barh(labels, scaled.values, color=self.BLUE, edgecolor='white')
                 ax_bar.set_title('Latest Normalized Parameter Means', fontweight='bold', fontsize=13)
                 ax_bar.set_xlabel('Normalized mean')
-            ax_bar.grid(True, axis='x', color='0.90')
 
             ax_count = fig.add_subplot(gs[1, 1])
+            self._style_axis(ax_count)
             daily_counts = plot_df.groupby('date')['station_key'].nunique()
-            ax_count.plot(daily_counts.index, daily_counts.values, color='#b2182b', marker='o', linewidth=1.8)
+            ax_count.plot(daily_counts.index, daily_counts.values, color=self.RED, marker='o', linewidth=2.2,
+                          markerfacecolor='white', markeredgewidth=1.3)
             ax_count.set_title('Daily Reporting Station Count', fontweight='bold', fontsize=13)
             ax_count.set_xlabel('Date')
             ax_count.set_ylabel('Stations')
-            ax_count.grid(True, color='0.90')
             ax_count.tick_params(axis='x', rotation=30)
 
-            fig.tight_layout(rect=[0, 0, 1, 0.94])
-            fig.savefig(self._plots_dir() / 'quality_summary.png', dpi=300, bbox_inches='tight', facecolor='white')
-            plt.close(fig)
+            self._save_figure(fig, self._plots_dir() / 'quality_summary.png')
             self.logger.info("Summary dashboard saved")
         except Exception as e:
             self.logger.error(f"Error in summary: {str(e)}")
@@ -3221,6 +3249,175 @@ class DashboardGenerator:
       .nav-tabs {{ position: static; width: 100%; }}
       .nav-tabs a {{ flex: 1 1 160px; justify-content: center; }}
       header {{ min-height: 250px; padding: 22px 12px; }}
+    }}
+
+    /* K-WaterGuard executive dashboard template v5. */
+    body {{
+      background:
+        linear-gradient(180deg, #f8fbff 0%, #eef5fc 42%, #fdf7f8 100%);
+    }}
+    header {{
+      min-height: 238px;
+      padding: 24px 24px 28px;
+      align-items: center;
+      border-bottom: 1px solid rgba(0,71,160,.16);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.92) 42%, rgba(237,246,255,.58) 68%, rgba(0,71,160,.20)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    header .wrap {{
+      display: grid;
+      gap: 18px;
+    }}
+    .topline {{
+      align-items: center;
+    }}
+    .brand {{
+      padding: 8px 11px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(0,71,160,.16);
+    }}
+    .brand-logo {{
+      width: 42px;
+      height: 42px;
+    }}
+    .brand-name {{
+      font-size: 18px;
+    }}
+    .badge {{
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--red);
+      background: rgba(255,255,255,.88);
+    }}
+    h1 {{
+      margin: 12px 0 0;
+      font-size: clamp(40px, 4.1vw, 64px);
+      line-height: 1.02;
+      max-width: 780px;
+      color: var(--blue);
+    }}
+    .subtitle {{
+      max-width: 860px;
+      font-size: clamp(16px, 1.15vw, 20px);
+      line-height: 1.35;
+      font-weight: 700;
+    }}
+    main.wrap {{
+      width: min(1520px, calc(100% - 56px));
+      padding-top: 24px;
+    }}
+    .nav-tabs {{
+      top: 10px;
+      width: 100%;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px;
+      margin-bottom: 18px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(216,227,241,.96);
+    }}
+    .nav-tabs a {{
+      flex: 1 1 150px;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 12px;
+      font-size: 15px;
+    }}
+    .toolbar {{
+      grid-template-columns: minmax(260px, 1fr) auto auto;
+      margin-bottom: 10px;
+    }}
+    .search-status {{
+      margin: 10px 4px 18px;
+    }}
+    .section {{
+      margin-top: 18px;
+      padding: clamp(20px, 2vw, 30px);
+    }}
+    .home-overview {{
+      min-height: 410px;
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, .92fr);
+      background:
+        linear-gradient(110deg, rgba(3,30,69,.96), rgba(0,71,160,.86) 51%, rgba(205,46,58,.78)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    .overview-panel {{
+      background: rgba(255,255,255,.15);
+      backdrop-filter: blur(12px);
+    }}
+    .home-overview h2 {{
+      font-size: clamp(30px, 2.7vw, 46px);
+    }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }}
+    .stat {{
+      min-height: 116px;
+      padding: 17px 18px;
+    }}
+    .value {{
+      font-size: clamp(26px, 2vw, 38px);
+      overflow-wrap: anywhere;
+    }}
+    .capability-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }}
+    .capability-card {{
+      min-height: 158px;
+      border-top-width: 3px;
+    }}
+    .param-grid {{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }}
+    .param {{
+      min-height: 146px;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }}
+    .param:hover {{
+      transform: translateY(-4px);
+    }}
+    .plots {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    .plot {{
+      background: #fff;
+    }}
+    .plot h3 {{
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(216,227,241,.86);
+      background: linear-gradient(90deg, #f4f8ff, #ffffff);
+      font-size: 17px;
+    }}
+    .plot img {{
+      padding: 10px;
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+    }}
+    .spatial-maps {{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+    .table-wrap {{
+      max-height: 600px;
+    }}
+    footer {{
+      width: min(1520px, calc(100% - 56px));
+    }}
+    @media (max-width: 1180px) {{
+      .stats, .capability-grid, .param-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .plots, .spatial-maps, .two-col, .three-col, .home-overview {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 720px) {{
+      main.wrap, .wrap, footer {{ width: min(100% - 24px, 1520px); }}
+      header {{ min-height: 220px; padding: 18px 12px 22px; }}
+      h1 {{ font-size: 38px; }}
+      .nav-tabs {{ position: static; }}
+      .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
@@ -4680,7 +4877,7 @@ class DashboardGenerator:
             if source.exists():
                 target = assets_dir / output_name
                 shutil.copyfile(source, target)
-                replacements[self._file_uri(source)] = self._image_data_uri(source)
+                replacements[self._file_uri(source)] = self._site_asset_url(f"assets/{output_name}")
                 if output_name == "logo.png":
                     self._write_pwa_icons(source, assets_dir)
 

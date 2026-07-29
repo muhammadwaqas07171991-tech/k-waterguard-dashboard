@@ -1,0 +1,28 @@
+name: Data Quality Report
+description: Report a station, dataset, trend, map, or algal-bloom data issue.
+title: "[Data]: "
+labels: ["data-quality"]
+body:
+  - type: textarea
+    id: issue
+    attributes:
+      label: Issue Summary
+      description: Describe what looks incorrect or incomplete.
+      placeholder: Example: Historical station count does not match the source file.
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: Dashboard Page
+      placeholder: Home, Data Downloads, Historical Trends, Algal Bloom Status, or Spatial Maps
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+      description: What should the dashboard show instead?
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / Screenshot / Source
+      description: Add links, screenshots, station IDs, dates, variables, or source-file names.
