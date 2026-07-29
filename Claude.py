@@ -2326,7 +2326,7 @@ class DashboardGenerator:
         algal_standard_rows = self._algal_standard_rows()
         watershed_rows = self._watershed_status_rows()
         algal_scenario_rows = self._algal_scenario_rows()
-        side_rail_html = self._side_rail_html(latest_df, latest_station_df, alerts_df, str(latest_date), city_count, province_count, station_count)
+        side_rail_html = ''
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
         historical_measurements_path = Config.HISTORICAL_MEASUREMENTS_FILE if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
         historical_stations_path = Config.HISTORICAL_STATIONS_FILE if Config.HISTORICAL_STATIONS_FILE.exists() else Config.DERIVED_HISTORICAL_STATIONS_FILE
@@ -2565,6 +2565,301 @@ class DashboardGenerator:
       .brand-name {{ font-size: 16px; }}
       .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col, .capability-grid {{ grid-template-columns: 1fr; }}
       .home-overview {{ grid-template-columns: 1fr; }}
+    }}
+
+    /* Modern dashboard refresh: white / Korean blue / Korean red, with no side rails. */
+    :root {{
+      --bg: #eef4fb;
+      --panel: rgba(255, 255, 255, 0.94);
+      --panel-soft: #f7fbff;
+      --ink: #071426;
+      --muted: #526172;
+      --line: #d5dfed;
+      --blue: #0047a0;
+      --blue-soft: #edf5ff;
+      --red: #cd2e3a;
+      --red-soft: #fff0f2;
+      --black: #101828;
+      --shadow: 0 18px 48px rgba(15, 39, 72, 0.11);
+      --shadow-soft: 0 8px 24px rgba(15, 39, 72, 0.08);
+    }}
+    body {{
+      min-height: 100vh;
+      background:
+        linear-gradient(140deg, rgba(255,255,255,.96), rgba(237,245,255,.92) 42%, rgba(255,240,242,.70)),
+        radial-gradient(circle at 12% 18%, rgba(0,71,160,.11), transparent 28%),
+        radial-gradient(circle at 94% 8%, rgba(205,46,58,.10), transparent 26%);
+      color: var(--ink);
+    }}
+    header {{
+      min-height: 245px;
+      align-items: center;
+      padding: 28px 24px 30px;
+      border-bottom: 1px solid rgba(0,71,160,.18);
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,.72);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.88) 42%, rgba(237,245,255,.62) 66%, rgba(0,71,160,.16)),
+        linear-gradient(135deg, rgba(205,46,58,.12), transparent 34%),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    .wrap {{ width: min(1460px, calc(100% - 44px)); }}
+    .topline {{ align-items: flex-start; }}
+    .brand {{
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,71,160,.14);
+      box-shadow: var(--shadow-soft);
+    }}
+    .brand-logo {{ width: 46px; height: 46px; }}
+    .badge {{
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      color: var(--red);
+      border: 1px solid rgba(205,46,58,.24);
+      box-shadow: var(--shadow-soft);
+    }}
+    h1 {{
+      margin: 30px 0 9px;
+      font-size: clamp(42px, 5vw, 76px);
+      max-width: 860px;
+      color: var(--blue);
+      letter-spacing: 0;
+    }}
+    .subtitle {{
+      max-width: 930px;
+      color: #14243a;
+      font-size: clamp(17px, 1.5vw, 22px);
+      line-height: 1.25;
+      font-weight: 700;
+    }}
+    main {{
+      padding: 26px 0 56px;
+    }}
+    .nav-tabs {{
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      gap: 10px;
+      padding: 10px;
+      margin: 0 0 20px;
+      width: fit-content;
+      max-width: 100%;
+      border: 1px solid rgba(213,223,237,.85);
+      border-radius: 8px;
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow-soft);
+    }}
+    .nav-tabs a {{
+      border: 0;
+      border-radius: 7px;
+      padding: 11px 14px;
+      background: transparent;
+      color: #12345b;
+      font-weight: 800;
+      transition: background .16s ease, color .16s ease, transform .16s ease;
+    }}
+    .nav-tabs a:hover {{
+      background: var(--blue);
+      color: white;
+      transform: translateY(-1px);
+      text-decoration: none;
+    }}
+    .toolbar {{
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) auto auto;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      border: 1px solid rgba(213,223,237,.88);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(10px);
+    }}
+    .search {{
+      min-height: 48px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,71,160,.17);
+      background: white;
+      color: var(--ink);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }}
+    .button {{
+      justify-content: center;
+      min-height: 48px;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 800;
+      box-shadow: 0 12px 24px rgba(0,71,160,.18);
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }}
+    .button:hover {{ transform: translateY(-1px); box-shadow: 0 16px 30px rgba(0,71,160,.24); }}
+    .search-status {{ margin: 10px 0 18px; font-size: 14px; }}
+    .insight-rail {{ display: none !important; }}
+    .card {{
+      border-radius: 8px;
+      border: 1px solid rgba(213,223,237,.82);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }}
+    .section {{
+      padding: clamp(20px, 2.2vw, 32px);
+      margin-top: 20px;
+    }}
+    h2 {{
+      font-size: clamp(24px, 2vw, 34px);
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }}
+    h3 {{ color: var(--ink); }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(150px, 1fr));
+      gap: 14px;
+    }}
+    .stat {{
+      min-height: 122px;
+      padding: 18px;
+      border-top: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,251,255,.96)),
+        linear-gradient(90deg, var(--blue), var(--red));
+      position: relative;
+    }}
+    .stat::before {{
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--blue);
+    }}
+    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
+    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
+    .label {{
+      font-size: 12px;
+      color: #66758a;
+      font-weight: 800;
+    }}
+    .value {{
+      font-size: clamp(28px, 2.2vw, 42px);
+      line-height: 1;
+      color: var(--blue);
+    }}
+    .home-overview {{
+      min-height: 430px;
+      align-items: end;
+      border-radius: 8px;
+      padding: clamp(28px, 4vw, 54px);
+      background:
+        linear-gradient(112deg, rgba(0,35,76,.94), rgba(0,71,160,.82) 48%, rgba(205,46,58,.80)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+      box-shadow: var(--shadow);
+    }}
+    .overview-panel {{
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 8px;
+      padding: clamp(18px, 2vw, 28px);
+      box-shadow: 0 20px 60px rgba(0,0,0,.12);
+    }}
+    .home-overview h2 {{ font-size: clamp(32px, 3vw, 52px); line-height: 1.05; }}
+    .home-overview p {{ font-size: 17px; line-height: 1.45; }}
+    .capability-grid {{ gap: 16px; margin-top: 18px; }}
+    .capability-card {{
+      min-height: 172px;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,251,255,.94));
+      transition: transform .16s ease, box-shadow .16s ease;
+    }}
+    .capability-card:hover {{ transform: translateY(-3px); box-shadow: 0 24px 52px rgba(15,39,72,.14); }}
+    .param {{
+      border-left: 0;
+      min-height: 160px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }}
+    .param::before {{
+      content: "";
+      display: block;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--blue);
+      margin-bottom: 12px;
+    }}
+    .param.warn::before {{ background: var(--black); }}
+    .param.bad::before {{ background: var(--red); }}
+    .plots, .spatial-maps {{
+      gap: 18px;
+    }}
+    .plot h3 {{
+      margin: 0;
+      padding: 14px 16px;
+      background: linear-gradient(90deg, var(--blue-soft), white);
+      color: #10233f;
+    }}
+    .plot img {{ border-top: 0; }}
+    .table-wrap {{
+      border-radius: 8px;
+      border: 1px solid rgba(213,223,237,.9);
+      background: white;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }}
+    table {{ font-size: 15px; }}
+    th {{
+      background: linear-gradient(180deg, #edf5ff, #e4eefc);
+      color: #10233f;
+      font-weight: 800;
+      padding: 13px 14px;
+    }}
+    td {{
+      padding: 12px 14px;
+      color: #1f2f46;
+    }}
+    tbody tr:hover {{ background: #f8fbff; }}
+    .history-link {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      margin-right: 6px;
+    }}
+    .history-link:hover {{ background: var(--blue); color: white; text-decoration: none; }}
+    footer {{
+      width: min(1460px, calc(100% - 44px));
+      margin: 0 auto 28px;
+      padding: 16px 18px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.7);
+      border: 1px solid rgba(213,223,237,.78);
+      box-shadow: var(--shadow-soft);
+    }}
+    .chat-launch {{
+      border-radius: 8px;
+      min-height: 52px;
+      box-shadow: 0 18px 38px rgba(0,71,160,.28);
+    }}
+    @media (min-width: 1840px) {{
+      .insight-rail {{ display: none !important; }}
+    }}
+    @media (max-width: 980px) {{
+      .toolbar {{ grid-template-columns: 1fr; }}
+      .nav-tabs {{ width: 100%; }}
+      header {{ min-height: 230px; }}
+    }}
+    @media (max-width: 640px) {{
+      .wrap, footer {{ width: min(100% - 24px, 1460px); }}
+      header {{ padding: 22px 12px; min-height: 220px; }}
+      .nav-tabs {{ position: static; }}
+      .nav-tabs a {{ flex: 1 1 auto; text-align: center; }}
     }}
   </style>
 </head>
@@ -2978,10 +3273,23 @@ class DashboardGenerator:
                 'page-algal': 'Algal Bloom Status',
                 'page-spatial': 'Spatial Maps',
             }.get(page_class, 'Dashboard')
+            page_subtitle = {
+                'page-data': 'Download current records, archived daily runs, station metadata, and the national annual historical dataset for research use.',
+                'page-trends': 'Explore cleaned historical water-quality records with Mann-Kendall statistics, Sen slope summaries, and annual trend plots.',
+                'page-algal': 'Track Korean algal bloom thresholds, watershed chlorophyll-a signals, lake/reservoir risk, and HSPF scenario support data.',
+                'page-spatial': 'Review corrected station coverage, latest alerts, province summaries, and coolwarm spatial parameter maps across South Korea.',
+            }.get(page_class, 'Daily South Korea water-quality intelligence dashboard.')
             page_html = page_html.replace(
                 '<h1>Water Quality Dashboard</h1>',
                 f'<h1>{html.escape(page_title)}</h1>',
                 1,
+            )
+            page_html = re.sub(
+                r'<p class="subtitle">.*?</p>',
+                f'<p class="subtitle">{html.escape(page_subtitle)}</p>',
+                page_html,
+                count=1,
+                flags=re.S,
             )
         return page_html
 
