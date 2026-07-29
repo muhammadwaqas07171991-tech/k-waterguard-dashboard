@@ -2327,8 +2327,9 @@ class PlotGenerator:
   <title>{html.escape(title)}</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
-    html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; }}
-    #plot {{ width: 100%; height: 100vh; min-height: 440px; }}
+    html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #071426; }}
+    #plot {{ width: 100%; height: 100vh; min-height: 640px; }}
+    @media (max-width: 760px) {{ #plot {{ min-height: 720px; }} }}
   </style>
 </head>
 <body>
@@ -2352,12 +2353,19 @@ class PlotGenerator:
         plot_df = plot_df.dropna(subset=['sample_date'])
         if plot_df.empty:
             return
+        alert_colorscale = [
+            [0.0, '#0057b8'],
+            [0.35, '#7aa6f7'],
+            [0.55, '#f7f9fc'],
+            [0.75, '#f08a5d'],
+            [1.0, '#cd2e3a'],
+        ]
         base_layout = {
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
             'paper_bgcolor': '#ffffff',
             'plot_bgcolor': '#f6faff',
-            'margin': {'l': 70, 'r': 30, 't': 70, 'b': 70},
-            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif'}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+            'margin': {'l': 120, 'r': 44, 't': 78, 'b': 84},
+            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
         }
 
         if grouped is not None and not grouped.empty:
@@ -2366,22 +2374,37 @@ class PlotGenerator:
                 'type': 'bar',
                 'orientation': 'h',
                 'y': top.index.astype(str).tolist(),
-                'x': top['max_cells'].round(2).tolist(),
-                'marker': {'color': top['max_cells'].tolist(), 'colorscale': 'RdBu', 'reversescale': True, 'line': {'color': '#ffffff', 'width': 1}},
+                'x': top['max_cells'].clip(lower=1).round(2).tolist(),
+                'marker': {'color': top['max_cells'].clip(lower=1).tolist(), 'colorscale': alert_colorscale, 'line': {'color': '#ffffff', 'width': 1.2}},
                 'customdata': np.column_stack([
+                    top['max_cells'].round(2).astype(str).to_numpy(),
                     top['stations'].astype(int).astype(str).to_numpy(),
                     pd.to_datetime(top['latest_date']).dt.strftime('%Y-%m-%d').to_numpy(),
                 ]).tolist(),
-                'hovertemplate': '<b>%{y}</b><br>Max cyanobacteria: %{x:,.0f} cells/mL<br>Stations: %{customdata[0]}<br>Latest date: %{customdata[1]}<extra></extra>',
+                'hovertemplate': '<b>%{y}</b><br>Max cyanobacteria: %{customdata[0]} cells/mL<br>Stations: %{customdata[1]}<br>Latest date: %{customdata[2]}<extra></extra>',
             }]
             layout = dict(base_layout)
             layout.update({
-                'title': {'text': 'Clickable Watershed Cyanobacteria Screening', 'x': 0.02, 'xanchor': 'left'},
-                'xaxis': {'title': f'Cyanobacteria ({rule["unit"]})', 'type': 'log', 'gridcolor': '#d8e3f1'},
-                'yaxis': {'title': 'Watershed / lake group'},
+                'title': {'text': 'Watershed Cyanobacteria Screening', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+                'xaxis': {
+                    'title': {'text': f'Cyanobacteria ({rule["unit"]})', 'standoff': 18},
+                    'type': 'log',
+                    'gridcolor': '#d8e3f1',
+                    'tickmode': 'array',
+                    'tickvals': [100, 1000, 10000, 100000],
+                    'ticktext': ['100', '1,000', '10,000', '100,000'],
+                    'range': [1.9, 5.05],
+                    'zeroline': False,
+                },
+                'yaxis': {'title': '', 'automargin': True, 'tickfont': {'size': 15}},
+                'bargap': 0.28,
                 'shapes': [
                     {'type': 'line', 'xref': 'x', 'yref': 'paper', 'x0': rule['caution'], 'x1': rule['caution'], 'y0': 0, 'y1': 1, 'line': {'color': '#0047a0', 'dash': 'dot', 'width': 2}},
                     {'type': 'line', 'xref': 'x', 'yref': 'paper', 'x0': rule['warning'], 'x1': rule['warning'], 'y0': 0, 'y1': 1, 'line': {'color': '#cd2e3a', 'dash': 'dash', 'width': 2}},
+                ],
+                'annotations': [
+                    {'x': rule['caution'], 'y': 1.04, 'xref': 'x', 'yref': 'paper', 'text': 'Caution', 'showarrow': False, 'font': {'color': '#0047a0', 'size': 14}},
+                    {'x': rule['warning'], 'y': 1.04, 'xref': 'x', 'yref': 'paper', 'text': 'Warning', 'showarrow': False, 'font': {'color': '#cd2e3a', 'size': 14}},
                 ],
             })
             self._write_plotly_html('algal_watershed_cyanobacteria_interactive.html', 'Interactive Watershed Cyanobacteria Screening', traces, layout)
@@ -2404,32 +2427,38 @@ class PlotGenerator:
                     latest.get('algae_alarm_stage', pd.Series('', index=latest.index)).fillna('').astype(str).to_numpy(),
                 ]).tolist(),
                 'marker': {
-                    'size': np.clip(np.log10(latest['cyanobacteria_cells_ml'].clip(lower=1)) * 6 + 7, 8, 30).round(2).tolist(),
+                    'size': np.clip(np.log10(latest['cyanobacteria_cells_ml'].clip(lower=1)) * 3.8 + 6, 7, 22).round(2).tolist(),
                     'color': latest['cyanobacteria_cells_ml'].clip(lower=1).tolist(),
-                    'colorscale': 'RdBu',
-                    'reversescale': True,
+                    'colorscale': alert_colorscale,
                     'cmin': 1,
                     'cmax': max(10000, float(latest['cyanobacteria_cells_ml'].max())),
-                    'colorbar': {'title': 'cells/mL'},
-                    'line': {'color': '#ffffff', 'width': 1},
-                    'opacity': 0.9,
+                    'colorbar': {'title': {'text': 'cells/mL', 'side': 'right'}, 'tickformat': ',.0f', 'thickness': 16, 'len': 0.72},
+                    'line': {'color': '#ffffff', 'width': 1.1},
+                    'opacity': 0.86,
                 },
                 'hovertemplate': '<b>%{text}</b><br>Lake/river: %{customdata[0]}<br>Basin: %{customdata[1]}<br>Watershed: %{customdata[2]}<br>Cyanobacteria: %{customdata[3]} cells/mL<br>Date: %{customdata[4]}<br>NIER stage: %{customdata[5]}<extra></extra>',
             }]
             layout = dict(base_layout)
             layout.update({
-                'title': {'text': 'Clickable National Cyanobacteria Map', 'x': 0.02, 'xanchor': 'left'},
+                'title': {'text': 'National Cyanobacteria Monitoring Map', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+                'margin': {'l': 28, 'r': 86, 't': 76, 'b': 34},
                 'geo': {
                     'scope': 'asia',
-                    'projection': {'type': 'mercator'},
-                    'lonaxis': {'range': [124.5, 131.8]},
-                    'lataxis': {'range': [33.0, 39.6]},
+                    'projection': {'type': 'mercator', 'scale': 5.4},
+                    'center': {'lon': 127.8, 'lat': 36.25},
+                    'lonaxis': {'range': [124.2, 131.9], 'showgrid': True, 'gridcolor': '#dce8f4'},
+                    'lataxis': {'range': [33.0, 39.8], 'showgrid': True, 'gridcolor': '#dce8f4'},
                     'showland': True,
-                    'landcolor': '#f4f8fc',
+                    'landcolor': '#f8fbff',
                     'showocean': True,
                     'oceancolor': '#edf5ff',
                     'showlakes': True,
                     'lakecolor': '#edf5ff',
+                    'showrivers': True,
+                    'rivercolor': '#b7d1ea',
+                    'showcoastlines': True,
+                    'coastlinecolor': '#7d98b5',
+                    'showcountries': True,
                     'countrycolor': '#93a9c4',
                     'subunitcolor': '#d8e3f1',
                 },
@@ -2450,16 +2479,18 @@ class PlotGenerator:
                 'x': [str(int(year)) for year in heatmap_data.columns],
                 'y': heatmap_data.index.astype(str).tolist(),
                 'customdata': custom,
-                'colorscale': 'RdBu',
-                'reversescale': True,
-                'colorbar': {'title': 'log10 cells/mL'},
+                'colorscale': alert_colorscale,
+                'colorbar': {'title': {'text': 'log10 cells/mL', 'side': 'right'}, 'thickness': 16, 'len': 0.72},
+                'xgap': 1,
+                'ygap': 1,
                 'hovertemplate': '<b>%{y}</b><br>Year: %{x}<br>Maximum: %{customdata} cells/mL<extra></extra>',
             }]
             layout = dict(base_layout)
             layout.update({
-                'title': {'text': 'Clickable Annual Cyanobacteria Signal By Watershed', 'x': 0.02, 'xanchor': 'left'},
-                'xaxis': {'title': 'Year'},
-                'yaxis': {'title': 'Watershed / lake group'},
+                'title': {'text': 'Annual Cyanobacteria Signal By Watershed', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+                'margin': {'l': 170, 'r': 78, 't': 78, 'b': 92},
+                'xaxis': {'title': {'text': 'Year', 'standoff': 18}, 'tickangle': 0, 'gridcolor': '#d8e3f1'},
+                'yaxis': {'title': '', 'automargin': True, 'tickfont': {'size': 15}},
             })
             self._write_plotly_html('algal_status_timeline_interactive.html', 'Interactive Annual Cyanobacteria Signal', traces, layout)
 
@@ -3916,11 +3947,22 @@ class DashboardGenerator:
     }}
     .interactive-plot iframe {{
       width: 100%;
-      min-height: 520px;
+      min-height: 680px;
       border: 0;
       display: block;
       background: #ffffff;
       border-top: 1px solid rgba(216,227,241,.9);
+    }}
+    .plots .interactive-plot {{
+      grid-column: span 2;
+    }}
+    @media (max-width: 980px) {{
+      .plots .interactive-plot {{
+        grid-column: span 1;
+      }}
+      .interactive-plot iframe {{
+        min-height: 720px;
+      }}
     }}
     .open-interactive {{
       margin: 12px 14px 14px;
