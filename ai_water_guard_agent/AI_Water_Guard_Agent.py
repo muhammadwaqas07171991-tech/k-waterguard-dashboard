@@ -2684,38 +2684,57 @@ class PlotGenerator:
             if recent.empty or latest.empty:
                 return
 
-            fig, ax = self._new_figure(figsize=(13.8, 7.2))
+            fig, ax = self._new_figure(figsize=(14.5, 7.4))
             pivot = recent.pivot_table(index='basin', columns='date', values='precipitation_mm', aggfunc='mean').fillna(0)
-            totals = pivot.sum(axis=1).sort_values()
-            colors = ['#cd2e3a' if value >= 50 else '#f08a5d' if value >= 25 else '#0057b8' for value in totals]
-            ax.barh(totals.index, totals.values, color=colors, edgecolor='white')
+            totals = pivot.sum(axis=1).sort_values(ascending=True)
+            colors = ['#d73345' if value >= 100 else '#f08a5d' if value >= 50 else '#0758bd' for value in totals]
+            bars = ax.barh(totals.index, totals.values, color=colors, edgecolor='#ffffff', linewidth=1.2)
+            for bar, value in zip(bars, totals.values):
+                ax.text(value + max(totals.max() * 0.012, 0.25), bar.get_y() + bar.get_height() / 2, f'{value:.1f}', va='center', fontsize=11, color=self.INK)
+            ax.axvline(50, color='#f08a5d', linestyle='--', linewidth=1.4, label='50 mm / 14 days')
+            ax.axvline(100, color='#d73345', linestyle='--', linewidth=1.4, label='100 mm / 14 days')
             self._style_axis(ax, grid_axis='x')
-            ax.set_title('Recent Basin Rainfall Accumulation', fontweight='bold', fontsize=19, color=self.INK, pad=12)
+            fig.suptitle('Fourteen-Day Basin Rainfall Accumulation', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.125, 0.93, 'Daily basin meteorology aggregated over the most recent 14-day window', fontsize=12, color='#53677f')
             ax.set_xlabel('14-day precipitation total (mm)')
-            self._save_figure(fig, self._plots_dir() / 'weather_basin_precipitation.png', rect=[0, 0, 1, 0.96])
+            ax.set_ylabel('')
+            ax.legend(loc='lower right', frameon=True, framealpha=0.92, edgecolor='#d5e4f5', fontsize=10)
+            self._save_figure(fig, self._plots_dir() / 'weather_basin_precipitation.png', rect=[0, 0, 1, 0.90])
 
-            fig, ax = self._new_figure(figsize=(13.8, 7.2))
+            fig, ax = self._new_figure(figsize=(14.5, 7.4))
+            palette = ['#0758bd', '#d73345', '#2d7f5e', '#8057b8', '#f08a5d']
             for basin, group in recent.sort_values('date').groupby('basin'):
-                ax.plot(group['date'], group['temperature_max_c'], linewidth=2.0, label=f'{basin} max')
-                ax.plot(group['date'], group['temperature_min_c'], linewidth=1.4, linestyle='--', alpha=0.8, label=f'{basin} min')
+                color = palette[len(ax.lines) % len(palette)]
+                group = group.sort_values('date')
+                ax.fill_between(group['date'], group['temperature_min_c'], group['temperature_max_c'], color=color, alpha=0.10)
+                ax.plot(group['date'], group['temperature_max_c'], linewidth=2.2, color=color, label=f'{basin} max')
+                ax.plot(group['date'], group['temperature_min_c'], linewidth=1.5, linestyle='--', color=color, alpha=0.86, label=f'{basin} min')
+            ax.axhline(33, color='#d73345', linestyle='--', linewidth=1.5, label='Heat-stress screen 33 deg C')
             self._style_axis(ax, grid_axis='y')
-            ax.set_title('Daily Temperature Envelope By Basin', fontweight='bold', fontsize=19, color=self.INK, pad=12)
+            fig.suptitle('Daily Temperature Envelope By Basin', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.125, 0.93, 'Maximum and minimum air-temperature envelope with heat-stress screening line', fontsize=12, color='#53677f')
             ax.set_ylabel('Temperature (deg C)')
-            ax.legend(ncol=2, fontsize=8, frameon=False)
-            self._save_figure(fig, self._plots_dir() / 'weather_temperature_range.png', rect=[0, 0, 1, 0.94])
+            ax.set_xlabel('Date')
+            ax.legend(ncol=3, fontsize=9, frameon=True, framealpha=0.92, edgecolor='#d5e4f5')
+            self._save_figure(fig, self._plots_dir() / 'weather_temperature_range.png', rect=[0, 0, 1, 0.89])
 
-            fig, axes = self._new_figure(1, 3, figsize=(16, 5.6))
+            fig, axes = self._new_figure(1, 3, figsize=(16.5, 5.8))
             metrics = [
-                ('precipitation_mm', 'Latest rainfall (mm)', '#0057b8'),
-                ('wind_speed_max_kmh', 'Max wind (km/h)', '#cd2e3a'),
+                ('precipitation_mm', 'Latest rainfall (mm)', '#0758bd'),
+                ('wind_speed_max_kmh', 'Max wind (km/h)', '#d73345'),
                 ('et0_mm', 'Reference ET0 (mm)', '#f08a5d'),
             ]
             for ax, (column, title, color) in zip(axes, metrics):
                 ordered = latest.sort_values(column)
-                ax.barh(ordered['basin'], ordered[column], color=color, edgecolor='white')
+                bars = ax.barh(ordered['basin'], ordered[column], color=color, edgecolor='white', linewidth=1.2)
+                for bar, value in zip(bars, ordered[column]):
+                    if pd.notna(value):
+                        ax.text(float(value) + max(float(ordered[column].max()) * 0.02, 0.1), bar.get_y() + bar.get_height() / 2, f'{float(value):.1f}', va='center', fontsize=10, color=self.INK)
                 self._style_axis(ax, grid_axis='x')
                 ax.set_title(title, fontweight='bold', color=self.INK)
-            self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.95])
+                ax.set_ylabel('')
+            fig.suptitle('Latest Hydrometeorological Basin Indicators', fontweight='bold', fontsize=20, color=self.INK)
+            self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.91])
             self._write_weather_interactive_plots(df, latest)
         except Exception as exc:
             self.logger.error(f"Error in weather hydrometeorology plots: {exc}")
@@ -2724,26 +2743,38 @@ class PlotGenerator:
         base_layout = {
             'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
             'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#f6faff',
-            'margin': {'l': 80, 'r': 42, 't': 76, 'b': 78},
+            'plot_bgcolor': '#f8fbff',
+            'margin': {'l': 86, 'r': 42, 't': 96, 'b': 82},
             'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
         }
         recent = df[df['date'] >= pd.to_datetime(df['date']).max() - pd.Timedelta(days=13)].copy()
         traces = []
+        colors = ['#0758bd', '#d73345', '#2d7f5e', '#8057b8', '#f08a5d']
         for basin, group in recent.sort_values('date').groupby('basin'):
+            color = colors[len(traces) % len(colors)]
             traces.append({
                 'type': 'bar',
                 'name': basin,
                 'x': pd.to_datetime(group['date']).dt.strftime('%Y-%m-%d').tolist(),
                 'y': pd.to_numeric(group['precipitation_mm'], errors='coerce').round(2).tolist(),
+                'marker': {'color': color, 'opacity': 0.82, 'line': {'color': '#ffffff', 'width': 0.7}},
                 'hovertemplate': '<b>%{fullData.name}</b><br>Date: %{x}<br>Rainfall: %{y:.2f} mm<extra></extra>',
             })
         layout = dict(base_layout)
         layout.update({
-            'title': {'text': 'Clickable Basin Rainfall And Runoff-Pressure Signal', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+            'title': {'text': 'Clickable Basin Rainfall And Runoff-Pressure Signal<br><span style="font-size:14px;color:#53677f">Daily precipitation by basin with Korean-time API update history</span>', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
             'barmode': 'group',
-            'xaxis': {'title': {'text': 'Date', 'standoff': 16}, 'tickangle': -35},
-            'yaxis': {'title': {'text': 'Daily precipitation (mm)', 'standoff': 16}, 'gridcolor': '#d8e3f1'},
+            'legend': {'orientation': 'h', 'y': 1.03, 'x': 1, 'xanchor': 'right', 'font': {'size': 13}},
+            'shapes': [
+                {'type': 'line', 'xref': 'paper', 'x0': 0, 'x1': 1, 'yref': 'y', 'y0': 25, 'y1': 25, 'line': {'color': '#f08a5d', 'width': 1.4, 'dash': 'dash'}},
+                {'type': 'line', 'xref': 'paper', 'x0': 0, 'x1': 1, 'yref': 'y', 'y0': 50, 'y1': 50, 'line': {'color': '#d73345', 'width': 1.4, 'dash': 'dash'}},
+            ],
+            'annotations': [
+                {'xref': 'paper', 'x': 1, 'yref': 'y', 'y': 25, 'text': '25 mm watch', 'showarrow': False, 'xanchor': 'right', 'yanchor': 'bottom', 'font': {'size': 12, 'color': '#a86124'}},
+                {'xref': 'paper', 'x': 1, 'yref': 'y', 'y': 50, 'text': '50 mm runoff pressure', 'showarrow': False, 'xanchor': 'right', 'yanchor': 'bottom', 'font': {'size': 12, 'color': '#d73345'}},
+            ],
+            'xaxis': {'title': {'text': 'Date', 'standoff': 16}, 'tickangle': -35, 'showgrid': False, 'linecolor': '#9eb4cc', 'mirror': True},
+            'yaxis': {'title': {'text': 'Daily precipitation (mm)', 'standoff': 16}, 'gridcolor': '#d8e3f1', 'zerolinecolor': '#9eb4cc', 'linecolor': '#9eb4cc', 'mirror': True},
         })
         self._write_plotly_html('weather_basin_rainfall_interactive.html', 'Interactive Basin Rainfall', traces, layout)
 
@@ -5779,6 +5810,182 @@ class DashboardGenerator:
       header {{ min-height: 280px; }}
       .plots, body.page-weather .plots {{ grid-template-columns: 1fr; }}
     }}
+
+    /* K-WaterGuard correction layer v11: professional app layout, contact page, and readable plot surfaces. */
+    body {{
+      background:
+        radial-gradient(circle at 80% 8%, rgba(7,88,189,.12), transparent 28%),
+        radial-gradient(circle at 92% 72%, rgba(215,51,69,.10), transparent 30%),
+        linear-gradient(135deg, #edf6ff 0%, #ffffff 52%, #fff7f8 100%) !important;
+    }}
+    header {{
+      min-height: 270px;
+      padding: 28px 24px 30px;
+      align-items: center;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.90) 43%, rgba(7,88,189,.26) 100%),
+        url("{self._asset_uri('Kwater.png')}") !important;
+      background-size: cover !important;
+      background-position: center right !important;
+    }}
+    header .wrap {{
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 16px 22px;
+      align-items: center;
+    }}
+    header h1 {{
+      grid-column: 1 / 3;
+      margin: 10px 0 0;
+      font-size: clamp(42px, 5.2vw, 72px);
+      line-height: 1;
+    }}
+    header .subtitle {{
+      grid-column: 1 / 3;
+      max-width: 980px;
+      font-size: clamp(16px, 1.5vw, 21px);
+      color: #17324f;
+    }}
+    .topline {{ display: contents; }}
+    .brand {{ grid-column: 1; width: fit-content; }}
+    .badge {{ grid-column: 3; justify-self: end; }}
+    main.wrap {{
+      width: min(1500px, calc(100% - 48px));
+      padding-top: 24px;
+    }}
+    .nav-tabs {{
+      position: sticky !important;
+      top: 12px !important;
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      width: 100% !important;
+      max-height: none !important;
+      gap: 8px !important;
+      margin: 0 0 18px !important;
+      padding: 10px !important;
+      background: rgba(255,255,255,.92) !important;
+      border: 1px solid rgba(213,228,245,.98) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 16px 38px rgba(6,25,47,.10) !important;
+      overflow: visible !important;
+    }}
+    .nav-tabs::before {{ display: none !important; }}
+    .nav-tabs a {{
+      flex: 0 0 auto !important;
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px !important;
+      border-radius: 10px !important;
+      color: #17324f !important;
+      background: transparent !important;
+      text-decoration: none;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"],
+    body.page-contact .nav-tabs a[href="contact.html"],
+    body.page-data .nav-tabs a[href="data.html"] {{
+      color: #ffffff !important;
+      background: linear-gradient(135deg, #0758bd, #0b76df) !important;
+    }}
+    body.page-home .page:not(.page-home),
+    body.page-trends .page:not(.page-trends),
+    body.page-algal .page:not(.page-algal),
+    body.page-weather .page:not(.page-weather),
+    body.page-spatial .page:not(.page-spatial),
+    body.page-contact .page:not(.page-contact),
+    body.page-data .page:not(.page-data) {{ display: none !important; }}
+    .toolbar {{
+      padding: 10px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(213,228,245,.92);
+      border-radius: 12px;
+      box-shadow: 0 14px 34px rgba(6,25,47,.08);
+    }}
+    .section {{
+      padding: clamp(22px, 2.4vw, 34px);
+      border-radius: 14px;
+      background: rgba(255,255,255,.98);
+    }}
+    .home-overview {{
+      border-radius: 14px;
+      min-height: 520px;
+      align-items: end;
+    }}
+    .overview-panel {{
+      background: rgba(7, 27, 52, .66);
+      backdrop-filter: blur(12px);
+    }}
+    .stats .stat, .param, .capability-card {{
+      border-radius: 12px;
+      background: linear-gradient(145deg, #ffffff, #f8fbff);
+    }}
+    .plot {{
+      border-radius: 13px;
+      overflow: hidden;
+      background: #ffffff !important;
+      box-shadow: 0 18px 42px rgba(6,25,47,.10);
+    }}
+    .plot h3 {{
+      padding: 13px 16px;
+      font-size: 17px;
+      background: linear-gradient(90deg, #eef6ff, #ffffff) !important;
+    }}
+    .plot img {{
+      padding: 18px !important;
+      background: #ffffff !important;
+    }}
+    .interactive-plot iframe {{
+      height: 620px;
+      background: #ffffff;
+    }}
+    body.page-weather .interactive-plot:first-child,
+    body.page-weather .interactive-plot:nth-child(2) {{
+      grid-column: 1 / -1;
+    }}
+    body.page-weather .plots {{
+      grid-template-columns: repeat(2, minmax(460px, 1fr));
+    }}
+    .contact-grid {{
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 18px;
+      align-items: stretch;
+    }}
+    .contact-panel {{
+      padding: 22px;
+      border-radius: 13px;
+      border: 1px solid rgba(213,228,245,.95);
+      background: linear-gradient(145deg, #ffffff, #f6fbff);
+    }}
+    .contact-list {{
+      display: grid;
+      gap: 10px;
+      margin: 0;
+    }}
+    .contact-list div {{
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #e7f0fb;
+    }}
+    .contact-list div:last-child {{ border-bottom: 0; }}
+    .contact-list dt {{ font-weight: 800; color: #0758bd; }}
+    .contact-list dd {{ margin: 0; color: #17324f; }}
+    @media (max-width: 980px) {{
+      header .wrap {{ display: block; }}
+      .badge {{ display: inline-flex; margin-top: 10px; }}
+      main.wrap {{ width: min(100% - 28px, 1500px); }}
+      .contact-grid, body.page-weather .plots {{ grid-template-columns: 1fr; }}
+      .interactive-plot iframe {{ height: 520px; }}
+      .contact-list div {{ grid-template-columns: 1fr; gap: 4px; }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -5799,11 +6006,12 @@ class DashboardGenerator:
   <main class="wrap">
     <nav class="nav-tabs" aria-label="Dashboard pages">
       <a href="index.html">Home</a>
-      <a href="data.html">Data Downloads</a>
       <a href="trends.html">Historical Trends</a>
       <a href="algal-bloom.html">Algal Bloom Status</a>
       <a href="weather.html">Hydrometeorological Risk</a>
       <a href="spatial.html">WQ Status</a>
+      <a href="contact.html">Contact / Collaborate</a>
+      <a href="data.html">Data Downloads</a>
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
@@ -5825,10 +6033,12 @@ class DashboardGenerator:
             <li>Water managers can track alerts, spatial hotspots, watershed status, and station coverage with consistent Korean units and standards.</li>
           </ul>
           <div class="page-actions">
-            <a class="button" href="data.html">Open Data Page</a>
             <a class="button" href="trends.html">Open Trend Page</a>
             <a class="button" href="algal-bloom.html">Open Algal Bloom Page</a>
             <a class="button" href="weather.html">Open Weather Page</a>
+            <a class="button" href="spatial.html">Open WQ Status</a>
+            <a class="button" href="contact.html">Contact Lab</a>
+            <a class="button" href="data.html">Open Data Page</a>
           </div>
         </div>
         <div class="overview-panel">
@@ -5891,6 +6101,33 @@ class DashboardGenerator:
             <thead><tr><th>Standard Parameter</th><th>Dashboard Rule</th></tr></thead>
             <tbody>{standard_rows}</tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section page page-contact" id="contactPage">
+      <h2>Contact And Collaborate</h2>
+      <p class="muted">K-Water Guard AI Agent is developed as a research and decision-support system for water-quality monitoring, environmental data automation, and smart water management. Researchers, agencies, watershed managers, farmers, and technology partners are welcome to connect with the Regional Water Environment System Lab for collaboration.</p>
+      <div class="contact-grid">
+        <div class="contact-panel">
+          <h3>Regional Water Environment System Lab</h3>
+          <dl class="contact-list">
+            <div><dt>Location</dt><dd>Room 101, Department of Agricultural Engineering, Building 456, 501 Jinju-daero, Jinju-si, Gyeongsangnam-do, Korea</dd></div>
+            <div><dt>Affiliation</dt><dd>Regional Water Environment System Lab</dd></div>
+            <div><dt>Project Name</dt><dd>K-Water Guard AI Agent</dd></div>
+            <div><dt>Research Field</dt><dd>Water Quality Monitoring, Environmental Data Automation, Smart Water Management</dd></div>
+            <div><dt>Website</dt><dd><a class="history-link" href="https://sites.google.com/view/rwer/home">https://sites.google.com/view/rwer/home</a></dd></div>
+          </dl>
+        </div>
+        <div class="contact-panel">
+          <h3>Project Team</h3>
+          <dl class="contact-list">
+            <div><dt>Developed by</dt><dd>Dr. Muhammad Waqas and Mr. Sangbin Ha</dd></div>
+            <div><dt>Idea by</dt><dd>Prof. Sang Min Kim</dd></div>
+            <div><dt>Telephone</dt><dd>055-772-1930</dd></div>
+            <div><dt>Fax</dt><dd>055-772-1939</dd></div>
+            <div><dt>Email</dt><dd><a class="history-link" href="mailto:smkim@gnu.ac.kr">smkim@gnu.ac.kr</a><br><a class="history-link" href="mailto:muhammad.waqas@gnu.ac.kr">muhammad.waqas@gnu.ac.kr</a></dd></div>
+          </dl>
         </div>
       </div>
     </section>
@@ -6225,29 +6462,32 @@ class DashboardGenerator:
     def _page_variants(self, html_text):
         return {
             'index.html': 'page-home',
-            'data.html': 'page-data',
             'trends.html': 'page-trends',
             'algal-bloom.html': 'page-algal',
             'weather.html': 'page-weather',
             'spatial.html': 'page-spatial',
+            'contact.html': 'page-contact',
+            'data.html': 'page-data',
         }
 
     def _page_html(self, html_text, page_class):
         page_html = re.sub(r'<body class="[^"]*">', f'<body class="{page_class}">', html_text, count=1)
         if page_class != 'page-home':
             page_title = {
-                'page-data': 'Data Downloads',
                 'page-trends': 'Historical Trends',
                 'page-algal': 'Algal Bloom Status',
                 'page-weather': 'Hydrometeorological Risk',
                 'page-spatial': 'WQ Status',
+                'page-contact': 'Contact And Collaborate',
+                'page-data': 'Data Downloads',
             }.get(page_class, 'Dashboard')
             page_subtitle = {
-                'page-data': 'Download current records, archived daily runs, station metadata, and the national annual historical dataset for research use.',
                 'page-trends': 'Explore cleaned historical water-quality records with Mann-Kendall statistics, Sen slope summaries, and annual trend plots.',
                 'page-algal': 'Track Korean algal bloom thresholds with harmful cyanobacteria cell-count data, watershed maps, lake/reservoir risk, and HSPF scenario support data.',
                 'page-weather': 'Review basin-scale rainfall, temperature, humidity, wind, and evapotranspiration signals that shape water-quality and bloom risk.',
                 'page-spatial': 'Review corrected station coverage, latest alerts, province summaries, and coolwarm water-quality status maps across South Korea.',
+                'page-contact': 'Connect with the Regional Water Environment System Lab for research collaboration, field deployment, and smart water-management partnerships.',
+                'page-data': 'Download current records, archived daily runs, station metadata, and the national annual historical dataset for research use.',
             }.get(page_class, 'Daily South Korea water-quality intelligence dashboard.')
             page_html = page_html.replace(
                 '<h1>Water Quality Dashboard</h1>',
@@ -7536,11 +7776,12 @@ class DashboardGenerator:
         cache_files = [
             "./",
             "./index.html",
-            "./data.html",
             "./trends.html",
             "./algal-bloom.html",
             "./weather.html",
             "./spatial.html",
+            "./contact.html",
+            "./data.html",
             "./manifest.webmanifest",
             "./assets/logo.png",
             "./assets/icon-192.png",
