@@ -1763,6 +1763,7 @@ class PlotGenerator:
             self._plot_historical_trend_dashboard()
             self._plot_algal_bloom_dashboard()
             self._plot_weather_hydrometeorology_dashboard()
+            self._plot_agrometeorology_prediction_dashboard(df)
             
             self.logger.info("All plots generated successfully")
         except Exception as e:
@@ -2847,6 +2848,166 @@ class PlotGenerator:
         })
         self._write_plotly_html('weather_basin_map_interactive.html', 'Interactive Basin Weather Map', traces, layout)
 
+    def _agrometeorology_model_frame(self, water_quality_df=None):
+        weather = load_weather_records(self.logger)
+        if weather.empty:
+            return pd.DataFrame()
+        working = weather.copy()
+        working['date_dt'] = pd.to_datetime(working.get('date'), errors='coerce')
+        working = working.dropna(subset=['date_dt', 'basin'])
+        if working.empty:
+            return pd.DataFrame()
+        latest_date = working['date_dt'].max()
+        recent = working[working['date_dt'] >= latest_date - pd.Timedelta(days=13)].copy()
+        summary = (
+            recent.groupby('basin', as_index=False)
+            .agg(
+                rain_14d=('precipitation_mm', 'sum'),
+                dry_days=('precipitation_mm', lambda values: int((pd.to_numeric(values, errors='coerce').fillna(0) < 1).sum())),
+                max_temp=('temperature_max_c', 'max'),
+                heat_days=('temperature_max_c', lambda values: int((pd.to_numeric(values, errors='coerce') >= 33).sum())),
+                humidity=('relative_humidity_mean_pct', 'mean'),
+                wind=('wind_speed_max_kmh', 'max'),
+                et0=('et0_mm', 'mean'),
+            )
+            .fillna(0)
+        )
+        if summary.empty:
+            return pd.DataFrame()
+
+        basin_count = max(1, len(summary))
+        bloom_context = load_cyanobacteria_records(self.logger)
+        bloom_score_by_basin = {}
+        if not bloom_context.empty and 'cyanobacteria_cells_ml' in bloom_context.columns:
+            bloom_context = bloom_context.dropna(subset=['cyanobacteria_cells_ml']).copy()
+            if not bloom_context.empty:
+                basin_col = 'river_basin' if 'river_basin' in bloom_context.columns else 'middle_watershed'
+                if basin_col in bloom_context.columns:
+                    grouped = bloom_context.groupby(bloom_context[basin_col].fillna('Unknown'))['cyanobacteria_cells_ml'].max()
+                    for basin, value in grouped.items():
+                        bloom_score_by_basin[str(basin)] = float(np.clip(np.log10(max(float(value), 1)) / 6.0, 0, 1))
+
+        if water_quality_df is not None and not water_quality_df.empty and {'TN', 'TP'}.issubset(water_quality_df.columns):
+            nutrient_pressure = np.nanmean([
+                np.clip(pd.to_numeric(water_quality_df['TN'], errors='coerce').mean() / 3.0, 0, 1),
+                np.clip(pd.to_numeric(water_quality_df['TP'], errors='coerce').mean() / 0.3, 0, 1),
+            ])
+            nutrient_pressure = 0 if pd.isna(nutrient_pressure) else float(nutrient_pressure)
+        else:
+            nutrient_pressure = 0.35
+
+        summary['drought_stress'] = (
+            np.clip(summary['dry_days'] / 14.0, 0, 1) * 0.42
+            + np.clip(summary['et0'] / 8.0, 0, 1) * 0.32
+            + np.clip((summary['max_temp'] - 28.0) / 9.0, 0, 1) * 0.26
+        )
+        summary['heat_stress'] = (
+            np.clip(summary['heat_days'] / 5.0, 0, 1) * 0.52
+            + np.clip((summary['max_temp'] - 30.0) / 8.0, 0, 1) * 0.48
+        )
+        summary['runoff_extreme'] = (
+            np.clip(summary['rain_14d'] / 100.0, 0, 1) * 0.72
+            + np.clip(summary['wind'] / 35.0, 0, 1) * 0.28
+        )
+        summary['bloom_agri_pressure'] = (
+            np.clip((summary['max_temp'] - 24.0) / 12.0, 0, 1) * 0.30
+            + np.clip(summary['humidity'] / 100.0, 0, 1) * 0.20
+            + np.clip(nutrient_pressure, 0, 1) * 0.25
+            + summary['basin'].astype(str).map(bloom_score_by_basin).fillna(0.18).astype(float) * 0.25
+        )
+        summary['climate_shift_sensitivity'] = (
+            np.clip((summary['max_temp'] + 2.0 - 33.0) / 7.0, 0, 1) * 0.45
+            + np.clip((summary['dry_days'] + 2) / 14.0, 0, 1) * 0.35
+            + np.clip((summary['rain_14d'] * 1.25) / 100.0, 0, 1) * 0.20
+        )
+        summary['kwaterguard_prediction_index'] = (
+            summary['drought_stress'] * 0.27
+            + summary['heat_stress'] * 0.23
+            + summary['runoff_extreme'] * 0.19
+            + summary['bloom_agri_pressure'] * 0.18
+            + summary['climate_shift_sensitivity'] * 0.13
+        ).clip(0, 1)
+        summary['model_status'] = pd.cut(
+            summary['kwaterguard_prediction_index'],
+            bins=[-0.01, 0.34, 0.62, 1.01],
+            labels=['Low', 'Moderate', 'High']
+        ).astype(str)
+        summary['rank'] = summary['kwaterguard_prediction_index'].rank(ascending=False, method='first').astype(int)
+        return summary.sort_values('kwaterguard_prediction_index', ascending=False)
+
+    def _plot_agrometeorology_prediction_dashboard(self, water_quality_df=None):
+        try:
+            model = self._agrometeorology_model_frame(water_quality_df)
+            if model.empty:
+                self.logger.warning("Agrometeorology prediction model data are unavailable")
+                return
+            metrics = [
+                ('drought_stress', 'Drought\nstress'),
+                ('heat_stress', 'Crop heat\nstress'),
+                ('runoff_extreme', 'Runoff / extreme\nevent'),
+                ('bloom_agri_pressure', 'Bloom-agri\npressure'),
+                ('climate_shift_sensitivity', 'Climate-shift\nsensitivity'),
+                ('kwaterguard_prediction_index', 'Prediction\nindex'),
+            ]
+            fig, ax = self._new_figure(figsize=(15.4, 7.8))
+            matrix = model[[column for column, _ in metrics]].to_numpy()
+            image = ax.imshow(matrix, cmap='coolwarm', vmin=0, vmax=1, aspect='auto')
+            ax.set_xticks(np.arange(len(metrics)))
+            ax.set_xticklabels([label for _, label in metrics], fontsize=12, fontweight='bold')
+            ax.set_yticks(np.arange(len(model)))
+            ax.set_yticklabels(model['basin'].astype(str), fontsize=12)
+            ax.tick_params(axis='both', length=0)
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            for row_index, (_, row) in enumerate(model.iterrows()):
+                for col_index, (column, _) in enumerate(metrics):
+                    value = float(row[column])
+                    color = '#ffffff' if value > 0.58 else self.INK
+                    ax.text(col_index, row_index, f'{value:.2f}', ha='center', va='center', fontsize=11, fontweight='bold', color=color)
+            ax.set_xticks(np.arange(-.5, len(metrics), 1), minor=True)
+            ax.set_yticks(np.arange(-.5, len(model), 1), minor=True)
+            ax.grid(which='minor', color='white', linewidth=2.0)
+            ax.tick_params(which='minor', bottom=False, left=False)
+            cbar = fig.colorbar(image, ax=ax, fraction=0.032, pad=0.02)
+            cbar.set_label('Normalized risk probability proxy (0-1)', fontsize=11)
+            fig.suptitle('K-WaterGuard AgroClimate Prediction Model', fontweight='bold', fontsize=22, color=self.INK, y=0.985)
+            fig.text(0.105, 0.928, 'Hybrid daily screening of drought, crop heat stress, runoff extremes, bloom-agriculture pressure, and climate-shift sensitivity', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_prediction_matrix.png', rect=[0, 0, 1, 0.90])
+
+            scenario = model.copy()
+            scenario['near_term'] = scenario['kwaterguard_prediction_index']
+            scenario['hot_dry_shift'] = (
+                scenario['kwaterguard_prediction_index'] * 0.70
+                + np.clip(scenario['drought_stress'] + 0.18, 0, 1) * 0.20
+                + np.clip(scenario['heat_stress'] + 0.20, 0, 1) * 0.10
+            ).clip(0, 1)
+            scenario['extreme_rain_shift'] = (
+                scenario['kwaterguard_prediction_index'] * 0.62
+                + np.clip(scenario['runoff_extreme'] + 0.25, 0, 1) * 0.28
+                + scenario['bloom_agri_pressure'] * 0.10
+            ).clip(0, 1)
+            ordered = scenario.sort_values('near_term')
+            y_pos = np.arange(len(ordered))
+            fig, ax = self._new_figure(figsize=(15.2, 7.2))
+            ax.barh(y_pos - 0.23, ordered['near_term'], height=0.22, color='#174a7c', label='Near-term observed signal')
+            ax.barh(y_pos, ordered['hot_dry_shift'], height=0.22, color='#d73345', label='+2 deg C hot-dry stress scenario')
+            ax.barh(y_pos + 0.23, ordered['extreme_rain_shift'], height=0.22, color='#f08a5d', label='Extreme rainfall sensitivity scenario')
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(ordered['basin'].astype(str), fontsize=12)
+            ax.set_xlim(0, 1)
+            ax.axvspan(0.62, 1, color='#d73345', alpha=0.08)
+            ax.axvline(0.34, color='#8b9aaa', linestyle='--', linewidth=1.2)
+            ax.axvline(0.62, color='#d73345', linestyle='--', linewidth=1.2)
+            self._style_axis(ax, grid_axis='x')
+            ax.set_xlabel('K-WaterGuard prediction index (0-1)')
+            ax.set_ylabel('')
+            fig.suptitle('Scenario Sensitivity For Agriculture, Drought, And Extreme Events', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.125, 0.93, 'Scenario bars are screening sensitivities from observed daily APIs and local archives, not a replacement for official forecasts', fontsize=12, color='#53677f')
+            ax.legend(loc='lower right', frameon=True, framealpha=0.92, edgecolor='#d5e4f5', fontsize=10)
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_scenario_sensitivity.png', rect=[0, 0, 1, 0.90])
+        except Exception as exc:
+            self.logger.error(f"Error in agrometeorology prediction plots: {exc}")
+
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
         try:
@@ -3493,6 +3654,9 @@ class DashboardGenerator:
         trend_plot_cards = self._trend_plot_cards(str(latest_date))
         algal_plot_cards = self._algal_plot_cards(str(latest_date))
         weather_plot_cards = self._weather_plot_cards(str(latest_date))
+        agro_plot_cards = self._agrometeorology_plot_cards(str(latest_date))
+        agro_stat_cards = self._agrometeorology_stat_cards()
+        agro_model_rows = self._agrometeorology_model_rows()
         province_rows = self._province_rows(latest_df)
         history_rows = self._history_rows(limit=30)
         historical_option_rows = self._historical_option_rows()
@@ -6105,11 +6269,11 @@ class DashboardGenerator:
       color: #ffffff;
       background: linear-gradient(135deg, #0758bd, #0c7ee8);
     }}
-    body:not(.page-data) .toolbar .install-button,
-    body:not(.page-data) .toolbar > a.button {{
+    body:not(.page-contact) .toolbar .install-button,
+    body:not(.page-contact) .toolbar > a.button {{
       display: none !important;
     }}
-    body:not(.page-data) .toolbar {{
+    body:not(.page-contact) .toolbar {{
       grid-template-columns: 1fr !important;
       background: transparent !important;
       box-shadow: none !important;
@@ -6519,6 +6683,57 @@ class DashboardGenerator:
     .chat-launch {{
       background: linear-gradient(135deg, #174a7c, #2e6f9e) !important;
     }}
+
+    /* K-WaterGuard correction layer v16: merged page architecture and agrometeorology model page. */
+    body .nav-tabs {{
+      grid-template-columns: repeat(6, minmax(132px, 1fr)) !important;
+    }}
+    body.page-home .page:not(.page-home),
+    body.page-trends .page:not(.page-trends),
+    body.page-algal .page:not(.page-algal),
+    body.page-weather .page:not(.page-weather),
+    body.page-agro .page:not(.page-agro),
+    body.page-contact .page:not(.page-contact) {{
+      display: none !important;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-agro .nav-tabs a[href="agrometeorology.html"],
+    body.page-contact .nav-tabs a[href="contact.html"] {{
+      background: linear-gradient(135deg, #143d66, #2d6f8f) !important;
+      color: #ffffff !important;
+    }}
+    body.page-contact #historicalDownloads,
+    body.page-contact #historicalDataPage {{
+      display: block !important;
+    }}
+    body.page-trends #spatialPage,
+    body.page-trends #provinceCoverage,
+    body.page-trends #latestCharts,
+    body.page-trends #spatialParameterMaps,
+    body.page-trends #stationMeasurements {{
+      display: block !important;
+    }}
+    body.page-agro .plots {{
+      grid-template-columns: repeat(2, minmax(420px, 1fr));
+    }}
+    body.page-agro .plot img {{
+      padding: 12px;
+      background: #ffffff;
+    }}
+    body.page-agro main.wrap,
+    body.page-trends main.wrap,
+    body.page-contact main.wrap {{
+      width: min(100% - 48px, 1760px) !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }}
+    @media (max-width: 980px) {{
+      body .nav-tabs {{ grid-template-columns: 1fr !important; }}
+      body.page-agro .plots {{ grid-template-columns: 1fr; }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -6543,12 +6758,11 @@ class DashboardGenerator:
   <main class="wrap">
     <nav class="nav-tabs" aria-label="Dashboard pages">
       <a href="index.html">Home</a>
-      <a href="trends.html">Historical Trends</a>
+      <a href="trends.html">WQ Evidence & Trends</a>
       <a href="algal-bloom.html">Algal Bloom Status</a>
       <a href="weather.html">Hydrometeorological Risk</a>
-      <a href="spatial.html">WQ Status</a>
-      <a href="contact.html">Contact / Collaborate</a>
-      <a href="data.html">Data Downloads</a>
+      <a href="agrometeorology.html">Agrometeorology Prediction</a>
+      <a href="contact.html">Contact & Downloads</a>
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
@@ -6573,9 +6787,9 @@ class DashboardGenerator:
             <a class="button" href="trends.html">Open Trend Page</a>
             <a class="button" href="algal-bloom.html">Open Algal Bloom Page</a>
             <a class="button" href="weather.html">Open Weather Page</a>
-            <a class="button" href="spatial.html">Open WQ Status</a>
+            <a class="button" href="trends.html">Open WQ Evidence</a>
+            <a class="button" href="agrometeorology.html">Open Prediction Model</a>
             <a class="button" href="contact.html">Contact Lab</a>
-            <a class="button" href="data.html">Open Data Page</a>
           </div>
         </div>
         <div class="overview-panel">
@@ -6686,7 +6900,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section page page-data" id="historicalDownloads">
+    <section class="card section page page-contact" id="historicalDownloads">
       <h2>Historical Data Downloads</h2>
       <p class="muted">The downloaded NIER historical archive contains {int(historical_summary.get('measurement_rows') or 0):,} measurements and {station_count:,} unique stations from {html.escape(str(historical_summary.get('start_year', '')))} to {html.escape(str(historical_summary.get('end_year', '')))}.</p>
       <p><a class="history-link" href="{historical_measurements_link}">{html.escape(historical_measurements_label)}</a> &nbsp; <a class="history-link" href="{historical_stations_link}">Download station metadata</a></p>
@@ -6719,7 +6933,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section page page-data" id="historicalDataPage">
+    <section class="card section page page-contact" id="historicalDataPage">
       <h2>Historical Dataset By Station And Variable</h2>
       <p class="muted">Use the search box above to filter by station code, station name, province, watershed, or variable. The full CSV links above provide every historical record.</p>
       <div class="table-wrap">
@@ -6790,7 +7004,26 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section page page-spatial" id="spatialPage">
+    <section class="card section page page-agro" id="agrometeorologyPage">
+      <h2>Agrometeorology Prediction And Climate Impact Outlook</h2>
+      <div class="grid three-col">{agro_stat_cards}</div>
+      <p class="muted">The K-WaterGuard AgroClimate Prediction Model is a hybrid screening model that combines basin-scale daily weather APIs, recent water-quality pressure, cyanobacteria context, evapotranspiration, heat-stress thresholds, and scenario sensitivity rules. It is designed for early interpretation of agricultural water stress, drought tendency, runoff/extreme-event pressure, and climate-change-related risk signals.</p>
+      <div class="objective-grid">
+        <article class="objective-card"><span>01</span><h3>Agriculture Water Stress</h3><p>Ranks basins using dry days, ET0, heat stress, and recent meteorological pressure that can affect irrigation demand and crop water reliability.</p></article>
+        <article class="objective-card"><span>02</span><h3>Drought And Extreme Events</h3><p>Separates hot-dry sensitivity from heavy-rainfall runoff sensitivity so managers can compare drought risk and sudden extreme-event pressure.</p></article>
+        <article class="objective-card"><span>03</span><h3>Future Impact Lens</h3><p>Uses transparent +2 deg C hot-dry and extreme-rainfall stress scenarios as near-term climate-impact screening indicators, not as an official deterministic forecast.</p></article>
+      </div>
+      <div class="grid plots">{agro_plot_cards}</div>
+      <h3>K-WaterGuard AgroClimate Model Basin Ranking</h3>
+      <div class="table-wrap">
+        <table id="agroTable">
+          <thead><tr><th>Basin</th><th>Prediction Index</th><th>Status</th><th>Main Driver</th><th>Drought</th><th>Heat</th><th>Extreme Runoff</th><th>Bloom-Agri</th></tr></thead>
+          <tbody>{agro_model_rows}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card section page page-trends" id="spatialPage">
       <h2>WQ Status Alerts</h2>
       <div class="table-wrap">
         <table id="alertTable">
@@ -6802,7 +7035,7 @@ class DashboardGenerator:
       </div>
     </section>
 
-    <section class="card section page page-spatial" id="provinceCoverage">
+    <section class="card section page page-trends" id="provinceCoverage">
         <h2>Province Coverage</h2>
         <div class="table-wrap">
           <table>
@@ -6812,17 +7045,17 @@ class DashboardGenerator:
         </div>
     </section>
 
-    <section class="card section page page-spatial" id="latestCharts">
+    <section class="card section page page-trends" id="latestCharts">
       <h2>Latest Charts And Maps</h2>
       <div class="grid plots">{plot_cards}</div>
     </section>
 
-    <section class="card section page page-spatial" id="spatialParameterMaps">
+    <section class="card section page page-trends" id="spatialParameterMaps">
       <h2>Spatial Parameter Maps</h2>
       <div class="grid spatial-maps">{spatial_map_cards}</div>
     </section>
 
-    <section class="card section page page-spatial" id="stationMeasurements">
+    <section class="card section page page-trends" id="stationMeasurements">
       <h2>Latest Station Measurements</h2>
       <div class="table-wrap">
         <table id="stationTable">
@@ -7019,9 +7252,8 @@ class DashboardGenerator:
             'trends.html': 'page-trends',
             'algal-bloom.html': 'page-algal',
             'weather.html': 'page-weather',
-            'spatial.html': 'page-spatial',
+            'agrometeorology.html': 'page-agro',
             'contact.html': 'page-contact',
-            'data.html': 'page-data',
         }
 
     def _korean_page_variants(self):
@@ -7030,9 +7262,8 @@ class DashboardGenerator:
             'trends.html': 'trends-ko.html',
             'algal-bloom.html': 'algal-bloom-ko.html',
             'weather.html': 'weather-ko.html',
-            'spatial.html': 'spatial-ko.html',
+            'agrometeorology.html': 'agrometeorology-ko.html',
             'contact.html': 'contact-ko.html',
-            'data.html': 'data-ko.html',
         }
 
     def _page_language_links(self, page_class):
@@ -7041,9 +7272,8 @@ class DashboardGenerator:
             'page-trends': 'trends.html',
             'page-algal': 'algal-bloom.html',
             'page-weather': 'weather.html',
-            'page-spatial': 'spatial.html',
+            'page-agro': 'agrometeorology.html',
             'page-contact': 'contact.html',
-            'page-data': 'data.html',
         }
         english = english_by_class.get(page_class, 'index.html')
         return english, self._korean_page_variants().get(english, 'ko.html')
@@ -7141,20 +7371,18 @@ class DashboardGenerator:
         page_html = page_html.replace('__EN_PAGE__', english_page).replace('__KO_PAGE__', korean_page)
         if page_class != 'page-home':
             page_title = {
-                'page-trends': 'Historical Trends',
+                'page-trends': 'WQ Evidence And Historical Trends',
                 'page-algal': 'Algal Bloom Status',
                 'page-weather': 'Hydrometeorological Risk',
-                'page-spatial': 'WQ Status',
-                'page-contact': 'Contact And Collaborate',
-                'page-data': 'Data Downloads',
+                'page-agro': 'Agrometeorology Prediction',
+                'page-contact': 'Contact, Collaborate And Downloads',
             }.get(page_class, 'Dashboard')
             page_subtitle = {
-                'page-trends': 'Explore cleaned historical water-quality records with Mann-Kendall statistics, Sen slope summaries, and annual trend plots.',
+                'page-trends': 'Explore corrected station maps, latest WQ status, cleaned historical records, Mann-Kendall statistics, Sen slope summaries, and annual trend plots.',
                 'page-algal': 'Track Korean algal bloom thresholds with harmful cyanobacteria cell-count data, watershed maps, lake/reservoir risk, and HSPF scenario support data.',
                 'page-weather': 'Review basin-scale rainfall, temperature, humidity, wind, and evapotranspiration signals that shape water-quality and bloom risk.',
-                'page-spatial': 'Review corrected station coverage, latest alerts, province summaries, and coolwarm water-quality status maps across South Korea.',
-                'page-contact': 'Connect with the Regional Water Environment System Lab for research collaboration, field deployment, and smart water-management partnerships.',
-                'page-data': 'Download current records, archived daily runs, station metadata, and the national annual historical dataset for research use.',
+                'page-agro': 'Review agriculture-weather-climate risk, drought and extreme-event sensitivity, and the K-WaterGuard AgroClimate Prediction Model.',
+                'page-contact': 'Connect with the Regional Water Environment System Lab and download current, archived, station, and historical research datasets.',
             }.get(page_class, 'Daily South Korea water-quality intelligence dashboard.')
             page_html = page_html.replace(
                 '<h1>Water Quality Dashboard</h1>',
@@ -7176,10 +7404,15 @@ class DashboardGenerator:
             'Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.': '대한민국 수질 관측소의 일별 모니터링, 위치, 요약 지표, 지도 및 다운로드 자료를 제공합니다.',
             'Home': '홈',
             'Historical Trends': '과거 추세',
+            'WQ Evidence & Trends': '수질 근거 및 추세',
+            'WQ Evidence And Historical Trends': '수질 근거 및 과거 추세',
             'Algal Bloom Status': '조류 발생 현황',
             'Hydrometeorological Risk': '수문기상 위험',
+            'Agrometeorology Prediction': '농업기상 예측',
             'WQ Status': '수질 현황',
             'Contact / Collaborate': '문의 / 협력',
+            'Contact & Downloads': '문의 및 자료',
+            'Contact, Collaborate And Downloads': '문의, 협력 및 자료 다운로드',
             'Data Downloads': '자료 다운로드',
             'Download App': '앱 다운로드',
             'Open latest CSV': '최신 CSV 열기',
@@ -7231,6 +7464,8 @@ class DashboardGenerator:
             'Open Algal Bloom Page': '조류 발생 페이지 열기',
             'Open Weather Page': '기상 위험 페이지 열기',
             'Open WQ Status': '수질 현황 열기',
+            'Open WQ Evidence': '수질 근거 열기',
+            'Open Prediction Model': '예측 모델 열기',
             'Contact Lab': '연구실 문의',
             'Open Data Page': '자료 페이지 열기',
             'Farm Decisions': '농업 의사결정',
@@ -7289,6 +7524,21 @@ class DashboardGenerator:
             'Page-aware': '페이지 인식',
             'Static fallback': '정적 응답',
             'Basin Hydrometeorological Risk Matrix': '유역 수문기상 위험 매트릭스',
+            'Agrometeorology Prediction And Climate Impact Outlook': '농업기상 예측 및 기후영향 전망',
+            'K-WaterGuard AgroClimate Prediction Model': 'K-WaterGuard 농업기후 예측 모델',
+            'Agriculture Drought And Extreme-Event Scenario Sensitivity': '농업 가뭄 및 극한사상 시나리오 민감도',
+            'Agriculture Water Stress': '농업용수 스트레스',
+            'Drought And Extreme Events': '가뭄 및 극한사상',
+            'Future Impact Lens': '미래 영향 관점',
+            'K-WaterGuard AgroClimate Model Basin Ranking': 'K-WaterGuard 농업기후 모델 유역 순위',
+            'Prediction Index': '예측 지수',
+            'Main Driver': '주요 원인',
+            'Drought': '가뭄',
+            'Heat': '고온',
+            'Extreme Runoff': '극한 유출',
+            'Bloom-Agri': '조류-농업',
+            'High-risk basins': '고위험 유역',
+            'Top driver': '주요 구동 인자',
             'OpenStreetMap Hydrometeorological Basin Explorer': 'OpenStreetMap 유역 수문기상 탐색기',
             'Fourteen-Day Rainfall Risk Ranking With Thresholds': '14일 강우 위험 순위 및 기준선',
             'Temperature Envelope And Heat-Stress Screen': '온도 범위 및 열 스트레스 선별',
@@ -7324,7 +7574,6 @@ class DashboardGenerator:
             'Cleaning Before And After': '정제 전후',
             "Mann-Kendall And Sen's Slope": 'Mann-Kendall 및 Sen 기울기',
             'Step': '단계',
-            'Rows': '행',
             'Notes': '비고',
             'Variable': '변수',
             'Years': '연도',
@@ -7376,6 +7625,8 @@ class DashboardGenerator:
             'I am answering from': '현재 페이지 기준으로 답변합니다:',
             'Ask about alerts, stations, parameters, algal bloom, weather risk, downloads, charts, or maps for more detail.': '자세한 내용은 경보, 관측소, 변수, 조류 발생, 기상 위험, 다운로드, 차트 또는 지도에 대해 질문하세요.',
             'Open the Hydrometeorological Risk page to review rainfall/runoff pressure, heat stress, basin weather maps, and fourteen-day summaries.': '강우/유출 압력, 열 스트레스, 유역 기상 지도, 14일 요약을 보려면 수문기상 위험 페이지를 여세요.',
+            'Open the Agrometeorology Prediction page to review agriculture water stress, drought tendency, extreme-event sensitivity, and future climate-impact screening outputs.': '농업용수 스트레스, 가뭄 경향, 극한사상 민감도, 미래 기후영향 선별 결과를 보려면 농업기상 예측 페이지를 여세요.',
+            'The K-WaterGuard AgroClimate Prediction Model combines drought, heat, runoff, bloom-agriculture pressure, and climate-shift sensitivity. Visible top basin ranks:': 'K-WaterGuard 농업기후 예측 모델은 가뭄, 고온, 유출, 조류-농업 압력, 기후변화 민감도를 결합합니다. 표시된 상위 유역 순위:',
             'Available charts/maps on': '현재 페이지의 차트/지도:',
             'for pan, zoom, hover, and point details.': '이동, 확대/축소, 마우스오버 및 지점 상세정보를 확인할 수 있습니다.',
         }
@@ -7389,6 +7640,7 @@ class DashboardGenerator:
             'WQ 현황 Alerts': '수질 현황 경보',
             '<th>Date</th>': '<th>날짜</th>',
             '<th>Run 시간</th>': '<th>실행 시간</th>',
+            '<th>Rows</th>': '<th>행</th>',
             '<th>File</th>': '<th>파일</th>',
             '<th>Unit</th>': '<th>단위</th>',
             '>Warning<': '>경계<',
@@ -7588,17 +7840,22 @@ class DashboardGenerator:
         if (weatherRows.length) return `Hydrometeorological risk combines basin rainfall, temperature, humidity, wind, and ET0. Visible latest rows: ${weatherRows.join(' | ')}`;
         return 'Open the Hydrometeorological Risk page to review rainfall/runoff pressure, heat stress, basin weather maps, and fourteen-day summaries.';
       }
+      if (q.includes('agro') || q.includes('agriculture') || q.includes('drought') || q.includes('climate') || q.includes('prediction') || q.includes('extreme')) {
+        const agroRows = tableRows('#agroTable', 5);
+        if (agroRows.length) return `The K-WaterGuard AgroClimate Prediction Model combines drought, heat, runoff, bloom-agriculture pressure, and climate-shift sensitivity. Visible top basin ranks: ${agroRows.join(' | ')}`;
+        return 'Open the Agrometeorology Prediction page to review agriculture water stress, drought tendency, extreme-event sensitivity, and future climate-impact screening outputs.';
+      }
       if (q.includes('station') || q.includes('location') || q.includes('site')) {
         if (!stations.length) return 'No station rows are available in the latest dashboard table.';
         return `The dashboard shows ${stats.stations || 'available'} stations. First station rows: ${stations.join(' | ')}`;
       }
       if (q.includes('download') || q.includes('csv') || q.includes('metadata') || q.includes('archive')) {
         return downloads.length
-          ? `Download options visible from this dashboard include: ${downloads.join(' | ')}. The dedicated Data Downloads page keeps current CSV runs, historical datasets, and station metadata.`
-          : 'Use the Data Downloads page for current CSV runs, historical records, and station metadata. Download buttons are intentionally concentrated there for a cleaner research workflow.';
+          ? `Download options visible from this dashboard include: ${downloads.join(' | ')}. The Contact & Downloads page keeps current CSV runs, historical datasets, and station metadata.`
+          : 'Use the Contact & Downloads page for current CSV runs, historical records, and station metadata. Download buttons are intentionally concentrated there for a cleaner research workflow.';
       }
       if (q.includes('record') || q.includes('data')) {
-        return `The latest dashboard has ${stats.records || 'not available'} records for ${stats.stations || 'not available'} stations. Latest date: ${stats['latest date'] || 'not available'}. For exports, use the Data Downloads page.`;
+        return `The latest dashboard has ${stats.records || 'not available'} records for ${stats.stations || 'not available'} stations. Latest date: ${stats['latest date'] || 'not available'}. For exports, use the Contact & Downloads page.`;
       }
       if (q.includes('parameter') || q.includes('ph') || q.includes('do') || q.includes('bod') || q.includes('cod') || q.includes('tn') || q.includes('tp')) {
         if (!parameters.length) return 'No numeric parameter cards are available on this dashboard run.';
@@ -7607,16 +7864,16 @@ class DashboardGenerator:
       if (q.includes('standard') || q.includes('threshold') || q.includes('korean') || q.includes('limit')) {
         return standards.length
           ? `Visible Korean screening standards / thresholds include: ${standards.join(' | ')}`
-          : 'The dashboard screens parameters against configured Korean water-quality and algal bloom thresholds. Open WQ Status or Algal Bloom Status for the detailed rule tables.';
+          : 'The dashboard screens parameters against configured Korean water-quality and algal bloom thresholds. Open WQ Evidence & Trends or Algal Bloom Status for the detailed rule tables.';
       }
       if (q.includes('map') || q.includes('chart') || q.includes('plot')) {
         const chartTitles = Array.from(document.querySelectorAll('.plot h3')).map((item) => item.textContent.trim()).filter(Boolean);
         return chartTitles.length
           ? `Available charts/maps on ${pageTitle}: ${chartTitles.join(', ')}. Click Open full interactive view for pan, zoom, hover, and point details.`
-          : 'Charts and maps will appear after the dashboard has enough generated plot files. Open WQ Status, Algal Bloom Status, or Hydrometeorological Risk for the main interactive maps.';
+          : 'Charts and maps will appear after the dashboard has enough generated plot files. Open WQ Evidence & Trends, Algal Bloom Status, Hydrometeorological Risk, or Agrometeorology Prediction for the main maps and model outputs.';
       }
       if (q.includes('help') || q.includes('what can')) {
-        return 'You can ask about latest date, stations, alerts, parameter averages, algal bloom/cyanobacteria status, hydrometeorological risk, Korean thresholds, maps, charts, and downloads. If no backend is connected, I answer from the current static dashboard page.';
+        return 'You can ask about latest date, stations, alerts, parameter averages, algal bloom/cyanobacteria status, hydrometeorological risk, agrometeorology prediction, Korean thresholds, maps, charts, and downloads. If no backend is connected, I answer from the current static dashboard page.';
       }
       return `I am answering from ${pageTitle}. Latest date ${stats['latest date'] || 'not available'}, ${stats.records || 'not available'} records, ${stats.stations || 'not available'} stations, and ${stats.alerts || '0'} alerts. Ask about alerts, stations, parameters, algal bloom, weather risk, downloads, charts, or maps for more detail.`;
     }
@@ -8082,6 +8339,69 @@ class DashboardGenerator:
                 '</tr>'
             )
         return ''.join(rows) if rows else '<tr><td colspan="5">Fourteen-day basin weather history is not available yet.</td></tr>'
+
+    def _agrometeorology_model_rows(self):
+        try:
+            water_quality = DataManager().get_latest_data(days=7)
+            model = PlotGenerator()._agrometeorology_model_frame(water_quality)
+        except Exception:
+            model = pd.DataFrame()
+        if model.empty:
+            return '<tr><td colspan="8">Agrometeorology prediction model data are not available yet.</td></tr>'
+        rows = []
+        for _, row in model.head(20).iterrows():
+            status = str(row.get('model_status', 'Low'))
+            pill = 'critical' if status == 'High' else 'warning' if status == 'Moderate' else 'ok'
+            main_driver = max(
+                [
+                    ('Drought', float(row.get('drought_stress', 0))),
+                    ('Heat', float(row.get('heat_stress', 0))),
+                    ('Extreme runoff', float(row.get('runoff_extreme', 0))),
+                    ('Bloom-agriculture', float(row.get('bloom_agri_pressure', 0))),
+                    ('Climate sensitivity', float(row.get('climate_shift_sensitivity', 0))),
+                ],
+                key=lambda item: item[1],
+            )[0]
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(str(row.get("basin", "")))}</td>'
+                f'<td>{float(row.get("kwaterguard_prediction_index", 0)):.2f}</td>'
+                f'<td><span class="alert-pill {pill}">{html.escape(status)}</span></td>'
+                f'<td>{html.escape(main_driver)}</td>'
+                f'<td>{float(row.get("drought_stress", 0)):.2f}</td>'
+                f'<td>{float(row.get("heat_stress", 0)):.2f}</td>'
+                f'<td>{float(row.get("runoff_extreme", 0)):.2f}</td>'
+                f'<td>{float(row.get("bloom_agri_pressure", 0)):.2f}</td>'
+                '</tr>'
+            )
+        return ''.join(rows)
+
+    def _agrometeorology_stat_cards(self):
+        try:
+            water_quality = DataManager().get_latest_data(days=7)
+            model = PlotGenerator()._agrometeorology_model_frame(water_quality)
+        except Exception:
+            model = pd.DataFrame()
+        if model.empty:
+            return (
+                self._stat_card('Model', 'Waiting for data')
+                + self._stat_card('High-risk basins', '0')
+                + self._stat_card('Top driver', 'Not available')
+            )
+        high_count = int((model['model_status'] == 'High').sum())
+        top = model.iloc[0]
+        driver_values = {
+            'Drought': float(top.get('drought_stress', 0)),
+            'Heat': float(top.get('heat_stress', 0)),
+            'Extreme runoff': float(top.get('runoff_extreme', 0)),
+            'Bloom-agri': float(top.get('bloom_agri_pressure', 0)),
+        }
+        top_driver = max(driver_values, key=driver_values.get)
+        return (
+            self._stat_card('Model', 'K-WaterGuard AgroClimate')
+            + self._stat_card('High-risk basins', f'{high_count:,}')
+            + self._stat_card('Top driver', html.escape(top_driver))
+        )
 
     def _algal_scenario_rows(self):
         scenario_files = [
@@ -8551,6 +8871,16 @@ class DashboardGenerator:
             'Hydrometeorological plots will appear here after weather data are downloaded.'
         )
 
+    def _agrometeorology_plot_cards(self, date_label):
+        return self._named_plot_cards(
+            date_label,
+            [
+                ('agroclimate_prediction_matrix.png', 'K-WaterGuard AgroClimate Prediction Model'),
+                ('agroclimate_scenario_sensitivity.png', 'Agriculture Drought And Extreme-Event Scenario Sensitivity'),
+            ],
+            'Agrometeorology prediction plots will appear here after the hybrid model is generated.'
+        )
+
     def _named_plot_cards(self, date_label, plot_specs, empty_message):
         plots_dir = Config.daily_plots_dir(date_label)
         cards = []
@@ -8777,16 +9107,14 @@ class DashboardGenerator:
             "./trends.html",
             "./algal-bloom.html",
             "./weather.html",
-            "./spatial.html",
+            "./agrometeorology.html",
             "./contact.html",
-            "./data.html",
             "./ko.html",
             "./trends-ko.html",
             "./algal-bloom-ko.html",
             "./weather-ko.html",
-            "./spatial-ko.html",
+            "./agrometeorology-ko.html",
             "./contact-ko.html",
-            "./data-ko.html",
             "./manifest.webmanifest",
             "./assets/logo.png",
             "./assets/icon-192.png",
