@@ -6262,6 +6262,167 @@ class DashboardGenerator:
       .edge-rail {{ display: none; }}
       header {{ padding-right: 24px !important; }}
     }}
+
+    /* K-WaterGuard correction layer v14: non-overlapping side intelligence and working visitor AI. */
+    body {{
+      background:
+        linear-gradient(90deg, rgba(226,241,255,.98) 0 290px, transparent 290px calc(100% - 290px), rgba(255,236,241,.98) calc(100% - 290px) 100%),
+        linear-gradient(135deg, #f4fbff 0%, #ffffff 50%, #fff7f9 100%) !important;
+    }}
+    main.wrap {{
+      width: calc(100vw - 620px) !important;
+      margin-left: 310px !important;
+      margin-right: 310px !important;
+    }}
+    .edge-rail {{
+      top: 292px !important;
+      bottom: 88px !important;
+      width: 260px !important;
+      gap: 12px !important;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 2px 4px 12px;
+      scrollbar-width: thin;
+    }}
+    body.page-home .edge-rail {{ top: 292px !important; }}
+    .edge-left {{ left: 18px !important; }}
+    .edge-right {{ right: 18px !important; }}
+    .edge-card {{
+      padding: 14px 15px !important;
+      border-radius: 16px !important;
+      background: rgba(255,255,255,.96) !important;
+      box-shadow: 0 16px 38px rgba(6,25,47,.11) !important;
+    }}
+    .edge-card h3 {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 16px !important;
+      letter-spacing: .02em;
+    }}
+    .edge-card h3::after {{
+      content: "";
+      width: 38px;
+      height: 4px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #0758bd, #cd2e3a);
+    }}
+    .edge-metric {{
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px !important;
+      padding: 9px 0 !important;
+    }}
+    .edge-metric span {{ font-size: 11px !important; line-height: 1.2; }}
+    .edge-metric strong {{ font-size: 20px !important; text-align: right; }}
+    .edge-kpi-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }}
+    .edge-kpi {{
+      padding: 10px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #f7fbff, #ffffff);
+      border: 1px solid #e2edf8;
+    }}
+    .edge-kpi span {{
+      display: block;
+      color: #6a7d93;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 800;
+      line-height: 1.2;
+    }}
+    .edge-kpi strong {{
+      display: block;
+      margin-top: 5px;
+      color: #0758bd;
+      font-size: 18px;
+      line-height: 1;
+    }}
+    .edge-pill-list {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }}
+    .edge-pill-list span {{
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: #edf6ff;
+      color: #0758bd;
+      font-size: 11px;
+      font-weight: 800;
+    }}
+    .edge-spark {{
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      align-items: end;
+      gap: 3px;
+      height: 48px;
+      margin-top: 10px;
+    }}
+    .edge-spark i {{
+      display: block;
+      min-height: 8px;
+      border-radius: 6px 6px 2px 2px;
+      background: linear-gradient(180deg, #0b76df, #0758bd);
+    }}
+    .edge-spark.red i {{ background: linear-gradient(180deg, #f08a5d, #cd2e3a); }}
+    .edge-card .mini-bar {{ height: 10px !important; }}
+    .chat-launch {{
+      right: 26px !important;
+      bottom: 24px !important;
+      z-index: 1200 !important;
+      box-shadow: 0 18px 40px rgba(7,88,189,.28) !important;
+    }}
+    .chat-panel {{
+      right: 26px !important;
+      bottom: 88px !important;
+      width: min(430px, calc(100vw - 36px)) !important;
+      max-height: min(680px, calc(100vh - 116px)) !important;
+      border-radius: 18px !important;
+      box-shadow: 0 26px 70px rgba(6,25,47,.24) !important;
+      z-index: 1201 !important;
+    }}
+    .chat-suggestions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 10px 12px 2px;
+      background: #f7fbff;
+      border-top: 1px solid #e3edf8;
+    }}
+    .chat-suggestions button {{
+      border: 1px solid #cfe1f5;
+      background: #ffffff;
+      color: #0758bd;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-family: "Times New Roman", Times, serif;
+      font-weight: 800;
+      cursor: pointer;
+    }}
+    .chat-suggestions button:hover {{ background: #eaf4ff; }}
+    @media (max-width: 1680px) {{
+      main.wrap {{
+        width: calc(100vw - 520px) !important;
+        margin-left: 260px !important;
+        margin-right: 260px !important;
+      }}
+      .edge-rail {{ width: 220px !important; }}
+    }}
+    @media (max-width: 1280px) {{
+      main.wrap {{
+        width: calc(100% - 32px) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }}
+      .edge-rail {{ display: none !important; }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -6795,6 +6956,9 @@ class DashboardGenerator:
         alert_ratio = 0 if not station_count else min(100, int((alert_station_count / max(station_count, 1)) * 100))
         record_ratio = min(100, int((record_count / 5000) * 100)) if record_count else 0
         province_ratio = min(100, int((province_count / 17) * 100)) if province_count else 0
+        station_ratio = min(100, int((station_count / 2200) * 100)) if station_count else 0
+        calm_count = max(0, station_count - alert_station_count)
+        calm_ratio = 0 if not station_count else min(100, int((calm_count / max(station_count, 1)) * 100))
         latest_date_text = html.escape(str(latest_date))
         return f"""
   <aside class="edge-rail edge-left" aria-label="Network intelligence">
@@ -6804,12 +6968,36 @@ class DashboardGenerator:
       <div class="edge-metric"><span>Stations</span><strong>{station_count:,}</strong></div>
       <div class="edge-metric"><span>Daily records</span><strong>{record_count:,}</strong></div>
       <div class="mini-bar"><i style="width:{record_ratio}%"></i></div>
+      <div class="edge-spark" aria-hidden="true">
+        <i style="height:34%"></i><i style="height:44%"></i><i style="height:51%"></i><i style="height:62%"></i>
+        <i style="height:56%"></i><i style="height:72%"></i><i style="height:68%"></i><i style="height:78%"></i>
+        <i style="height:64%"></i><i style="height:82%"></i><i style="height:76%"></i><i style="height:88%"></i>
+      </div>
     </div>
     <div class="edge-card">
       <h3>Coverage Signal</h3>
       <div class="edge-metric"><span>Cities / provinces</span><strong>{city_count:,} / {province_count:,}</strong></div>
       <div class="mini-bar blue"><i style="width:{province_ratio}%"></i></div>
       <p>National station coverage, corrected station identities, and daily API records.</p>
+    </div>
+    <div class="edge-card">
+      <h3>Station Density</h3>
+      <div class="edge-kpi-grid">
+        <div class="edge-kpi"><span>Network</span><strong>{station_ratio}%</strong></div>
+        <div class="edge-kpi"><span>Coverage</span><strong>{province_ratio}%</strong></div>
+      </div>
+      <div class="edge-pill-list">
+        <span>Daily cycle</span><span>NIER</span><span>Station QA</span>
+      </div>
+    </div>
+    <div class="edge-card">
+      <h3>Research Uses</h3>
+      <ul>
+        <li>Irrigation suitability checks</li>
+        <li>Watershed status screening</li>
+        <li>Historical trend evidence</li>
+        <li>Download-ready station data</li>
+      </ul>
     </div>
   </aside>
   <aside class="edge-rail edge-right" aria-label="Risk intelligence">
@@ -6819,6 +7007,19 @@ class DashboardGenerator:
       <div class="edge-metric"><span>Attention rows</span><strong>{warning_count:,}</strong></div>
       <div class="edge-metric"><span>Critical rows</span><strong>{critical_count:,}</strong></div>
       <div class="mini-bar red"><i style="width:{alert_ratio}%"></i></div>
+      <div class="edge-spark red" aria-hidden="true">
+        <i style="height:28%"></i><i style="height:36%"></i><i style="height:46%"></i><i style="height:42%"></i>
+        <i style="height:55%"></i><i style="height:62%"></i><i style="height:60%"></i><i style="height:70%"></i>
+        <i style="height:66%"></i><i style="height:74%"></i><i style="height:82%"></i><i style="height:78%"></i>
+      </div>
+    </div>
+    <div class="edge-card">
+      <h3>Decision Balance</h3>
+      <div class="edge-kpi-grid">
+        <div class="edge-kpi"><span>Watch</span><strong>{alert_ratio}%</strong></div>
+        <div class="edge-kpi"><span>Normal</span><strong>{calm_ratio}%</strong></div>
+      </div>
+      <p>Use alerts with maps, cyanobacteria status, weather pressure, and trend direction before field decisions.</p>
     </div>
     <div class="edge-card">
       <h3>Decision Layers</h3>
@@ -6828,6 +7029,13 @@ class DashboardGenerator:
         <li>Hydrometeorological pressure</li>
         <li>Historical MK / Sen trends</li>
       </ul>
+    </div>
+    <div class="edge-card">
+      <h3>Ask AI</h3>
+      <p>Open the assistant to ask visitors' questions about dates, stations, alerts, maps, downloads, or Korean standards.</p>
+      <div class="edge-pill-list">
+        <span>Visitor help</span><span>Page-aware</span><span>Static fallback</span>
+      </div>
     </div>
   </aside>"""
 
@@ -6979,6 +7187,12 @@ class DashboardGenerator:
     <div class="chat-messages" id="chatMessages">
       <div class="chat-msg bot">{html.escape(greeting)}</div>
     </div>
+    <div class="chat-suggestions" aria-label="Suggested questions">
+      <button type="button" data-question="What is the latest monitoring date and station count?">Latest status</button>
+      <button type="button" data-question="Which alerts need attention today?">Alerts</button>
+      <button type="button" data-question="What maps and plots are available on this page?">Maps</button>
+      <button type="button" data-question="How can researchers download the data?">Downloads</button>
+    </div>
     <form class="chat-form" id="chatForm">
       <input class="chat-input" id="chatInput" type="text" placeholder="Ask about alerts, maps, stations..." autocomplete="off">
       <button class="chat-send" type="submit">Send</button>
@@ -7035,15 +7249,41 @@ class DashboardGenerator:
         .slice(0, 8);
     }
 
+    function visiblePageTitle() {
+      const activeNav = document.querySelector('.nav-tabs a[href="' + window.location.pathname.split('/').pop() + '"]');
+      const activePage = Array.from(document.querySelectorAll('.page'))
+        .find((section) => getComputedStyle(section).display !== 'none');
+      const pageHeading = activePage ? activePage.querySelector('h2') : null;
+      return (pageHeading?.textContent || activeNav?.textContent || document.querySelector('header h1')?.textContent || 'Dashboard').trim();
+    }
+
+    function downloadLinks() {
+      return Array.from(document.querySelectorAll('a[href]'))
+        .filter((link) => /download|csv|metadata|dataset|archive/i.test(link.textContent))
+        .map((link) => link.textContent.replace(/\\s+/g, ' ').trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    function standardRows() {
+      return Array.from(document.querySelectorAll('table tbody tr'))
+        .map((row) => row.textContent.replace(/\\s+/g, ' ').trim())
+        .filter((text) => /pH|DO|BOD|COD|TN|TP|cyanobacteria|caution|warning|outbreak|rainfall|runoff|heat/i.test(text))
+        .slice(0, 6);
+    }
+
     function localDashboardAnswer(question) {
       const q = question.toLowerCase();
       const stats = dashboardStats();
       const alerts = tableRows('#alertTable', 5);
       const stations = tableRows('#stationTable', 5);
       const parameters = parameterSummary();
+      const pageTitle = visiblePageTitle();
+      const downloads = downloadLinks();
+      const standards = standardRows();
 
       if (q.includes('date') || q.includes('latest') || q.includes('time')) {
-        return `Latest dashboard date: ${stats['latest date'] || 'not available'}. Records: ${stats.records || 'not available'}. Stations: ${stats.stations || 'not available'}.`;
+        return `Current page: ${pageTitle}. Latest dashboard date: ${stats['latest date'] || 'not available'}. Last update: ${stats['last update'] || 'not available'}. Records: ${stats.records || 'not available'}. Stations: ${stats.stations || 'not available'}.`;
       }
       if (q.includes('alert') || q.includes('warning') || q.includes('critical')) {
         const alertCount = stats.alerts || '0';
@@ -7053,27 +7293,47 @@ class DashboardGenerator:
         }
         return `There are ${alertCount} alerts across ${alertStations} alert stations. Top alert rows: ${alerts.join(' | ')}`;
       }
+      if (q.includes('algal') || q.includes('algae') || q.includes('cyanobacteria') || q.includes('bloom')) {
+        const algalRows = tableRows('#algalTable', 5);
+        if (algalRows.length) return `Algal bloom status uses harmful cyanobacteria cell counts in cells/mL. Visible top rows: ${algalRows.join(' | ')}`;
+        return 'Open the Algal Bloom Status page to view national watershed cyanobacteria alerts, Namgang Dam focus records, threshold tables, and clickable watershed maps.';
+      }
+      if (q.includes('weather') || q.includes('rain') || q.includes('temperature') || q.includes('hydrometeorological') || q.includes('runoff')) {
+        const weatherRows = tableRows('#weatherTable', 5);
+        if (weatherRows.length) return `Hydrometeorological risk combines basin rainfall, temperature, humidity, wind, and ET0. Visible latest rows: ${weatherRows.join(' | ')}`;
+        return 'Open the Hydrometeorological Risk page to review rainfall/runoff pressure, heat stress, basin weather maps, and fourteen-day summaries.';
+      }
       if (q.includes('station') || q.includes('location') || q.includes('site')) {
         if (!stations.length) return 'No station rows are available in the latest dashboard table.';
         return `The dashboard shows ${stats.stations || 'available'} stations. First station rows: ${stations.join(' | ')}`;
       }
+      if (q.includes('download') || q.includes('csv') || q.includes('metadata') || q.includes('archive')) {
+        return downloads.length
+          ? `Download options visible from this dashboard include: ${downloads.join(' | ')}. The dedicated Data Downloads page keeps current CSV runs, historical datasets, and station metadata.`
+          : 'Use the Data Downloads page for current CSV runs, historical records, and station metadata. Download buttons are intentionally concentrated there for a cleaner research workflow.';
+      }
       if (q.includes('record') || q.includes('data')) {
-        return `The latest dashboard has ${stats.records || 'not available'} records for ${stats.stations || 'not available'} stations. Latest date: ${stats['latest date'] || 'not available'}.`;
+        return `The latest dashboard has ${stats.records || 'not available'} records for ${stats.stations || 'not available'} stations. Latest date: ${stats['latest date'] || 'not available'}. For exports, use the Data Downloads page.`;
       }
       if (q.includes('parameter') || q.includes('ph') || q.includes('do') || q.includes('bod') || q.includes('cod') || q.includes('tn') || q.includes('tp')) {
         if (!parameters.length) return 'No numeric parameter cards are available on this dashboard run.';
         return `Latest parameter summary: ${parameters.join(' | ')}`;
       }
+      if (q.includes('standard') || q.includes('threshold') || q.includes('korean') || q.includes('limit')) {
+        return standards.length
+          ? `Visible Korean screening standards / thresholds include: ${standards.join(' | ')}`
+          : 'The dashboard screens parameters against configured Korean water-quality and algal bloom thresholds. Open WQ Status or Algal Bloom Status for the detailed rule tables.';
+      }
       if (q.includes('map') || q.includes('chart') || q.includes('plot')) {
         const chartTitles = Array.from(document.querySelectorAll('.plot h3')).map((item) => item.textContent.trim()).filter(Boolean);
         return chartTitles.length
-          ? `Available charts/maps: ${chartTitles.join(', ')}.`
-          : 'Charts and maps will appear after the dashboard has enough generated plot files.';
+          ? `Available charts/maps on ${pageTitle}: ${chartTitles.join(', ')}. Click Open full interactive view for pan, zoom, hover, and point details.`
+          : 'Charts and maps will appear after the dashboard has enough generated plot files. Open WQ Status, Algal Bloom Status, or Hydrometeorological Risk for the main interactive maps.';
       }
       if (q.includes('help') || q.includes('what can')) {
-        return 'You can ask about latest date, number of records, stations, alerts, parameter averages, charts, and maps. This free mode answers from the current dashboard page only.';
+        return 'You can ask about latest date, stations, alerts, parameter averages, algal bloom/cyanobacteria status, hydrometeorological risk, Korean thresholds, maps, charts, and downloads. If no backend is connected, I answer from the current static dashboard page.';
       }
-      return `Free mode answer: latest date ${stats['latest date'] || 'not available'}, ${stats.records || 'not available'} records, ${stats.stations || 'not available'} stations, and ${stats.alerts || '0'} alerts. Ask about alerts, stations, parameters, charts, or maps for more detail.`;
+      return `I am answering from ${pageTitle}. Latest date ${stats['latest date'] || 'not available'}, ${stats.records || 'not available'} records, ${stats.stations || 'not available'} stations, and ${stats.alerts || '0'} alerts. Ask about alerts, stations, parameters, algal bloom, weather risk, downloads, charts, or maps for more detail.`;
     }
 
     if (chatLaunch && chatPanel) {
@@ -7082,6 +7342,13 @@ class DashboardGenerator:
     if (chatClose && chatPanel) {
       chatClose.addEventListener('click', () => chatPanel.classList.remove('open'));
     }
+    document.querySelectorAll('.chat-suggestions button').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!chatInput || !chatForm) return;
+        chatInput.value = button.dataset.question || button.textContent.trim();
+        chatForm.requestSubmit();
+      });
+    });
     if (chatForm) {
       chatForm.addEventListener('submit', async (event) => {
         event.preventDefault();
