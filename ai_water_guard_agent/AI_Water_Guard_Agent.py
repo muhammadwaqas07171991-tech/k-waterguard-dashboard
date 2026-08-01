@@ -2506,8 +2506,8 @@ class PlotGenerator:
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #071426; }}
-    #plot {{ width: 100%; height: 100vh; min-height: 640px; }}
-    @media (max-width: 760px) {{ #plot {{ min-height: 720px; }} }}
+    #plot {{ width: 100%; height: 100vh; min-height: 760px; }}
+    @media (max-width: 760px) {{ #plot {{ min-height: 820px; }} }}
   </style>
 </head>
 <body>
@@ -2515,7 +2515,7 @@ class PlotGenerator:
   <script>
     const traces = {json.dumps(traces, ensure_ascii=False)};
     const layout = {json.dumps(layout, ensure_ascii=False)};
-    const config = {{responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d']}};
+    const config = {{responsive: true, scrollZoom: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d']}};
     Plotly.newPlot('plot', traces, layout, config);
   </script>
 </body>
@@ -3472,6 +3472,16 @@ class DashboardGenerator:
         national_cyanobacteria_link = self._file_uri(Config.NATIONAL_CYANOBACTERIA_FILE) if Config.NATIONAL_CYANOBACTERIA_FILE.exists() else '#'
         cyanobacteria_station_link = self._file_uri(Config.CYANOBACTERIA_STATION_FILE) if Config.CYANOBACTERIA_STATION_FILE.exists() else '#'
         cyanobacteria_lakewide_link = self._file_uri(Config.CYANOBACTERIA_LAKEWIDE_FILE) if Config.CYANOBACTERIA_LAKEWIDE_FILE.exists() else '#'
+        side_rail_html = self._edge_rail_html(
+            latest_date=latest_date,
+            station_count=station_count,
+            record_count=record_count,
+            alert_station_count=alert_station_count,
+            warning_count=warning_count,
+            critical_count=critical_count,
+            province_count=province_count,
+            city_count=city_count,
+        )
         chatbot_html = self._chatbot_html()
         chatbot_script = self._chatbot_script()
 
@@ -6127,10 +6137,139 @@ class DashboardGenerator:
       .toolbar {{ grid-template-columns: 1fr !important; }}
       .capability-grid, .objective-grid {{ grid-template-columns: 1fr !important; }}
     }}
+
+    /* K-WaterGuard correction layer v13: full-canvas intelligence layout. */
+    body {{
+      background:
+        linear-gradient(90deg, rgba(232,243,255,.96) 0 15vw, transparent 15vw calc(100% - 15vw), rgba(255,241,244,.96) calc(100% - 15vw) 100%),
+        linear-gradient(135deg, #f5fbff 0%, #ffffff 48%, #fff7f8 100%) !important;
+    }}
+    .language-corner {{
+      position: fixed !important;
+      top: 10px;
+      right: 16px;
+      z-index: 1000;
+      box-shadow: 0 12px 28px rgba(6,25,47,.16);
+    }}
+    header {{
+      min-height: 180px !important;
+      padding-top: 26px !important;
+      padding-right: 180px !important;
+    }}
+    header h1 {{
+      font-size: clamp(36px, 3.8vw, 56px) !important;
+    }}
+    main.wrap {{
+      width: calc(100vw - 360px) !important;
+      max-width: none !important;
+      margin-left: 180px !important;
+      margin-right: 180px !important;
+    }}
+    body .nav-tabs {{
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 900 !important;
+      grid-template-columns: repeat(7, minmax(116px, 1fr)) !important;
+      backdrop-filter: blur(20px);
+    }}
+    .edge-rail {{
+      position: fixed;
+      top: 226px;
+      bottom: 22px;
+      width: 156px;
+      z-index: 12;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      pointer-events: none;
+    }}
+    .edge-left {{ left: 14px; }}
+    .edge-right {{ right: 14px; }}
+    .edge-card {{
+      pointer-events: auto;
+      padding: 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(213,228,245,.95);
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 16px 34px rgba(6,25,47,.10);
+      backdrop-filter: blur(16px);
+    }}
+    .edge-card h3 {{
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #06192f;
+    }}
+    .edge-card p, .edge-card li {{
+      margin: 8px 0 0;
+      color: #53677f;
+      font-size: 12px;
+      line-height: 1.35;
+    }}
+    .edge-card ul {{ padding-left: 16px; margin: 0; }}
+    .edge-metric {{
+      display: grid;
+      gap: 3px;
+      padding: 7px 0;
+      border-top: 1px solid #e7f0fb;
+    }}
+    .edge-metric span {{
+      color: #6a7d93;
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 800;
+    }}
+    .edge-metric strong {{
+      color: #0758bd;
+      font-size: 18px;
+      line-height: 1;
+    }}
+    .mini-bar {{
+      height: 8px;
+      border-radius: 999px;
+      background: #e8f1fb;
+      overflow: hidden;
+      margin-top: 8px;
+    }}
+    .mini-bar i {{
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0758bd, #0c7ee8);
+    }}
+    .mini-bar.red i {{ background: linear-gradient(90deg, #d73345, #f08a5d); }}
+    .mini-bar.blue i {{ background: linear-gradient(90deg, #0758bd, #5ea3f1); }}
+    body.page-home .edge-rail {{ top: 206px; }}
+    .section {{
+      box-shadow: 0 14px 34px rgba(6,25,47,.07) !important;
+    }}
+    .home-overview {{
+      min-height: 360px !important;
+    }}
+    .interactive-plot iframe {{
+      height: 740px !important;
+    }}
+    .plot.interactive-plot.wide-plot iframe,
+    article:has(iframe[src*="map_interactive"]) iframe,
+    article:has(iframe[src*="parameter_map_interactive"]) iframe {{
+      height: 820px !important;
+    }}
+    @media (max-width: 1400px) {{
+      main.wrap {{
+        width: calc(100% - 32px) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }}
+      .edge-rail {{ display: none; }}
+      header {{ padding-right: 24px !important; }}
+    }}
   </style>
 </head>
 <body class="page-home">
   {side_rail_html}
+  <div class="language-switch language-corner" aria-label="Language">
+    <a class="active lang-en" href="__EN_PAGE__">English</a>
+    <a class="lang-ko" href="__KO_PAGE__">한국어</a>
+  </div>
   <header>
     <div class="wrap">
       <div class="topline">
@@ -6156,10 +6295,6 @@ class DashboardGenerator:
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
-      <div class="language-switch" aria-label="Language">
-        <a class="active" href="index.html">English</a>
-        <a href="ko.html">한국어</a>
-      </div>
       <button class="button install-button ready" id="installAppButton" type="button">Download App</button>
       <a class="button" href="{csv_link}">Open latest CSV</a>
     </div>
@@ -6643,8 +6778,63 @@ class DashboardGenerator:
             'data.html': 'data-ko.html',
         }
 
+    def _page_language_links(self, page_class):
+        english_by_class = {
+            'page-home': 'index.html',
+            'page-trends': 'trends.html',
+            'page-algal': 'algal-bloom.html',
+            'page-weather': 'weather.html',
+            'page-spatial': 'spatial.html',
+            'page-contact': 'contact.html',
+            'page-data': 'data.html',
+        }
+        english = english_by_class.get(page_class, 'index.html')
+        return english, self._korean_page_variants().get(english, 'ko.html')
+
+    def _edge_rail_html(self, latest_date, station_count, record_count, alert_station_count, warning_count, critical_count, province_count, city_count):
+        alert_ratio = 0 if not station_count else min(100, int((alert_station_count / max(station_count, 1)) * 100))
+        record_ratio = min(100, int((record_count / 5000) * 100)) if record_count else 0
+        province_ratio = min(100, int((province_count / 17) * 100)) if province_count else 0
+        latest_date_text = html.escape(str(latest_date))
+        return f"""
+  <aside class="edge-rail edge-left" aria-label="Network intelligence">
+    <div class="edge-card">
+      <h3>Network Pulse</h3>
+      <div class="edge-metric"><span>Latest date</span><strong>{latest_date_text}</strong></div>
+      <div class="edge-metric"><span>Stations</span><strong>{station_count:,}</strong></div>
+      <div class="edge-metric"><span>Daily records</span><strong>{record_count:,}</strong></div>
+      <div class="mini-bar"><i style="width:{record_ratio}%"></i></div>
+    </div>
+    <div class="edge-card">
+      <h3>Coverage Signal</h3>
+      <div class="edge-metric"><span>Cities / provinces</span><strong>{city_count:,} / {province_count:,}</strong></div>
+      <div class="mini-bar blue"><i style="width:{province_ratio}%"></i></div>
+      <p>National station coverage, corrected station identities, and daily API records.</p>
+    </div>
+  </aside>
+  <aside class="edge-rail edge-right" aria-label="Risk intelligence">
+    <div class="edge-card">
+      <h3>Risk Focus</h3>
+      <div class="edge-metric"><span>Alert stations</span><strong>{alert_station_count:,}</strong></div>
+      <div class="edge-metric"><span>Attention rows</span><strong>{warning_count:,}</strong></div>
+      <div class="edge-metric"><span>Critical rows</span><strong>{critical_count:,}</strong></div>
+      <div class="mini-bar red"><i style="width:{alert_ratio}%"></i></div>
+    </div>
+    <div class="edge-card">
+      <h3>Decision Layers</h3>
+      <ul>
+        <li>WQ status maps</li>
+        <li>Cyanobacteria alerts</li>
+        <li>Hydrometeorological pressure</li>
+        <li>Historical MK / Sen trends</li>
+      </ul>
+    </div>
+  </aside>"""
+
     def _page_html(self, html_text, page_class):
         page_html = re.sub(r'<body class="[^"]*">', f'<body class="{page_class}">', html_text, count=1)
+        english_page, korean_page = self._page_language_links(page_class)
+        page_html = page_html.replace('__EN_PAGE__', english_page).replace('__KO_PAGE__', korean_page)
         if page_class != 'page-home':
             page_title = {
                 'page-trends': 'Historical Trends',
@@ -6676,7 +6866,7 @@ class DashboardGenerator:
             )
         return page_html
 
-    def _koreanize_html(self, page_html):
+    def _koreanize_html(self, page_html, english_page='index.html', korean_page='ko.html'):
         replacements = {
             'Water Quality Dashboard': '수질 대시보드',
             'Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.': '대한민국 수질 관측소의 일별 모니터링, 위치, 요약 지표, 지도 및 다운로드 자료를 제공합니다.',
@@ -6743,9 +6933,13 @@ class DashboardGenerator:
             korean_html = korean_html.replace(source, target)
         for english, korean in self._korean_page_variants().items():
             korean_html = korean_html.replace(f'href="{english}"', f'href="{korean}"')
+        korean_html = korean_html.replace('href="__EN_PAGE__"', f'href="{english_page}"').replace('href="__KO_PAGE__"', f'href="{korean_page}"')
         korean_html = korean_html.replace('<html lang="en">', '<html lang="ko">')
-        korean_html = korean_html.replace('<a class="active" href="ko.html">한국어</a>', '<a class="active" href="ko.html">한국어</a>')
-        korean_html = re.sub(r'<a class="active" href="[^"]*">English</a>\s*<a href="[^"]*">한국어</a>', '<a href="index.html">English</a><a class="active" href="ko.html">한국어</a>', korean_html)
+        korean_html = re.sub(
+            r'<a class="active lang-en" href="[^"]*">English</a>\s*<a class="lang-ko" href="[^"]*">한국어</a>',
+            f'<a class="lang-en" href="{english_page}">English</a><a class="active lang-ko" href="{korean_page}">한국어</a>',
+            korean_html,
+        )
         return korean_html
 
     def _write_local_dashboard_pages(self, html_text):
@@ -6758,7 +6952,7 @@ class DashboardGenerator:
                     (directory / filename).write_text(page_html, encoding='utf-8')
                     korean_filename = self._korean_page_variants().get(filename)
                     if korean_filename:
-                        (directory / korean_filename).write_text(self._koreanize_html(page_html), encoding='utf-8')
+                        (directory / korean_filename).write_text(self._koreanize_html(page_html, filename, korean_filename), encoding='utf-8')
         except Exception as exc:
             self.logger.warning(f"Could not write separate local dashboard pages: {exc}")
 
@@ -7988,7 +8182,7 @@ class DashboardGenerator:
             (bundle_dir / filename).write_text(page_html, encoding='utf-8')
             korean_filename = self._korean_page_variants().get(filename)
             if korean_filename:
-                (bundle_dir / korean_filename).write_text(self._koreanize_html(page_html), encoding='utf-8')
+                (bundle_dir / korean_filename).write_text(self._koreanize_html(page_html, filename, korean_filename), encoding='utf-8')
         (bundle_dir / ".nojekyll").write_text("", encoding='utf-8')
         return output_path
 
