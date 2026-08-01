@@ -2705,23 +2705,67 @@ class PlotGenerator:
             ax.legend(ncol=3, fontsize=9, frameon=True, framealpha=0.92, edgecolor='#d5e4f5')
             self._save_figure(fig, self._plots_dir() / 'weather_temperature_range.png', rect=[0, 0, 1, 0.89])
 
-            fig, axes = self._new_figure(1, 3, figsize=(16.5, 5.8))
-            metrics = [
-                ('precipitation_mm', 'Latest rainfall (mm)', '#0758bd'),
-                ('wind_speed_max_kmh', 'Max wind (km/h)', '#d73345'),
-                ('et0_mm', 'Reference ET0 (mm)', '#f08a5d'),
-            ]
-            for ax, (column, title, color) in zip(axes, metrics):
-                ordered = latest.sort_values(column)
-                bars = ax.barh(ordered['basin'], ordered[column], color=color, edgecolor='white', linewidth=1.2)
-                for bar, value in zip(bars, ordered[column]):
-                    if pd.notna(value):
-                        ax.text(float(value) + max(float(ordered[column].max()) * 0.02, 0.1), bar.get_y() + bar.get_height() / 2, f'{float(value):.1f}', va='center', fontsize=10, color=self.INK)
-                self._style_axis(ax, grid_axis='x')
-                ax.set_title(title, fontweight='bold', color=self.INK)
-                ax.set_ylabel('')
-            fig.suptitle('Latest Hydrometeorological Basin Indicators', fontweight='bold', fontsize=20, color=self.INK)
-            self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.91])
+            recent_summary = (
+                recent.groupby('basin', as_index=False)
+                .agg(
+                    rain_14d=('precipitation_mm', 'sum'),
+                    tmax=('temperature_max_c', 'max'),
+                    humidity=('relative_humidity_mean_pct', 'mean'),
+                    wind=('wind_speed_max_kmh', 'max'),
+                    et0=('et0_mm', 'mean'),
+                )
+                .fillna(0)
+            )
+            if not recent_summary.empty:
+                recent_summary['risk_index'] = (
+                    np.clip(recent_summary['rain_14d'] / 50.0, 0, 1) * 0.30
+                    + np.clip((recent_summary['tmax'] - 28.0) / 8.0, 0, 1) * 0.25
+                    + np.clip(recent_summary['humidity'] / 100.0, 0, 1) * 0.15
+                    + np.clip(recent_summary['wind'] / 25.0, 0, 1) * 0.15
+                    + np.clip(recent_summary['et0'] / 8.0, 0, 1) * 0.15
+                )
+                recent_summary = recent_summary.sort_values('risk_index', ascending=False)
+                metric_columns = ['rain_14d', 'tmax', 'humidity', 'wind', 'et0', 'risk_index']
+                metric_labels = ['14-day rain\nmm', 'Max temp\ndeg C', 'Humidity\n%', 'Max wind\nkm/h', 'ET0\nmm', 'Composite\nrisk']
+                threshold_scale = pd.DataFrame({
+                    'rain_14d': np.clip(recent_summary['rain_14d'] / 50.0, 0, 1),
+                    'tmax': np.clip((recent_summary['tmax'] - 28.0) / 8.0, 0, 1),
+                    'humidity': np.clip(recent_summary['humidity'] / 100.0, 0, 1),
+                    'wind': np.clip(recent_summary['wind'] / 25.0, 0, 1),
+                    'et0': np.clip(recent_summary['et0'] / 8.0, 0, 1),
+                    'risk_index': recent_summary['risk_index'].clip(0, 1),
+                })
+                fig, ax = self._new_figure(figsize=(14.8, 7.2))
+                image = ax.imshow(threshold_scale[metric_columns].to_numpy(), cmap='coolwarm', vmin=0, vmax=1, aspect='auto')
+                ax.set_xticks(np.arange(len(metric_labels)))
+                ax.set_xticklabels(metric_labels, fontsize=12, fontweight='bold')
+                ax.set_yticks(np.arange(len(recent_summary)))
+                ax.set_yticklabels(recent_summary['basin'].astype(str), fontsize=12)
+                ax.tick_params(axis='both', length=0)
+                ax.set_facecolor('#f7fafc')
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+                for row_index, (_, row) in enumerate(recent_summary.iterrows()):
+                    values = [
+                        f"{row['rain_14d']:.1f}",
+                        f"{row['tmax']:.1f}",
+                        f"{row['humidity']:.0f}",
+                        f"{row['wind']:.1f}",
+                        f"{row['et0']:.1f}",
+                        f"{row['risk_index']:.2f}",
+                    ]
+                    for col_index, text in enumerate(values):
+                        color = '#ffffff' if threshold_scale.iloc[row_index, col_index] > 0.58 else self.INK
+                        ax.text(col_index, row_index, text, ha='center', va='center', fontsize=11, fontweight='bold', color=color)
+                ax.set_xticks(np.arange(-.5, len(metric_labels), 1), minor=True)
+                ax.set_yticks(np.arange(-.5, len(recent_summary), 1), minor=True)
+                ax.grid(which='minor', color='white', linestyle='-', linewidth=2)
+                ax.tick_params(which='minor', bottom=False, left=False)
+                cbar = fig.colorbar(image, ax=ax, fraction=0.032, pad=0.02)
+                cbar.set_label('Threshold-normalized pressure (0-1)', fontsize=11)
+                fig.suptitle('Basin Hydrometeorological Risk Matrix', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+                fig.text(0.12, 0.925, 'Fourteen-day rainfall, heat, humidity, wind, ET0, and composite pressure for water-quality interpretation', fontsize=12, color='#53677f')
+                self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.90])
             self._write_weather_interactive_plots(df, latest)
         except Exception as exc:
             self.logger.error(f"Error in weather hydrometeorology plots: {exc}")
@@ -6423,6 +6467,58 @@ class DashboardGenerator:
       }}
       .edge-rail {{ display: none !important; }}
     }}
+
+    /* K-WaterGuard correction layer v15: academic color field and calmer sticky navigation. */
+    body {{
+      background:
+        linear-gradient(90deg, rgba(232,240,247,.98) 0 290px, transparent 290px calc(100% - 290px), rgba(238,242,247,.98) calc(100% - 290px) 100%),
+        radial-gradient(circle at 18% 10%, rgba(37,99,151,.10), transparent 26%),
+        radial-gradient(circle at 82% 12%, rgba(80,110,138,.12), transparent 30%),
+        linear-gradient(135deg, #f3f7fb 0%, #ffffff 46%, #f6f8fa 100%) !important;
+    }}
+    body .nav-tabs {{
+      top: 10px !important;
+      padding: 8px !important;
+      border-radius: 16px !important;
+      border: 1px solid rgba(191,205,222,.92) !important;
+      background: rgba(255,255,255,.84) !important;
+      box-shadow: 0 12px 30px rgba(32,54,78,.10) !important;
+      backdrop-filter: blur(18px) saturate(1.15) !important;
+    }}
+    body .nav-tabs a {{
+      min-height: 36px !important;
+      padding: 8px 10px !important;
+      border-radius: 11px !important;
+      background: rgba(241,247,253,.88) !important;
+      color: #17324f !important;
+      font-size: 14px !important;
+      box-shadow: none !important;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"],
+    body.page-contact .nav-tabs a[href="contact.html"],
+    body.page-data .nav-tabs a[href="data.html"] {{
+      background: linear-gradient(135deg, #174a7c, #2e6f9e) !important;
+      color: #ffffff !important;
+    }}
+    .edge-card h3::after {{
+      background: linear-gradient(90deg, #174a7c, #6f879d) !important;
+    }}
+    .edge-spark i,
+    .mini-bar i {{
+      background: linear-gradient(90deg, #174a7c, #4e87b5) !important;
+    }}
+    .mini-bar.red i,
+    .edge-spark.red i {{
+      background: linear-gradient(90deg, #8b9aaa, #c45b62) !important;
+    }}
+    .button,
+    .chat-launch {{
+      background: linear-gradient(135deg, #174a7c, #2e6f9e) !important;
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -7123,15 +7219,204 @@ class DashboardGenerator:
             'Telephone': '전화',
             'Location': '위치',
             'Search station, city, province, or parameter values': '관측소, 도시, 도, 변수 또는 값을 검색',
+            'K-WaterGuard AI is an autonomous water-quality intelligence dashboard for South Korea. It combines Korean monitoring data, historical station records, spatial maps, alert screening rules, trend analysis, and researcher-ready downloads into one decision-support system.': 'K-WaterGuard AI는 대한민국 수질 관측자료를 자동으로 통합하는 지능형 의사결정 지원 대시보드입니다. 국내 모니터링 자료, 과거 관측소 기록, 공간 지도, 경보 기준, 추세 분석, 연구용 다운로드 자료를 하나의 시스템으로 제공합니다.',
+            'The agent supports farmers, watershed managers, lake and reservoir operators, researchers, extension officers, policy experts, and environmental agencies by turning raw water-quality records into practical signals for irrigation safety, nutrient pressure, algal-bloom risk, pollution screening, and long-term watershed planning.': '본 에이전트는 농업인, 유역 관리자, 호소 및 저수지 운영자, 연구자, 지도 공무원, 정책 전문가, 환경기관이 원자료를 관개 안전성, 영양염 압력, 조류 발생 위험, 오염 선별, 장기 유역 관리 신호로 해석할 수 있도록 지원합니다.',
+            'Farmers can review water-quality status before irrigation planning and understand nutrient or algal risk around nearby watersheds.': '농업인은 관개 계획 전 수질 상태와 인근 유역의 영양염 및 조류 위험을 확인할 수 있습니다.',
+            "Researchers can download historical station datasets and inspect Mann-Kendall and Sen's slope trend outputs.": '연구자는 과거 관측소 자료를 다운로드하고 Mann-Kendall 및 Sen 기울기 추세 결과를 검토할 수 있습니다.',
+            'Water managers can track alerts, spatial hotspots, watershed status, and station coverage with consistent Korean units and standards.': '물관리자는 국내 단위와 기준에 맞춰 경보, 공간 핫스팟, 유역 상태, 관측소 범위를 추적할 수 있습니다.',
+            'This dashboard is created for the Regional Water Environment System Lab, Department of Agricultural Engineering, Gyeongsang National University.': '본 대시보드는 경상국립대학교 농업공학과 지역물환경시스템 연구실을 위해 개발되었습니다.',
+            'The lab works on water resource conservation, watershed management, agricultural water quality, AI, big-data analytics, remote sensing, and hydrological modeling for sustainable agriculture and evidence-based water policy.': '연구실은 지속가능한 농업과 근거 기반 물 정책을 위해 수자원 보전, 유역 관리, 농업용수 수질, AI, 빅데이터 분석, 원격탐사, 수문모델링을 연구합니다.',
+            'K-WaterGuard AI project page': 'K-WaterGuard AI 프로젝트 페이지',
+            'Open Trend Page': '추세 페이지 열기',
+            'Open Algal Bloom Page': '조류 발생 페이지 열기',
+            'Open Weather Page': '기상 위험 페이지 열기',
+            'Open WQ Status': '수질 현황 열기',
+            'Contact Lab': '연구실 문의',
+            'Open Data Page': '자료 페이지 열기',
+            'Farm Decisions': '농업 의사결정',
+            'Research Trends': '연구 추세',
+            'Watershed Alerts': '유역 경보',
+            'Spatial Evidence': '공간 근거',
+            'Hydrometeorology': '수문기상',
+            'Review water-quality status, nutrient pressure, and algal risk signals before irrigation and agricultural water planning.': '관개 및 농업용수 계획 전 수질 상태, 영양염 압력, 조류 위험 신호를 검토합니다.',
+            "Use Mann-Kendall, Sen's slope, annual plots, and downloadable station datasets for long-term water-quality analysis.": '장기 수질 분석을 위해 Mann-Kendall, Sen 기울기, 연간 그래프, 관측소별 다운로드 자료를 활용합니다.',
+            'Screen Korean water-quality standards, latest monitoring alerts, province coverage, and watershed-level algal bloom status.': '국내 수질 기준, 최신 모니터링 경보, 도별 관측 범위, 유역별 조류 발생 현황을 선별합니다.',
+            'Inspect one-point-per-station spatial maps with corrected station identity and coolwarm parameter visualization.': '보정된 관측소 식별정보와 coolwarm 변수 시각화를 활용해 관측소별 공간 지도를 검토합니다.',
+            'Track rainfall, temperature, wind, humidity, and evapotranspiration signals that influence runoff and bloom pressure.': '유출 및 조류 압력에 영향을 주는 강우, 온도, 바람, 습도, 증발산 신호를 추적합니다.',
+            'Latest Date': '최신 날짜',
+            'Last Update': '최근 업데이트',
+            'Stations': '관측소',
+            'Records': '기록',
+            'Cities / Provinces': '도시 / 시도',
+            'Alert Stations': '경보 관측소',
+            'Critical': '위험',
+            'Attention': '주의',
+            'Standard Parameter': '기준 변수',
+            'Dashboard Rule': '대시보드 기준',
+            'Average': '평균',
+            'Filter alerts': '경보 필터',
+            'Network Pulse': '관측망 현황',
+            'Coverage Signal': '관측 범위 신호',
+            'Station Density': '관측소 밀도',
+            'Research Uses': '연구 활용',
+            'Risk Focus': '위험 중점',
+            'Decision Balance': '의사결정 균형',
+            'Decision Layers': '판단 계층',
+            'Latest date': '최신 날짜',
+            'Daily records': '일별 기록',
+            'Cities / provinces': '도시 / 시도',
+            'National station coverage, corrected station identities, and daily API records.': '전국 관측소 범위, 보정된 관측소 식별정보, 일별 API 기록입니다.',
+            'Network': '관측망',
+            'Coverage': '범위',
+            'Daily cycle': '일별 갱신',
+            'Station QA': '관측소 품질관리',
+            'Irrigation suitability checks': '관개 적합성 검토',
+            'Watershed status screening': '유역 상태 선별',
+            'Historical trend evidence': '과거 추세 근거',
+            'Download-ready station data': '다운로드 가능한 관측소 자료',
+            'Attention rows': '주의 행',
+            'Critical rows': '위험 행',
+            'Watch': '감시',
+            'Normal': '정상',
+            'Use alerts with maps, cyanobacteria status, weather pressure, and trend direction before field decisions.': '현장 의사결정 전 경보, 지도, 남조류 상태, 기상 압력, 추세 방향을 함께 검토합니다.',
+            'WQ status maps': '수질 현황 지도',
+            'Cyanobacteria alerts': '남조류 경보',
+            'Hydrometeorological pressure': '수문기상 압력',
+            'Historical MK / Sen trends': '과거 MK / Sen 추세',
+            'Open the assistant to ask visitors': '방문자 질문을 위해 AI 도우미를 엽니다',
+            "Open the assistant to ask visitors' questions about dates, stations, alerts, maps, downloads, or Korean standards.": '날짜, 관측소, 경보, 지도, 다운로드, 국내 기준에 대한 방문자 질문을 AI 도우미에게 물어볼 수 있습니다.',
+            'Visitor help': '방문자 도움',
+            'Page-aware': '페이지 인식',
+            'Static fallback': '정적 응답',
+            'Basin Hydrometeorological Risk Matrix': '유역 수문기상 위험 매트릭스',
+            'OpenStreetMap Hydrometeorological Basin Explorer': 'OpenStreetMap 유역 수문기상 탐색기',
+            'Fourteen-Day Rainfall Risk Ranking With Thresholds': '14일 강우 위험 순위 및 기준선',
+            'Temperature Envelope And Heat-Stress Screen': '온도 범위 및 열 스트레스 선별',
+            'Rainfall Watch': '강우 감시',
+            'Runoff Pressure': '유출 압력',
+            'Heat Stress': '열 스트레스',
+            'This scientific weather page uses basin-scale daily meteorological data to support water-quality interpretation. Rainfall, temperature, humidity, wind, and reference evapotranspiration are screened as drivers of runoff, dilution, irrigation pressure, and algal-bloom development.': '이 과학적 기상 페이지는 유역 단위 일별 기상자료를 활용하여 수질 해석을 지원합니다. 강우, 온도, 습도, 바람, 기준 증발산량을 유출, 희석, 관개 압력, 조류 발생의 구동 인자로 선별합니다.',
+            'Basin': '유역',
+            'Rainfall': '강우',
+            'Temperature': '온도',
+            'Humidity': '습도',
+            'Wind': '바람',
+            'Signal': '신호',
+            'Rain Total': '강우 합계',
+            'Max Temperature': '최고 온도',
+            'Mean Humidity': '평균 습도',
+            'Status': '상태',
+            'Korean Caution': '국내 관심',
+            'Korean Warning': '국내 경계',
+            'Bloom Outbreak': '조류 대발생',
+            'Korean algae alerts use harmful cyanobacteria cell counts in cells/mL. This page keeps a persistent national history from the NIER algae-warning feed for all available Korean watersheds and keeps Namgang Dam / Jinyang Lake as a separate local focus area.': '국내 조류 경보는 유해 남조류 세포수를 cells/mL 단위로 사용합니다. 이 페이지는 사용 가능한 한국 유역 전체에 대해 NIER 조류 경보 자료의 국가 이력을 유지하고, 남강댐 / 진양호는 별도 중점 영역으로 관리합니다.',
+            'National watershed status is based on harmful cyanobacteria cell-count observations where available. Daily runs append new NIER records to the local historical archive so previous watersheds remain visible when the live feed changes.': '국가 유역 상태는 가능한 경우 유해 남조류 세포수 관측값을 기반으로 합니다. 일별 실행 시 새로운 NIER 기록을 로컬 과거 아카이브에 추가하여 실시간 자료가 변해도 이전 유역이 계속 표시됩니다.',
+            'National Current / Historical Alerts': '전국 현재 / 과거 경보',
+            'All-Watershed Status': '전체 유역 상태',
+            'Namgang Historical Alerts': '남강 과거 경보',
+            'Namgang Lake Status': '남강 호소 상태',
+            'Scenario And HSPF Support Data': '시나리오 및 HSPF 지원 자료',
+            'Watershed / Basin': '유역 / 권역',
+            'Max Cyanobacteria': '최대 남조류',
+            'Download national NIER cyanobacteria feed': '전국 NIER 남조류 자료 다운로드',
+            'Download local station cyanobacteria archive': '로컬 관측소 남조류 아카이브 다운로드',
+            'Download local lakewide archive': '로컬 호소 아카이브 다운로드',
+            'Cleaning Before And After': '정제 전후',
+            "Mann-Kendall And Sen's Slope": 'Mann-Kendall 및 Sen 기울기',
+            'Step': '단계',
+            'Rows': '행',
+            'Notes': '비고',
+            'Variable': '변수',
+            'Years': '연도',
+            'Trend': '추세',
+            'Sen slope / year': 'Sen 기울기 / 년',
+            'Use the search box above to filter by station code, station name, province, watershed, or variable. The full CSV links above provide every historical record.': '위 검색창을 사용하여 관측소 코드, 관측소명, 시도, 유역 또는 변수별로 필터링할 수 있습니다. 위 CSV 링크는 모든 과거 기록을 제공합니다.',
+            'Station Code': '관측소 코드',
+            'Station': '관측소',
+            'Province': '시도',
+            'Watershed': '유역',
+            'Variables Available': '사용 가능 변수',
+            'Location': '위치',
+            'Parameter': '변수',
+            'Value': '값',
+            'Standard': '기준',
+            'Basis': '근거',
+            'Time': '시간',
+            'Generated': '생성됨',
+            'The dashboard is rebuilt on the daily agent cycle.': '대시보드는 일별 에이전트 주기에 따라 재생성됩니다.',
+            'Ask AI': 'AI에게 질문',
+            'K-Water Guard AI Chat': 'K-Water Guard AI 채팅',
+            'Ask about latest water quality data': '최신 수질 자료에 대해 질문하세요',
+            'Hello. I am connected to the K-Water Guard AI chatbot backend. Ask me about alerts, stations, maps, or water quality parameters.': '안녕하세요. K-Water Guard AI 챗봇 백엔드에 연결되어 있습니다. 경보, 관측소, 지도 또는 수질 변수에 대해 질문하세요.',
+            'Hello. I am running in free dashboard mode. Ask me about latest date, stations, records, alerts, parameters, or maps.': '안녕하세요. 현재 무료 대시보드 모드로 실행 중입니다. 최신 날짜, 관측소, 기록, 경보, 변수 또는 지도에 대해 질문하세요.',
+            'Close': '닫기',
+            'Latest status': '최신 현황',
+            'Alerts': '경보',
+            'Maps': '지도',
+            'Downloads': '다운로드',
+            'Send': '전송',
+            'Ask about alerts, maps, stations...': '경보, 지도, 관측소에 대해 질문...',
+            'Open full interactive view': '전체 대화형 보기 열기',
+            'Image file not found. Check the matching file in the plots folder.': '이미지 파일을 찾을 수 없습니다. plots 폴더의 해당 파일을 확인하세요.',
+            'Click Open full interactive view for pan, zoom, hover, and point details.': '전체 대화형 보기 열기를 눌러 이동, 확대/축소, 마우스오버 및 지점 상세정보를 확인할 수 있습니다.',
+            'Clickable Basin Rainfall And Runoff-Pressure Signal': '대화형 유역 강우 및 유출 압력 신호',
+            'Clickable Basin Rainfall': '대화형 유역 강우',
+            'Runoff-Pressure Signal': '유출 압력 신호',
+            'Heat stress': '열 스트레스',
+            'deg C': '°C',
+            'Current page:': '현재 페이지:',
+            'Latest dashboard date:': '최신 대시보드 날짜:',
+            'Last update:': '최근 업데이트:',
+            'not available': '사용 불가',
+            'The latest dashboard has': '최신 대시보드에는',
+            'records for': '개의 기록과',
+            'stations.': '개의 관측소가 있습니다.',
+            'For exports, use the': '자료 내보내기는',
+            'You can ask about latest date, stations, alerts, parameter averages, algal bloom/cyanobacteria status, hydrometeorological risk, Korean thresholds, maps, charts, and downloads. If no backend is connected, I answer from the current static dashboard page.': '최신 날짜, 관측소, 경보, 변수 평균, 조류/남조류 상태, 수문기상 위험, 국내 기준, 지도, 차트, 다운로드에 대해 질문할 수 있습니다. 백엔드가 연결되지 않은 경우 현재 정적 대시보드 페이지의 정보로 답변합니다.',
+            'I am answering from': '현재 페이지 기준으로 답변합니다:',
+            'Ask about alerts, stations, parameters, algal bloom, weather risk, downloads, charts, or maps for more detail.': '자세한 내용은 경보, 관측소, 변수, 조류 발생, 기상 위험, 다운로드, 차트 또는 지도에 대해 질문하세요.',
+            'Open the Hydrometeorological Risk page to review rainfall/runoff pressure, heat stress, basin weather maps, and fourteen-day summaries.': '강우/유출 압력, 열 스트레스, 유역 기상 지도, 14일 요약을 보려면 수문기상 위험 페이지를 여세요.',
+            'Available charts/maps on': '현재 페이지의 차트/지도:',
+            'for pan, zoom, hover, and point details.': '이동, 확대/축소, 마우스오버 및 지점 상세정보를 확인할 수 있습니다.',
         }
         korean_html = page_html
-        for source, target in replacements.items():
+        for source, target in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
             korean_html = korean_html.replace(source, target)
         cleanup_replacements = {
             'Historical 자료 다운로드': '과거 자료 다운로드',
             '조류 발생 현황 In Korean Watersheds And Lakes': '한국 유역 및 호소 조류 발생 현황',
             '수문기상 위험 Outlook': '수문기상 위험 전망',
             'WQ 현황 Alerts': '수질 현황 경보',
+            '<th>Date</th>': '<th>날짜</th>',
+            '<th>Run 시간</th>': '<th>실행 시간</th>',
+            '<th>File</th>': '<th>파일</th>',
+            '<th>Unit</th>': '<th>단위</th>',
+            '>Warning<': '>경계<',
+            '>Caution<': '>관심<',
+            '>Normal<': '>정상<',
+            'NIER mobile algae-warning recent measurement: harmful cyanobacteria cell count': 'NIER 조류 경보 최근 관측: 유해 남조류 세포수',
+            'Measured harmful cyanobacteria cell count from local algae monitoring support data': '로컬 조류 모니터링 지원자료의 유해 남조류 세포수 관측값',
+            'Lakewide harmful cyanobacteria cell-count summary': '호소 전체 유해 남조류 세포수 요약',
+            'Quality Summary': '수질 요약',
+            'Water Quality 신호 Board': '수질 신호 보드',
+            'Alert Hotspot Matrix': '경보 핫스팟 매트릭스',
+            '관측소 범위 Map': '관측소 범위 지도',
+            '관측소 Distributions': '관측소 분포',
+            'Daily Mean Heatmap': '일별 평균 히트맵',
+            '변수 Distributions': '변수 분포',
+            'Clickable Historical Annual 추세 Explorer': '대화형 과거 연간 추세 탐색기',
+            'Historical Annual Means And Sen Slope Lines': '과거 연평균 및 Sen 기울기 선',
+            "Sen&#x27;s Slope Summary By 변수": '변수별 Sen 기울기 요약',
+            'Clickable 유역 Cyanobacteria Screening': '대화형 유역 남조류 선별',
+            'Clickable National Cyanobacteria Map': '대화형 전국 남조류 지도',
+            'Clickable Annual Cyanobacteria 신호': '대화형 연간 남조류 신호',
+            '유역 Cyanobacteria Screening': '유역 남조류 선별',
+            'Cyanobacteria 유역 Spatial Map': '남조류 유역 공간 지도',
+            'Annual Cyanobacteria 신호 By 유역': '유역별 연간 남조류 신호',
+            'Image file not found on GitHub Pages. Check the matching file in the plots folder.': 'GitHub Pages에서 이미지 파일을 찾을 수 없습니다. plots 폴더의 해당 파일을 확인하세요.',
+            'Spatial map file not found on GitHub Pages. Check the matching file in the plots folder.': 'GitHub Pages에서 공간 지도 파일을 찾을 수 없습니다. plots 폴더의 해당 파일을 확인하세요.',
+            'Clickable South Korea 관측소 변수 Map': '대화형 대한민국 관측소 변수 지도',
+            'Spatial Map': '공간 지도',
             'Latest Charts And Maps': '최신 차트 및 지도',
             'Spatial Parameter Maps': '공간 변수 지도',
             'Latest Station Measurements': '최신 관측소 측정값',
@@ -8261,7 +8546,7 @@ class DashboardGenerator:
                 ('weather_basin_map_interactive.html', 'OpenStreetMap Hydrometeorological Basin Explorer'),
                 ('weather_basin_precipitation.png', 'Fourteen-Day Rainfall Risk Ranking With Thresholds'),
                 ('weather_temperature_range.png', 'Temperature Envelope And Heat-Stress Screen'),
-                ('weather_hydrometeorology_summary.png', 'Multi-Metric Hydrometeorological Indicator Panel'),
+                ('weather_hydrometeorology_summary.png', 'Basin Hydrometeorological Risk Matrix'),
             ],
             'Hydrometeorological plots will appear here after weather data are downloaded.'
         )
