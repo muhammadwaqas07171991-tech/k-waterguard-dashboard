@@ -2591,7 +2591,7 @@ class PlotGenerator:
         if not spatial.empty:
             latest = spatial.sort_values('sample_date').groupby('station_code', as_index=False).tail(1)
             traces = [{
-                'type': 'scattergeo',
+                'type': 'scattermapbox',
                 'mode': 'markers',
                 'lon': latest['longitude'].round(5).tolist(),
                 'lat': latest['latitude'].round(5).tolist(),
@@ -2618,27 +2618,14 @@ class PlotGenerator:
             }]
             layout = dict(base_layout)
             layout.update({
-                'title': {'text': 'National Cyanobacteria Monitoring Map', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
-                'margin': {'l': 28, 'r': 86, 't': 76, 'b': 34},
-                'geo': {
-                    'scope': 'asia',
-                    'projection': {'type': 'mercator', 'scale': 5.4},
+                'title': {'text': 'National Cyanobacteria Monitoring Map<br><span style="font-size:14px;color:#53677f">OpenStreetMap basemap with harmful cyanobacteria station observations</span>', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+                'margin': {'l': 16, 'r': 80, 't': 96, 'b': 16},
+                'mapbox': {
+                    'style': 'open-street-map',
                     'center': {'lon': 127.8, 'lat': 36.25},
-                    'lonaxis': {'range': [124.2, 131.9], 'showgrid': True, 'gridcolor': '#dce8f4'},
-                    'lataxis': {'range': [33.0, 39.8], 'showgrid': True, 'gridcolor': '#dce8f4'},
-                    'showland': True,
-                    'landcolor': '#f8fbff',
-                    'showocean': True,
-                    'oceancolor': '#edf5ff',
-                    'showlakes': True,
-                    'lakecolor': '#edf5ff',
-                    'showrivers': True,
-                    'rivercolor': '#b7d1ea',
-                    'showcoastlines': True,
-                    'coastlinecolor': '#7d98b5',
-                    'showcountries': True,
-                    'countrycolor': '#93a9c4',
-                    'subunitcolor': '#d8e3f1',
+                    'zoom': 6.0,
+                    'bearing': 0,
+                    'pitch': 0,
                 },
             })
             self._write_plotly_html('algal_cyanobacteria_watershed_map_interactive.html', 'Interactive National Cyanobacteria Map', traces, layout)
@@ -2779,7 +2766,7 @@ class PlotGenerator:
         self._write_plotly_html('weather_basin_rainfall_interactive.html', 'Interactive Basin Rainfall', traces, layout)
 
         traces = [{
-            'type': 'scattergeo',
+            'type': 'scattermapbox',
             'mode': 'markers+text',
             'lon': latest['longitude'].round(5).tolist(),
             'lat': latest['latitude'].round(5).tolist(),
@@ -2804,24 +2791,14 @@ class PlotGenerator:
         }]
         layout = dict(base_layout)
         layout.update({
-            'title': {'text': 'Clickable Hydrometeorological Basin Map', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
-            'margin': {'l': 28, 'r': 86, 't': 76, 'b': 34},
-            'geo': {
-                'scope': 'asia',
-                'projection': {'type': 'mercator', 'scale': 5.4},
+            'title': {'text': 'Clickable Hydrometeorological Basin Map<br><span style="font-size:14px;color:#53677f">OpenStreetMap basin focus points with rainfall, heat, and wind signals</span>', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+            'margin': {'l': 16, 'r': 84, 't': 96, 'b': 16},
+            'mapbox': {
+                'style': 'open-street-map',
                 'center': {'lon': 127.8, 'lat': 36.25},
-                'lonaxis': {'range': [124.2, 131.9], 'showgrid': True, 'gridcolor': '#dce8f4'},
-                'lataxis': {'range': [33.0, 39.8], 'showgrid': True, 'gridcolor': '#dce8f4'},
-                'showland': True,
-                'landcolor': '#f8fbff',
-                'showocean': True,
-                'oceancolor': '#edf5ff',
-                'showrivers': True,
-                'rivercolor': '#b7d1ea',
-                'showcoastlines': True,
-                'coastlinecolor': '#7d98b5',
-                'showcountries': True,
-                'countrycolor': '#93a9c4',
+                'zoom': 6.0,
+                'bearing': 0,
+                'pitch': 0,
             },
         })
         self._write_plotly_html('weather_basin_map_interactive.html', 'Interactive Basin Weather Map', traces, layout)
@@ -5997,7 +5974,7 @@ class DashboardGenerator:
       margin-top: 8px !important;
     }}
     main.wrap {{
-      width: min(1680px, calc(100% - 40px)) !important;
+      width: min(1920px, calc(100% - 28px)) !important;
       padding-top: 18px !important;
     }}
     body .nav-tabs {{
@@ -6047,10 +6024,32 @@ class DashboardGenerator:
     }}
     .toolbar {{
       display: grid !important;
-      grid-template-columns: 1fr auto auto !important;
+      grid-template-columns: 1fr auto auto auto !important;
       gap: 10px !important;
       align-items: center !important;
       margin-bottom: 10px !important;
+    }}
+    .language-switch {{
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(213,228,245,.95);
+      white-space: nowrap;
+    }}
+    .language-switch a {{
+      padding: 7px 10px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: #17324f;
+      font-weight: 800;
+      font-size: 13px;
+    }}
+    .language-switch a.active {{
+      color: #ffffff;
+      background: linear-gradient(135deg, #0758bd, #0c7ee8);
     }}
     body:not(.page-data) .toolbar .install-button,
     body:not(.page-data) .toolbar > a.button {{
@@ -6108,6 +6107,16 @@ class DashboardGenerator:
     body.page-spatial .interactive-plot iframe {{
       height: 720px !important;
     }}
+    body.page-weather .section,
+    body.page-spatial .section,
+    body.page-algal .section {{
+      width: 100% !important;
+    }}
+    body.page-weather .plot,
+    body.page-spatial .plot,
+    body.page-algal .plot {{
+      min-height: 0;
+    }}
     @media (max-width: 1180px) {{
       body .nav-tabs {{ grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }}
       .capability-grid, .objective-grid {{ grid-template-columns: 1fr 1fr !important; }}
@@ -6147,6 +6156,10 @@ class DashboardGenerator:
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
+      <div class="language-switch" aria-label="Language">
+        <a class="active" href="index.html">English</a>
+        <a href="ko.html">한국어</a>
+      </div>
       <button class="button install-button ready" id="installAppButton" type="button">Download App</button>
       <a class="button" href="{csv_link}">Open latest CSV</a>
     </div>
@@ -6619,6 +6632,17 @@ class DashboardGenerator:
             'data.html': 'page-data',
         }
 
+    def _korean_page_variants(self):
+        return {
+            'index.html': 'ko.html',
+            'trends.html': 'trends-ko.html',
+            'algal-bloom.html': 'algal-bloom-ko.html',
+            'weather.html': 'weather-ko.html',
+            'spatial.html': 'spatial-ko.html',
+            'contact.html': 'contact-ko.html',
+            'data.html': 'data-ko.html',
+        }
+
     def _page_html(self, html_text, page_class):
         page_html = re.sub(r'<body class="[^"]*">', f'<body class="{page_class}">', html_text, count=1)
         if page_class != 'page-home':
@@ -6652,14 +6676,89 @@ class DashboardGenerator:
             )
         return page_html
 
+    def _koreanize_html(self, page_html):
+        replacements = {
+            'Water Quality Dashboard': '수질 대시보드',
+            'Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.': '대한민국 수질 관측소의 일별 모니터링, 위치, 요약 지표, 지도 및 다운로드 자료를 제공합니다.',
+            'Home': '홈',
+            'Historical Trends': '과거 추세',
+            'Algal Bloom Status': '조류 발생 현황',
+            'Hydrometeorological Risk': '수문기상 위험',
+            'WQ Status': '수질 현황',
+            'Contact / Collaborate': '문의 / 협력',
+            'Data Downloads': '자료 다운로드',
+            'Download App': '앱 다운로드',
+            'Open latest CSV': '최신 CSV 열기',
+            'English': 'English',
+            '한국어': '한국어',
+            'K-WaterGuard AI Agent Overview': 'K-WaterGuard AI 에이전트 개요',
+            'Daily Water Intelligence For South Korea': '대한민국 일별 물환경 인텔리전스',
+            'Created By': '개발 기관',
+            'Water Quality Indicators': '수질 지표',
+            'Alert Summary': '경보 요약',
+            'Historical Data Downloads': '과거 자료 다운로드',
+            'Historical Data Cleaning And Trends': '과거 자료 정제 및 추세',
+            'Historical Dataset By Station And Variable': '관측소 및 변수별 과거 자료',
+            'Algal Bloom Status In Korean Watersheds And Lakes': '한국 유역 및 호소 조류 발생 현황',
+            'Section 1 - All Korean Watersheds': '1부 - 한국 전체 유역',
+            'Section 2 - Namgang Dam / Jinyang Lake Focus': '2부 - 남강댐 / 진양호 중점 분석',
+            'Hydrometeorological Risk Outlook': '수문기상 위험 전망',
+            'Latest Basin Weather Signals': '최신 유역 기상 신호',
+            'Fourteen-Day Basin Summary': '14일 유역 요약',
+            'WQ Status Alerts': '수질 현황 경보',
+            'Province Coverage': '도별 관측 범위',
+            'Latest Charts And Maps': '최신 차트 및 지도',
+            'Spatial Parameter Maps': '공간 변수 지도',
+            'Latest Station Measurements': '최신 관측소 측정값',
+            'Contact And Collaborate': '문의 및 협력',
+            'Objectives': '목표',
+            'Research Goals': '연구 목표',
+            'Collaboration Goals': '협력 목표',
+            'Regional Water Environment System Lab': '지역물환경시스템 연구실',
+            'Project Team': '프로젝트 팀',
+            'Project Name': '프로젝트명',
+            'Research Field': '연구 분야',
+            'Developed by': '개발',
+            'Idea by': '아이디어',
+            'Affiliation': '소속',
+            'Website': '웹사이트',
+            'Telephone': '전화',
+            'Location': '위치',
+            'Search station, city, province, or parameter values': '관측소, 도시, 도, 변수 또는 값을 검색',
+        }
+        korean_html = page_html
+        for source, target in replacements.items():
+            korean_html = korean_html.replace(source, target)
+        cleanup_replacements = {
+            'Historical 자료 다운로드': '과거 자료 다운로드',
+            '조류 발생 현황 In Korean Watersheds And Lakes': '한국 유역 및 호소 조류 발생 현황',
+            '수문기상 위험 Outlook': '수문기상 위험 전망',
+            'WQ 현황 Alerts': '수질 현황 경보',
+            'Latest Charts And Maps': '최신 차트 및 지도',
+            'Spatial Parameter Maps': '공간 변수 지도',
+            'Latest Station Measurements': '최신 관측소 측정값',
+            'Contact And Collaborate': '문의 및 협력',
+        }
+        for source, target in cleanup_replacements.items():
+            korean_html = korean_html.replace(source, target)
+        for english, korean in self._korean_page_variants().items():
+            korean_html = korean_html.replace(f'href="{english}"', f'href="{korean}"')
+        korean_html = korean_html.replace('<html lang="en">', '<html lang="ko">')
+        korean_html = korean_html.replace('<a class="active" href="ko.html">한국어</a>', '<a class="active" href="ko.html">한국어</a>')
+        korean_html = re.sub(r'<a class="active" href="[^"]*">English</a>\s*<a href="[^"]*">한국어</a>', '<a href="index.html">English</a><a class="active" href="ko.html">한국어</a>', korean_html)
+        return korean_html
+
     def _write_local_dashboard_pages(self, html_text):
         try:
             agent_dir = Path(__file__).resolve().parent
             repo_dir = agent_dir.parent
             for directory in [Config.DATA_DIR, agent_dir, repo_dir]:
                 for filename, page_class in self._page_variants(html_text).items():
-                    page_path = directory / filename
-                    page_path.write_text(self._page_html(html_text, page_class), encoding='utf-8')
+                    page_html = self._page_html(html_text, page_class)
+                    (directory / filename).write_text(page_html, encoding='utf-8')
+                    korean_filename = self._korean_page_variants().get(filename)
+                    if korean_filename:
+                        (directory / korean_filename).write_text(self._koreanize_html(page_html), encoding='utf-8')
         except Exception as exc:
             self.logger.warning(f"Could not write separate local dashboard pages: {exc}")
 
@@ -7698,10 +7797,10 @@ class DashboardGenerator:
             date_label,
             [
                 ('weather_basin_rainfall_interactive.html', 'Clickable Basin Rainfall And Runoff-Pressure Signal'),
-                ('weather_basin_map_interactive.html', 'Clickable Hydrometeorological Basin Map'),
-                ('weather_basin_precipitation.png', 'Recent Basin Rainfall Accumulation'),
-                ('weather_temperature_range.png', 'Daily Temperature Envelope By Basin'),
-                ('weather_hydrometeorology_summary.png', 'Hydrometeorological Summary'),
+                ('weather_basin_map_interactive.html', 'OpenStreetMap Hydrometeorological Basin Explorer'),
+                ('weather_basin_precipitation.png', 'Fourteen-Day Rainfall Risk Ranking With Thresholds'),
+                ('weather_temperature_range.png', 'Temperature Envelope And Heat-Stress Screen'),
+                ('weather_hydrometeorology_summary.png', 'Multi-Metric Hydrometeorological Indicator Panel'),
             ],
             'Hydrometeorological plots will appear here after weather data are downloaded.'
         )
@@ -7885,7 +7984,11 @@ class DashboardGenerator:
         self._write_pwa_files(bundle_dir)
         output_path = bundle_dir / "index.html"
         for filename, page_class in self._page_variants(site_html).items():
-            (bundle_dir / filename).write_text(self._page_html(site_html, page_class), encoding='utf-8')
+            page_html = self._page_html(site_html, page_class)
+            (bundle_dir / filename).write_text(page_html, encoding='utf-8')
+            korean_filename = self._korean_page_variants().get(filename)
+            if korean_filename:
+                (bundle_dir / korean_filename).write_text(self._koreanize_html(page_html), encoding='utf-8')
         (bundle_dir / ".nojekyll").write_text("", encoding='utf-8')
         return output_path
 
@@ -7931,6 +8034,13 @@ class DashboardGenerator:
             "./spatial.html",
             "./contact.html",
             "./data.html",
+            "./ko.html",
+            "./trends-ko.html",
+            "./algal-bloom-ko.html",
+            "./weather-ko.html",
+            "./spatial-ko.html",
+            "./contact-ko.html",
+            "./data-ko.html",
             "./manifest.webmanifest",
             "./assets/logo.png",
             "./assets/icon-192.png",
