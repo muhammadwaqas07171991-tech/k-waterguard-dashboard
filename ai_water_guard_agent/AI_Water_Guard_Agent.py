@@ -2874,6 +2874,9 @@ class PlotGenerator:
         )
         if summary.empty:
             return pd.DataFrame()
+        summary['latitude'] = summary['basin'].map(lambda basin: Config.WEATHER_BASINS.get(str(basin), {}).get('latitude', np.nan))
+        summary['longitude'] = summary['basin'].map(lambda basin: Config.WEATHER_BASINS.get(str(basin), {}).get('longitude', np.nan))
+        summary['focus_area'] = summary['basin'].map(lambda basin: Config.WEATHER_BASINS.get(str(basin), {}).get('focus', str(basin)))
 
         basin_count = max(1, len(summary))
         bloom_context = load_cyanobacteria_records(self.logger)
@@ -3005,6 +3008,125 @@ class PlotGenerator:
             fig.text(0.125, 0.93, 'Scenario bars are screening sensitivities from observed daily APIs and local archives, not a replacement for official forecasts', fontsize=12, color='#53677f')
             ax.legend(loc='lower right', frameon=True, framealpha=0.92, edgecolor='#d5e4f5', fontsize=10)
             self._save_figure(fig, self._plots_dir() / 'agroclimate_scenario_sensitivity.png', rect=[0, 0, 1, 0.90])
+
+            fig, ax = self._new_figure(figsize=(12.8, 8.0))
+            status_colors = {'High': '#d73345', 'Moderate': '#f08a5d', 'Low': '#176f63'}
+            label_offsets = [(-62, 24), (16, 22), (-70, -8), (18, -18), (-70, -32), (16, 38), (-82, 44)]
+            for status, group in model.groupby('model_status'):
+                ax.scatter(
+                    group['drought_stress'],
+                    group['runoff_extreme'],
+                    s=260 + group['kwaterguard_prediction_index'] * 780,
+                    c=status_colors.get(status, '#174a7c'),
+                    alpha=0.82,
+                    edgecolor='white',
+                    linewidth=1.6,
+                    label=f'{status} model status',
+                    zorder=4,
+                )
+                for offset_index, (_, row) in enumerate(group.sort_values(['drought_stress', 'runoff_extreme']).iterrows()):
+                    offset = label_offsets[offset_index % len(label_offsets)]
+                    ax.annotate(
+                        str(row['basin']),
+                        (row['drought_stress'], row['runoff_extreme']),
+                        xytext=offset,
+                        textcoords='offset points',
+                        fontsize=10,
+                        color=self.INK,
+                        fontweight='bold',
+                        bbox={'boxstyle': 'round,pad=0.22', 'fc': 'white', 'ec': '#d5e4f5', 'alpha': 0.84},
+                        arrowprops={'arrowstyle': '-', 'color': '#8b9aaa', 'lw': 0.8, 'alpha': 0.75},
+                    )
+            ax.axvspan(0.62, 1.0, color='#d73345', alpha=0.06)
+            ax.axhspan(0.62, 1.0, color='#174a7c', alpha=0.06)
+            ax.axvline(0.34, color='#8b9aaa', linestyle='--', linewidth=1.1)
+            ax.axvline(0.62, color='#d73345', linestyle='--', linewidth=1.1)
+            ax.axhline(0.34, color='#8b9aaa', linestyle='--', linewidth=1.1)
+            ax.axhline(0.62, color='#d73345', linestyle='--', linewidth=1.1)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_xlabel('Drought stress index (dry days + ET0 + heat)')
+            ax.set_ylabel('Extreme runoff pressure index (14-day rainfall + wind)')
+            self._style_axis(ax, grid_axis='both')
+            handles = [
+                plt.Line2D([0], [0], marker='o', color='none', markerfacecolor=color, markeredgecolor='white', markersize=12, label=f'{status} model status')
+                for status, color in status_colors.items()
+                if status in set(model['model_status'].astype(str))
+            ]
+            ax.legend(handles=handles, loc='upper left', frameon=True, framealpha=0.92, edgecolor='#d5e4f5')
+            fig.suptitle('Drought Versus Extreme-Runoff Risk Space', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.105, 0.93, 'Bubble size scales with the K-WaterGuard prediction index; quadrants separate hot-dry stress from rainfall-driven runoff pressure', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_drought_runoff_risk_space.png', rect=[0, 0, 1, 0.90])
+
+            geo = model.dropna(subset=['latitude', 'longitude']).copy()
+            if not geo.empty:
+                traces = [{
+                    'type': 'scattermapbox',
+                    'mode': 'markers+text',
+                    'lon': geo['longitude'].round(5).tolist(),
+                    'lat': geo['latitude'].round(5).tolist(),
+                    'text': geo['basin'].astype(str).tolist(),
+                    'textposition': 'top center',
+                    'customdata': geo[[
+                        'basin',
+                        'focus_area',
+                        'model_status',
+                        'kwaterguard_prediction_index',
+                        'drought_stress',
+                        'heat_stress',
+                        'runoff_extreme',
+                        'bloom_agri_pressure',
+                        'climate_shift_sensitivity',
+                        'rain_14d',
+                        'dry_days',
+                        'max_temp',
+                        'et0',
+                    ]].round(3).astype(str).values.tolist(),
+                    'hovertemplate': (
+                        '<b>%{customdata[0]}</b><br>'
+                        'Focus: %{customdata[1]}<br>'
+                        'Model status: %{customdata[2]}<br>'
+                        'Prediction index: %{customdata[3]}<br>'
+                        'Drought stress: %{customdata[4]}<br>'
+                        'Heat stress: %{customdata[5]}<br>'
+                        'Extreme runoff: %{customdata[6]}<br>'
+                        'Bloom-agri pressure: %{customdata[7]}<br>'
+                        'Climate sensitivity: %{customdata[8]}<br>'
+                        '14-day rain: %{customdata[9]} mm<br>'
+                        'Dry days: %{customdata[10]}<br>'
+                        'Max temperature: %{customdata[11]} deg C<br>'
+                        'Mean ET0: %{customdata[12]} mm<extra></extra>'
+                    ),
+                    'marker': {
+                        'size': (24 + geo['kwaterguard_prediction_index'] * 34).round(1).tolist(),
+                        'color': geo['kwaterguard_prediction_index'].round(3).tolist(),
+                        'colorscale': 'RdBu',
+                        'reversescale': True,
+                        'cmin': 0,
+                        'cmax': 1,
+                        'showscale': True,
+                        'colorbar': {'title': {'text': 'Prediction<br>index'}, 'thickness': 16},
+                        'opacity': 0.88,
+                        'line': {'color': '#ffffff', 'width': 2},
+                    },
+                }]
+                layout = {
+                    'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
+                    'paper_bgcolor': '#ffffff',
+                    'plot_bgcolor': '#f8fbff',
+                    'title': {'text': 'Clickable K-WaterGuard AgroClimate Geospatial Prediction Map', 'x': 0.02},
+                    'height': 780,
+                    'mapbox': {
+                        'style': 'open-street-map',
+                        'center': {'lat': 36.25, 'lon': 127.75},
+                        'zoom': 6.25,
+                        'pitch': 0,
+                    },
+                    'showlegend': False,
+                    'margin': {'l': 20, 'r': 20, 't': 70, 'b': 20},
+                    'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+                }
+                self._write_plotly_html('agroclimate_prediction_map_interactive.html', 'Interactive AgroClimate Prediction Map', traces, layout)
         except Exception as exc:
             self.logger.error(f"Error in agrometeorology prediction plots: {exc}")
 
@@ -7007,11 +7129,16 @@ class DashboardGenerator:
     <section class="card section page page-agro" id="agrometeorologyPage">
       <h2>Agrometeorology Prediction And Climate Impact Outlook</h2>
       <div class="grid three-col">{agro_stat_cards}</div>
-      <p class="muted">The K-WaterGuard AgroClimate Prediction Model is a hybrid screening model that combines basin-scale daily weather APIs, recent water-quality pressure, cyanobacteria context, evapotranspiration, heat-stress thresholds, and scenario sensitivity rules. It is designed for early interpretation of agricultural water stress, drought tendency, runoff/extreme-event pressure, and climate-change-related risk signals.</p>
+      <p class="muted">The K-WaterGuard AgroClimate Prediction Model is a transparent hybrid screening model that combines basin-scale daily meteorology, recent water-quality nutrient pressure, cyanobacteria context, evapotranspiration demand, heat-stress thresholds, and scenario sensitivity rules. The purpose is not to replace official agricultural or meteorological forecasts, but to convert the daily water-environment archive into an interpretable early-warning layer for irrigation reliability, drought tendency, runoff-driven contamination risk, bloom-agriculture coupling, and climate-change stress screening.</p>
       <div class="objective-grid">
-        <article class="objective-card"><span>01</span><h3>Agriculture Water Stress</h3><p>Ranks basins using dry days, ET0, heat stress, and recent meteorological pressure that can affect irrigation demand and crop water reliability.</p></article>
-        <article class="objective-card"><span>02</span><h3>Drought And Extreme Events</h3><p>Separates hot-dry sensitivity from heavy-rainfall runoff sensitivity so managers can compare drought risk and sudden extreme-event pressure.</p></article>
-        <article class="objective-card"><span>03</span><h3>Future Impact Lens</h3><p>Uses transparent +2 deg C hot-dry and extreme-rainfall stress scenarios as near-term climate-impact screening indicators, not as an official deterministic forecast.</p></article>
+        <article class="objective-card"><span>01</span><h3>Agriculture Water Stress</h3><p>The agriculture-water-stress score ranks each basin using the number of dry days in the latest 14-day window, reference evapotranspiration, maximum temperature, and crop heat-stress exposure. Higher scores indicate basins where irrigation demand may rise faster than natural rainfall replenishment, especially when warm conditions increase ET0 and reduce soil-water persistence. This layer is useful for farmers, watershed managers, and extension experts who need a basin-scale view of potential crop water stress before field-level decisions are made.</p></article>
+        <article class="objective-card"><span>02</span><h3>Drought And Extreme Events</h3><p>The model separates two different hazards that are often mixed together: hot-dry drought pressure and rainfall-runoff extreme-event pressure. Drought pressure is derived from dry-day frequency, ET0, and heat load; runoff pressure is derived from 14-day accumulated rainfall and wind-related storm intensity. Showing both dimensions allows managers to distinguish basins that need irrigation planning from basins where sudden runoff, sediment transport, nutrient flushing, or post-storm water-quality deterioration may be more important.</p></article>
+        <article class="objective-card"><span>03</span><h3>Future Impact Lens</h3><p>The future-impact lens applies two transparent sensitivity experiments: a +2 deg C hot-dry stress scenario and an extreme-rainfall amplification scenario. These are not deterministic climate forecasts; they are screening perturbations that show how the current basin condition may respond if near-term climate stress intensifies. The results help identify basins where small increases in heat, dry spells, or rainfall intensity could shift agricultural water reliability, cyanobacteria risk, and runoff-driven pollutant delivery.</p></article>
+      </div>
+      <div class="objective-grid">
+        <article class="objective-card"><span>M1</span><h3>Model Inputs</h3><p>Daily basin weather records provide rainfall, temperature, humidity, wind, and ET0. Water-quality records provide nutrient pressure through TN and TP. Cyanobacteria records provide bloom-agriculture context where cell-count data are available. All indicators are normalized to a 0-1 screening scale for transparent comparison.</p></article>
+        <article class="objective-card"><span>M2</span><h3>Academic Interpretation</h3><p>The prediction index is a weighted composite of drought stress, heat stress, runoff pressure, bloom-agriculture pressure, and climate-shift sensitivity. It should be interpreted as a relative basin-priority index for monitoring and planning, not as a calibrated probability of crop loss or an official disaster warning.</p></article>
+        <article class="objective-card"><span>M3</span><h3>Geospatial Decision Layer</h3><p>The clickable map places the model output back into watershed space. Marker size and color show the integrated prediction index, while hover details expose the individual drivers so users can see whether a basin is controlled mainly by water stress, heat, runoff, or bloom-agriculture coupling.</p></article>
       </div>
       <div class="grid plots">{agro_plot_cards}</div>
       <h3>K-WaterGuard AgroClimate Model Basin Ranking</h3>
@@ -7526,10 +7653,15 @@ class DashboardGenerator:
             'Basin Hydrometeorological Risk Matrix': '유역 수문기상 위험 매트릭스',
             'Agrometeorology Prediction And Climate Impact Outlook': '농업기상 예측 및 기후영향 전망',
             'K-WaterGuard AgroClimate Prediction Model': 'K-WaterGuard 농업기후 예측 모델',
+            'Clickable K-WaterGuard AgroClimate Geospatial Prediction Map': '클릭 가능한 K-WaterGuard 농업기후 지리공간 예측 지도',
+            'Drought Versus Extreme-Runoff Risk Space': '가뭄과 극한 유출 위험 공간',
             'Agriculture Drought And Extreme-Event Scenario Sensitivity': '농업 가뭄 및 극한사상 시나리오 민감도',
             'Agriculture Water Stress': '농업용수 스트레스',
             'Drought And Extreme Events': '가뭄 및 극한사상',
             'Future Impact Lens': '미래 영향 관점',
+            'Model Inputs': '모델 입력자료',
+            'Academic Interpretation': '학술적 해석',
+            'Geospatial Decision Layer': '지리공간 의사결정 계층',
             'K-WaterGuard AgroClimate Model Basin Ranking': 'K-WaterGuard 농업기후 모델 유역 순위',
             'Prediction Index': '예측 지수',
             'Main Driver': '주요 원인',
@@ -7539,6 +7671,13 @@ class DashboardGenerator:
             'Bloom-Agri': '조류-농업',
             'High-risk basins': '고위험 유역',
             'Top driver': '주요 구동 인자',
+            'The K-WaterGuard AgroClimate Prediction Model is a transparent hybrid screening model that combines basin-scale daily meteorology, recent water-quality nutrient pressure, cyanobacteria context, evapotranspiration demand, heat-stress thresholds, and scenario sensitivity rules. The purpose is not to replace official agricultural or meteorological forecasts, but to convert the daily water-environment archive into an interpretable early-warning layer for irrigation reliability, drought tendency, runoff-driven contamination risk, bloom-agriculture coupling, and climate-change stress screening.': 'K-WaterGuard 농업기후 예측 모델은 유역 단위 일별 기상, 최근 수질 영양염 압력, 남조류 발생 맥락, 증발산 수요, 고온 스트레스 기준, 시나리오 민감도 규칙을 결합한 투명한 하이브리드 선별 모델입니다. 이 모델의 목적은 공식 농업 또는 기상 예보를 대체하는 것이 아니라, 일별 물환경 자료를 관개 안정성, 가뭄 경향, 유출 기반 오염 위험, 조류-농업 연계, 기후변화 스트레스 선별을 위한 해석 가능한 조기경보 계층으로 전환하는 것입니다.',
+            'The agriculture-water-stress score ranks each basin using the number of dry days in the latest 14-day window, reference evapotranspiration, maximum temperature, and crop heat-stress exposure. Higher scores indicate basins where irrigation demand may rise faster than natural rainfall replenishment, especially when warm conditions increase ET0 and reduce soil-water persistence. This layer is useful for farmers, watershed managers, and extension experts who need a basin-scale view of potential crop water stress before field-level decisions are made.': '농업용수 스트레스 점수는 최근 14일 동안의 무강우일 수, 기준 증발산량, 최고기온, 작물 고온 스트레스 노출을 이용해 각 유역의 우선순위를 산정합니다. 점수가 높을수록 따뜻한 조건에서 ET0가 증가하고 토양수분 유지성이 낮아져 관개 수요가 자연 강우 보충보다 빠르게 증가할 수 있는 유역을 의미합니다. 이 계층은 현장 의사결정 전에 유역 단위의 잠재적 작물 수분 스트레스를 파악해야 하는 농업인, 유역 관리자, 지도 전문가에게 유용합니다.',
+            'The model separates two different hazards that are often mixed together: hot-dry drought pressure and rainfall-runoff extreme-event pressure. Drought pressure is derived from dry-day frequency, ET0, and heat load; runoff pressure is derived from 14-day accumulated rainfall and wind-related storm intensity. Showing both dimensions allows managers to distinguish basins that need irrigation planning from basins where sudden runoff, sediment transport, nutrient flushing, or post-storm water-quality deterioration may be more important.': '이 모델은 자주 혼동되는 두 위험, 즉 고온-건조 가뭄 압력과 강우-유출 극한사상 압력을 분리합니다. 가뭄 압력은 무강우일 빈도, ET0, 열 부하에서 계산하고, 유출 압력은 14일 누적 강우와 바람 관련 폭풍 강도에서 계산합니다. 두 차원을 함께 제시하면 관리자가 관개 계획이 필요한 유역과 갑작스러운 유출, 퇴적물 이동, 영양염 플러싱 또는 강우 후 수질 악화가 더 중요한 유역을 구분할 수 있습니다.',
+            'The future-impact lens applies two transparent sensitivity experiments: a +2 deg C hot-dry stress scenario and an extreme-rainfall amplification scenario. These are not deterministic climate forecasts; they are screening perturbations that show how the current basin condition may respond if near-term climate stress intensifies. The results help identify basins where small increases in heat, dry spells, or rainfall intensity could shift agricultural water reliability, cyanobacteria risk, and runoff-driven pollutant delivery.': '미래 영향 관점은 두 가지 투명한 민감도 실험, 즉 +2 deg C 고온-건조 스트레스 시나리오와 극한강우 증폭 시나리오를 적용합니다. 이는 결정론적 기후 예측이 아니라, 단기 기후 스트레스가 강화될 경우 현재 유역 상태가 어떻게 반응할 수 있는지 보여주는 선별 교란 실험입니다. 결과는 열, 건조 기간 또는 강우 강도의 작은 증가가 농업용수 안정성, 남조류 위험, 유출 기반 오염물질 전달을 변화시킬 수 있는 유역을 식별하는 데 도움을 줍니다.',
+            'Daily basin weather records provide rainfall, temperature, humidity, wind, and ET0. Water-quality records provide nutrient pressure through TN and TP. Cyanobacteria records provide bloom-agriculture context where cell-count data are available. All indicators are normalized to a 0-1 screening scale for transparent comparison.': '일별 유역 기상자료는 강우, 기온, 습도, 바람, ET0를 제공합니다. 수질 자료는 TN과 TP를 통해 영양염 압력을 제공합니다. 남조류 자료는 세포수 자료가 있는 경우 조류-농업 연계 맥락을 제공합니다. 모든 지표는 투명한 비교를 위해 0-1 선별 척도로 정규화됩니다.',
+            'The prediction index is a weighted composite of drought stress, heat stress, runoff pressure, bloom-agriculture pressure, and climate-shift sensitivity. It should be interpreted as a relative basin-priority index for monitoring and planning, not as a calibrated probability of crop loss or an official disaster warning.': '예측 지수는 가뭄 스트레스, 고온 스트레스, 유출 압력, 조류-농업 압력, 기후변화 민감도를 가중 결합한 복합 지수입니다. 이는 작물 피해 확률이나 공식 재난 경보가 아니라, 모니터링과 계획을 위한 상대적 유역 우선순위 지수로 해석해야 합니다.',
+            'The clickable map places the model output back into watershed space. Marker size and color show the integrated prediction index, while hover details expose the individual drivers so users can see whether a basin is controlled mainly by water stress, heat, runoff, or bloom-agriculture coupling.': '클릭 가능한 지도는 모델 결과를 다시 유역 공간에 배치합니다. 마커의 크기와 색상은 통합 예측 지수를 나타내며, 마우스오버 상세정보는 개별 구동 인자를 보여주어 사용자가 해당 유역이 주로 수분 스트레스, 고온, 유출 또는 조류-농업 연계에 의해 지배되는지 확인할 수 있게 합니다.',
             'OpenStreetMap Hydrometeorological Basin Explorer': 'OpenStreetMap 유역 수문기상 탐색기',
             'Fourteen-Day Rainfall Risk Ranking With Thresholds': '14일 강우 위험 순위 및 기준선',
             'Temperature Envelope And Heat-Stress Screen': '온도 범위 및 열 스트레스 선별',
@@ -7627,6 +7766,7 @@ class DashboardGenerator:
             'Open the Hydrometeorological Risk page to review rainfall/runoff pressure, heat stress, basin weather maps, and fourteen-day summaries.': '강우/유출 압력, 열 스트레스, 유역 기상 지도, 14일 요약을 보려면 수문기상 위험 페이지를 여세요.',
             'Open the Agrometeorology Prediction page to review agriculture water stress, drought tendency, extreme-event sensitivity, and future climate-impact screening outputs.': '농업용수 스트레스, 가뭄 경향, 극한사상 민감도, 미래 기후영향 선별 결과를 보려면 농업기상 예측 페이지를 여세요.',
             'The K-WaterGuard AgroClimate Prediction Model combines drought, heat, runoff, bloom-agriculture pressure, and climate-shift sensitivity. Visible top basin ranks:': 'K-WaterGuard 농업기후 예측 모델은 가뭄, 고온, 유출, 조류-농업 압력, 기후변화 민감도를 결합합니다. 표시된 상위 유역 순위:',
+            'Review agriculture-weather-climate risk, drought and extreme-event sensitivity, and the K-WaterGuard AgroClimate Prediction Model.': '농업-기상-기후 위험, 가뭄 및 극한사상 민감도, K-WaterGuard 농업기후 예측 모델을 검토합니다.',
             'Available charts/maps on': '현재 페이지의 차트/지도:',
             'for pan, zoom, hover, and point details.': '이동, 확대/축소, 마우스오버 및 지점 상세정보를 확인할 수 있습니다.',
         }
@@ -8875,7 +9015,9 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
+                ('agroclimate_prediction_map_interactive.html', 'Clickable K-WaterGuard AgroClimate Geospatial Prediction Map'),
                 ('agroclimate_prediction_matrix.png', 'K-WaterGuard AgroClimate Prediction Model'),
+                ('agroclimate_drought_runoff_risk_space.png', 'Drought Versus Extreme-Runoff Risk Space'),
                 ('agroclimate_scenario_sensitivity.png', 'Agriculture Drought And Extreme-Event Scenario Sensitivity'),
             ],
             'Agrometeorology prediction plots will appear here after the hybrid model is generated.'
@@ -9136,6 +9278,10 @@ class DashboardGenerator:
             "weather_hydrometeorology_summary.png",
             "weather_basin_rainfall_interactive.html",
             "weather_basin_map_interactive.html",
+            "agroclimate_prediction_map_interactive.html",
+            "agroclimate_prediction_matrix.png",
+            "agroclimate_drought_runoff_risk_space.png",
+            "agroclimate_scenario_sensitivity.png",
         ]:
             if (bundle_dir / filename).exists():
                 cache_files.append(f"./{filename}")
