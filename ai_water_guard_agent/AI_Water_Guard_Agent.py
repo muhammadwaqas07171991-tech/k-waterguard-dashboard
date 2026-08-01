@@ -2942,7 +2942,7 @@ class PlotGenerator:
             trace_index = len(traces)
             visible = trace_index == 0
             traces.append({
-                'type': 'scattergeo',
+                'type': 'scattermapbox',
                 'mode': 'markers',
                 'name': label,
                 'lon': plot_df['longitude'].round(6).tolist(),
@@ -2982,27 +2982,20 @@ class PlotGenerator:
             })
 
         min_lon, min_lat, max_lon, max_lat = bounds
+        center_lon = float((min_lon + max_lon) / 2)
+        center_lat = float((min_lat + max_lat) / 2)
         layout = {
-            'title': {'text': f'Clickable South Korea Station Map - {traces[0]["name"]} ({day_label})', 'x': 0.02, 'xanchor': 'left'},
+            'title': {'text': f'Clickable WQ Status Map - {traces[0]["name"]} ({day_label})<br><span style="font-size:14px;color:#53677f">OpenStreetMap basemap with one corrected point per monitoring station</span>', 'x': 0.02, 'xanchor': 'left'},
             'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
             'paper_bgcolor': '#ffffff',
             'plot_bgcolor': '#ffffff',
-            'margin': {'l': 20, 'r': 24, 't': 88, 'b': 18},
-            'geo': {
-                'scope': 'asia',
-                'projection': {'type': 'mercator'},
-                'showland': True,
-                'landcolor': '#f5f9fd',
-                'showocean': True,
-                'oceancolor': '#e9f3fb',
-                'showlakes': True,
-                'lakecolor': '#dcecff',
-                'showrivers': True,
-                'rivercolor': '#b9d3ea',
-                'showcountries': True,
-                'countrycolor': '#9fb2c5',
-                'lonaxis': {'range': [min_lon - 0.2, max_lon + 0.2]},
-                'lataxis': {'range': [min_lat - 0.2, max_lat + 0.2]},
+            'margin': {'l': 16, 'r': 20, 't': 96, 'b': 16},
+            'mapbox': {
+                'style': 'open-street-map',
+                'center': {'lon': center_lon, 'lat': center_lat},
+                'zoom': 6.05,
+                'bearing': 0,
+                'pitch': 0,
             },
             'updatemenus': [{
                 'buttons': buttons,
@@ -5986,6 +5979,145 @@ class DashboardGenerator:
       .interactive-plot iframe {{ height: 520px; }}
       .contact-list div {{ grid-template-columns: 1fr; gap: 4px; }}
     }}
+
+    /* K-WaterGuard correction layer v12: final app shell override. */
+    body {{
+      background: #f7fbff !important;
+      background-image:
+        radial-gradient(circle at 12% 18%, rgba(7,88,189,.10), transparent 24%),
+        radial-gradient(circle at 92% 18%, rgba(215,51,69,.09), transparent 26%),
+        linear-gradient(135deg, #f7fbff 0%, #ffffff 46%, #fff7f8 100%) !important;
+    }}
+    header {{
+      min-height: 230px !important;
+      padding: 24px 24px 26px !important;
+    }}
+    header h1 {{
+      font-size: clamp(40px, 4.5vw, 64px) !important;
+      margin-top: 8px !important;
+    }}
+    main.wrap {{
+      width: min(1680px, calc(100% - 40px)) !important;
+      padding-top: 18px !important;
+    }}
+    body .nav-tabs {{
+      display: grid !important;
+      grid-template-columns: repeat(7, minmax(130px, 1fr)) !important;
+      align-items: stretch !important;
+      justify-content: stretch !important;
+      gap: 8px !important;
+      width: 100% !important;
+      max-width: none !important;
+      min-height: 0 !important;
+      margin: 0 0 14px !important;
+      padding: 8px !important;
+      background: rgba(255,255,255,.94) !important;
+      border-radius: 14px !important;
+    }}
+    body .nav-tabs a {{
+      display: flex !important;
+      width: auto !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      min-height: 40px !important;
+      height: auto !important;
+      padding: 9px 10px !important;
+      margin: 0 !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex: initial !important;
+      text-align: center !important;
+      white-space: normal !important;
+      line-height: 1.12 !important;
+      border-radius: 10px !important;
+      background: #eef6ff !important;
+      color: #0b2b4d !important;
+      box-shadow: none !important;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"],
+    body.page-contact .nav-tabs a[href="contact.html"],
+    body.page-data .nav-tabs a[href="data.html"] {{
+      color: #ffffff !important;
+      background: linear-gradient(135deg, #0758bd, #0c7ee8) !important;
+      box-shadow: 0 10px 22px rgba(7,88,189,.22) !important;
+    }}
+    .toolbar {{
+      display: grid !important;
+      grid-template-columns: 1fr auto auto !important;
+      gap: 10px !important;
+      align-items: center !important;
+      margin-bottom: 10px !important;
+    }}
+    body:not(.page-data) .toolbar .install-button,
+    body:not(.page-data) .toolbar > a.button {{
+      display: none !important;
+    }}
+    body:not(.page-data) .toolbar {{
+      grid-template-columns: 1fr !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      padding: 0 !important;
+    }}
+    body.page-home .toolbar,
+    body.page-home .search-status {{
+      display: none !important;
+    }}
+    .section {{
+      margin-bottom: 16px !important;
+    }}
+    .home-overview {{
+      min-height: 420px !important;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr) !important;
+      gap: 14px !important;
+    }}
+    .capability-grid {{
+      grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    }}
+    .objective-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 18px;
+    }}
+    .objective-card {{
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(213,228,245,.96);
+      background: linear-gradient(145deg, #f9fcff, #ffffff);
+      box-shadow: 0 12px 30px rgba(6,25,47,.06);
+    }}
+    .objective-card span {{
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0758bd, #d73345);
+      font-weight: 900;
+      margin-bottom: 10px;
+    }}
+    .objective-card h3 {{ margin: 0 0 8px; }}
+    .objective-card p {{ margin: 0; color: #53677f; line-height: 1.45; }}
+    body.page-spatial .interactive-plot iframe {{
+      height: 720px !important;
+    }}
+    @media (max-width: 1180px) {{
+      body .nav-tabs {{ grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }}
+      .capability-grid, .objective-grid {{ grid-template-columns: 1fr 1fr !important; }}
+      .home-overview {{ grid-template-columns: 1fr !important; }}
+    }}
+    @media (max-width: 720px) {{
+      body .nav-tabs {{ grid-template-columns: 1fr !important; }}
+      .toolbar {{ grid-template-columns: 1fr !important; }}
+      .capability-grid, .objective-grid {{ grid-template-columns: 1fr !important; }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -6107,7 +6239,24 @@ class DashboardGenerator:
 
     <section class="card section page page-contact" id="contactPage">
       <h2>Contact And Collaborate</h2>
-      <p class="muted">K-Water Guard AI Agent is developed as a research and decision-support system for water-quality monitoring, environmental data automation, and smart water management. Researchers, agencies, watershed managers, farmers, and technology partners are welcome to connect with the Regional Water Environment System Lab for collaboration.</p>
+      <p class="muted">K-Water Guard AI Agent is developed for collaborative research, field deployment, and practical water-management decision support. This page explains the project objectives, collaboration goals, and contact pathway for researchers, agencies, watershed managers, farmers, and technology partners.</p>
+      <div class="objective-grid">
+        <article class="objective-card">
+          <span>01</span>
+          <h3>Objectives</h3>
+          <p>Build an automated national dashboard that converts Korean water-quality, cyanobacteria, spatial, weather, and historical records into clear daily intelligence for water managers and researchers.</p>
+        </article>
+        <article class="objective-card">
+          <span>02</span>
+          <h3>Research Goals</h3>
+          <p>Support trend detection, algal-bloom screening, irrigation-risk interpretation, watershed comparison, and reproducible environmental data products for scientific analysis.</p>
+        </article>
+        <article class="objective-card">
+          <span>03</span>
+          <h3>Collaboration Goals</h3>
+          <p>Invite partnerships for field validation, API integration, watershed modeling, farmer decision tools, remote sensing, HSPF scenario analysis, and smart water-management deployment.</p>
+        </article>
+      </div>
       <div class="contact-grid">
         <div class="contact-panel">
           <h3>Regional Water Environment System Lab</h3>
