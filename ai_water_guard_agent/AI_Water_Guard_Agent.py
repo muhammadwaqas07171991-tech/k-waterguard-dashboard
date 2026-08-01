@@ -122,12 +122,24 @@ class Config:
     CYANOBACTERIA_STATION_FILE = ALGAL_BLOOM_DATA_DIR / "cyanobacteria_station_cells_per_ml.csv"
     CYANOBACTERIA_LAKEWIDE_FILE = ALGAL_BLOOM_DATA_DIR / "harmful_cyanobacteria_lakewide_cells_per_ml.csv"
     CYANOBACTERIA_STATION_COORDS_FILE = ALGAL_BLOOM_DATA_DIR / "namgang_station_latlon.csv"
+    NATIONAL_CYANOBACTERIA_SEED_FILE = ALGAL_BLOOM_DATA_DIR / "national_cyanobacteria_history_seed.csv"
     NATIONAL_CYANOBACTERIA_FILE = DATA_DIR / "national_cyanobacteria_recent.csv"
+    NATIONAL_CYANOBACTERIA_HISTORY_FILE = DATA_DIR / "national_cyanobacteria_history.csv"
     NIER_ALGAE_PAGE = "https://water.nier.go.kr/mobile/link/?pMENU_NO=132"
     NIER_CODE_LIST_URL = "https://water.nier.go.kr/web/codeUtil/codeListAjax"
     NIER_ALGAE_POSITION_URL = "https://water.nier.go.kr/mobile/waterRecent_1/positionList"
     NIER_ALGAE_RESULT_URL = "https://water.nier.go.kr/mobile/waterRecent_1/resultList"
     ENABLE_NIER_ALGAE_DOWNLOAD = os.environ.get("ENABLE_NIER_ALGAE_DOWNLOAD", "true").lower() not in {"0", "false", "no"}
+    WEATHER_DATA_FILE = DATA_DIR / "korea_basin_weather_daily.csv"
+    WEATHER_HISTORY_FILE = DATA_DIR / "korea_basin_weather_history.csv"
+    OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+    WEATHER_BASINS = {
+        "Han River": {"latitude": 37.45, "longitude": 127.45, "focus": "Seoul-Paldang-Han watershed"},
+        "Nakdong River": {"latitude": 35.75, "longitude": 128.45, "focus": "Daegu-Nakdong watershed"},
+        "Geum River": {"latitude": 36.25, "longitude": 127.05, "focus": "Daecheong-Geum watershed"},
+        "Yeongsan / Seomjin River": {"latitude": 35.05, "longitude": 126.85, "focus": "Gwangju-Yeongsan/Seomjin watershed"},
+        "Namgang Dam": {"latitude": 35.15, "longitude": 128.02, "focus": "Jinyang Lake / Namgang Dam"},
+    }
     WATERSHED_SHAPEFILE = AGENT_DIR / "watershed_shapes" / "korea_major_subbasins" / "korea_major_subbasins.shp"
     WATERSHED_SHAPEFILE_CRS = "EPSG:4326"
     REQUIRE_DASHBOARD_SUPPORT_DATA = os.environ.get("REQUIRE_DASHBOARD_SUPPORT_DATA", "").lower() in {"1", "true", "yes"}
@@ -352,6 +364,16 @@ def load_cyanobacteria_records(logger=None):
     national_df = download_nier_recent_cyanobacteria(logger)
     if not national_df.empty:
         rows.extend(national_df.to_dict('records'))
+    for fallback_path in [Config.NATIONAL_CYANOBACTERIA_HISTORY_FILE, Config.NATIONAL_CYANOBACTERIA_SEED_FILE]:
+        if not fallback_path.exists():
+            continue
+        try:
+            fallback_df = pd.read_csv(fallback_path, parse_dates=['sample_date'])
+            if not fallback_df.empty:
+                rows.extend(fallback_df.to_dict('records'))
+        except Exception as exc:
+            if logger:
+                logger.warning(f"National cyanobacteria history could not be loaded from {fallback_path}: {exc}")
 
     if not Config.CYANOBACTERIA_STATION_FILE.exists():
         if logger:
@@ -361,7 +383,13 @@ def load_cyanobacteria_records(logger=None):
             return df
         df['sample_date'] = pd.to_datetime(df['sample_date'], errors='coerce')
         df['cyanobacteria_cells_ml'] = pd.to_numeric(df['cyanobacteria_cells_ml'], errors='coerce')
-        return df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).sort_values('sample_date')
+        if 'source_scope' not in df.columns:
+            df['source_scope'] = 'national'
+        return (
+            df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml'])
+            .drop_duplicates(['sample_date', 'station_code', 'cyanobacteria_cells_ml', 'source_scope'])
+            .sort_values('sample_date')
+        )
 
     coord_lookup = {
         'Naedong': {'longitude': 128.020003, 'latitude': 35.149339},
@@ -408,6 +436,7 @@ def load_cyanobacteria_records(logger=None):
                     'longitude': coords.get('longitude'),
                     'basis': 'Measured harmful cyanobacteria cell count from local algae monitoring support data',
                     'source': Config.CYANOBACTERIA_STATION_FILE.name,
+                    'source_scope': 'namgang',
                 })
     except Exception as exc:
         if logger:
@@ -441,6 +470,7 @@ def load_cyanobacteria_records(logger=None):
                         'longitude': float(mean_lon) if pd.notna(mean_lon) else np.nan,
                         'basis': 'Lakewide harmful cyanobacteria cell-count summary',
                         'source': Config.CYANOBACTERIA_LAKEWIDE_FILE.name,
+                        'source_scope': 'namgang',
                     })
         except Exception as exc:
             if logger:
@@ -451,7 +481,17 @@ def load_cyanobacteria_records(logger=None):
         return df
     df['sample_date'] = pd.to_datetime(df['sample_date'], errors='coerce')
     df['cyanobacteria_cells_ml'] = pd.to_numeric(df['cyanobacteria_cells_ml'], errors='coerce')
-    return df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).sort_values('sample_date')
+    for column in ['source_scope', 'source']:
+        if column not in df.columns:
+            df[column] = ''
+    national_mask = df['source'].fillna('').astype(str).str.contains('water.nier.go.kr|NIER', case=False, regex=True)
+    df.loc[national_mask & df['source_scope'].fillna('').eq(''), 'source_scope'] = 'national'
+    df.loc[df['source_scope'].fillna('').eq(''), 'source_scope'] = 'namgang'
+    return (
+        df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml'])
+        .drop_duplicates(['sample_date', 'station_code', 'cyanobacteria_cells_ml', 'source_scope'])
+        .sort_values('sample_date')
+    )
 
 
 def _to_number(value):
@@ -514,6 +554,28 @@ def _cyanobacteria_threshold_status(cells):
     if cells >= Config.ALGAL_BLOOM_RULES['cyanobacteria_cells_ml']['caution']:
         return 'Caution'
     return 'Normal'
+
+
+def _append_history_csv(df, path, subset):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    history = df.copy()
+    if path.exists():
+        try:
+            existing = pd.read_csv(path)
+            history = pd.concat([existing, history], ignore_index=True)
+        except Exception:
+            pass
+    for column in subset:
+        if column not in history.columns:
+            history[column] = ''
+    sort_columns = [column for column in ['sample_date', 'date', 'river_basin', 'basin', 'middle_watershed'] if column in history.columns]
+    history = history.drop_duplicates(subset=subset)
+    if sort_columns:
+        history = history.sort_values(sort_columns)
+    history.to_csv(path, index=False, encoding='utf-8-sig')
+    return history
 
 
 def download_nier_recent_cyanobacteria(logger=None):
@@ -607,6 +669,7 @@ def download_nier_recent_cyanobacteria(logger=None):
                             'longitude': meta['longitude'],
                             'basis': 'NIER mobile algae-warning recent measurement: harmful cyanobacteria cell count',
                             'source': 'water.nier.go.kr mobile waterRecent_1',
+                            'source_scope': 'national',
                             'source_url': Config.NIER_ALGAE_PAGE,
                             'site_group_code': str(group_code),
                             'site_group_name_english': str(group_eng_name),
@@ -616,6 +679,7 @@ def download_nier_recent_cyanobacteria(logger=None):
             df = df.drop_duplicates(['sample_date', 'station_code', 'cyanobacteria_cells_ml']).sort_values(['sample_date', 'river_basin', 'lake_name'])
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(cache_path, index=False, encoding='utf-8-sig')
+            _append_history_csv(df, Config.NATIONAL_CYANOBACTERIA_HISTORY_FILE, ['sample_date', 'station_code', 'cyanobacteria_cells_ml', 'source_scope'])
             if logger:
                 logger.info(f"Downloaded {len(df):,} NIER national cyanobacteria records from {df['station_code'].nunique():,} stations")
             return df
@@ -629,6 +693,116 @@ def download_nier_recent_cyanobacteria(logger=None):
                 if logger:
                     logger.warning(f"Cached NIER cyanobacteria file could not be loaded: {cache_exc}")
     return pd.DataFrame()
+
+
+def load_weather_records(logger=None):
+    df = download_basin_weather(logger)
+    rows = []
+    if not df.empty:
+        rows.extend(df.to_dict('records'))
+    if Config.WEATHER_HISTORY_FILE.exists():
+        try:
+            history = pd.read_csv(Config.WEATHER_HISTORY_FILE, parse_dates=['date'])
+            if not history.empty:
+                rows.extend(history.to_dict('records'))
+        except Exception as exc:
+            if logger:
+                logger.warning(f"Weather history could not be loaded: {exc}")
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out['date'] = pd.to_datetime(out['date'], errors='coerce')
+    for column in ['precipitation_mm', 'temperature_max_c', 'temperature_min_c', 'wind_speed_max_kmh', 'relative_humidity_mean_pct', 'et0_mm']:
+        if column in out.columns:
+            out[column] = pd.to_numeric(out[column], errors='coerce')
+    return (
+        out.dropna(subset=['date', 'basin'])
+        .drop_duplicates(['date', 'basin'], keep='last')
+        .sort_values(['date', 'basin'])
+    )
+
+
+def download_basin_weather(logger=None):
+    cache_path = Config.WEATHER_DATA_FILE
+    if cache_path.exists():
+        try:
+            modified = datetime.fromtimestamp(cache_path.stat().st_mtime)
+            if modified.date() == Config.now().date():
+                return pd.read_csv(cache_path, parse_dates=['date'])
+        except Exception:
+            pass
+    if requests is None:
+        return pd.DataFrame()
+    rows = []
+    try:
+        for basin, meta in Config.WEATHER_BASINS.items():
+            params = {
+                'latitude': meta['latitude'],
+                'longitude': meta['longitude'],
+                'timezone': 'Asia/Seoul',
+                'forecast_days': 7,
+                'past_days': 7,
+                'daily': ','.join([
+                    'temperature_2m_max',
+                    'temperature_2m_min',
+                    'precipitation_sum',
+                    'wind_speed_10m_max',
+                    'et0_fao_evapotranspiration',
+                ]),
+                'hourly': 'relative_humidity_2m',
+            }
+            response = requests.get(Config.OPEN_METEO_FORECAST_URL, params=params, timeout=35)
+            response.raise_for_status()
+            payload = response.json()
+            daily = payload.get('daily', {})
+            hourly = payload.get('hourly', {})
+            humidity_by_date = {}
+            if hourly.get('time') and hourly.get('relative_humidity_2m'):
+                hdf = pd.DataFrame({'time': hourly['time'], 'humidity': hourly['relative_humidity_2m']})
+                hdf['time'] = pd.to_datetime(hdf['time'], errors='coerce')
+                hdf['humidity'] = pd.to_numeric(hdf['humidity'], errors='coerce')
+                humidity_by_date = hdf.groupby(hdf['time'].dt.strftime('%Y-%m-%d'))['humidity'].mean().to_dict()
+            dates = daily.get('time', [])
+            for index, date_text in enumerate(dates):
+                rows.append({
+                    'date': pd.to_datetime(date_text, errors='coerce'),
+                    'basin': basin,
+                    'focus_area': meta.get('focus', basin),
+                    'latitude': meta['latitude'],
+                    'longitude': meta['longitude'],
+                    'temperature_max_c': _list_value(daily.get('temperature_2m_max'), index),
+                    'temperature_min_c': _list_value(daily.get('temperature_2m_min'), index),
+                    'precipitation_mm': _list_value(daily.get('precipitation_sum'), index),
+                    'wind_speed_max_kmh': _list_value(daily.get('wind_speed_10m_max'), index),
+                    'et0_mm': _list_value(daily.get('et0_fao_evapotranspiration'), index),
+                    'relative_humidity_mean_pct': humidity_by_date.get(str(date_text), np.nan),
+                    'source': 'Open-Meteo daily forecast/archive API',
+                    'source_url': Config.OPEN_METEO_FORECAST_URL,
+                })
+        df = pd.DataFrame(rows).dropna(subset=['date', 'basin'])
+        if not df.empty:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(cache_path, index=False, encoding='utf-8-sig')
+            _append_history_csv(df, Config.WEATHER_HISTORY_FILE, ['date', 'basin'])
+            if logger:
+                logger.info(f"Downloaded {len(df):,} basin weather records for {df['basin'].nunique():,} focus areas")
+            return df
+    except Exception as exc:
+        if logger:
+            logger.warning(f"Basin weather download unavailable, using cached weather data: {exc}")
+        if cache_path.exists():
+            try:
+                return pd.read_csv(cache_path, parse_dates=['date'])
+            except Exception:
+                pass
+    return pd.DataFrame()
+
+
+def _list_value(values, index):
+    try:
+        return pd.to_numeric(values[index], errors='coerce')
+    except Exception:
+        return np.nan
 
 
 # ==================== SETUP ====================
@@ -1588,6 +1762,7 @@ class PlotGenerator:
             self._plot_parameter_maps(df)
             self._plot_historical_trend_dashboard()
             self._plot_algal_bloom_dashboard()
+            self._plot_weather_hydrometeorology_dashboard()
             
             self.logger.info("All plots generated successfully")
         except Exception as e:
@@ -1623,6 +1798,9 @@ class PlotGenerator:
             'algal_watershed_cyanobacteria.png',
             'algal_cyanobacteria_watershed_map.png',
             'algal_status_timeline.png',
+            'weather_basin_precipitation.png',
+            'weather_temperature_range.png',
+            'weather_hydrometeorology_summary.png',
         }
         for path in self._plots_dir().glob("*.png"):
             if path.name in active_files or '_map_' in path.name:
@@ -2494,6 +2672,129 @@ class PlotGenerator:
             })
             self._write_plotly_html('algal_status_timeline_interactive.html', 'Interactive Annual Cyanobacteria Signal', traces, layout)
 
+    def _plot_weather_hydrometeorology_dashboard(self):
+        try:
+            df = load_weather_records(self.logger)
+            if df.empty:
+                self.logger.warning("Weather hydrometeorology data are unavailable")
+                return
+            latest_date = pd.to_datetime(df['date'], errors='coerce').max()
+            recent = df[df['date'] >= latest_date - pd.Timedelta(days=13)].copy()
+            latest = df.sort_values('date').groupby('basin', as_index=False).tail(1)
+            if recent.empty or latest.empty:
+                return
+
+            fig, ax = self._new_figure(figsize=(13.8, 7.2))
+            pivot = recent.pivot_table(index='basin', columns='date', values='precipitation_mm', aggfunc='mean').fillna(0)
+            totals = pivot.sum(axis=1).sort_values()
+            colors = ['#cd2e3a' if value >= 50 else '#f08a5d' if value >= 25 else '#0057b8' for value in totals]
+            ax.barh(totals.index, totals.values, color=colors, edgecolor='white')
+            self._style_axis(ax, grid_axis='x')
+            ax.set_title('Recent Basin Rainfall Accumulation', fontweight='bold', fontsize=19, color=self.INK, pad=12)
+            ax.set_xlabel('14-day precipitation total (mm)')
+            self._save_figure(fig, self._plots_dir() / 'weather_basin_precipitation.png', rect=[0, 0, 1, 0.96])
+
+            fig, ax = self._new_figure(figsize=(13.8, 7.2))
+            for basin, group in recent.sort_values('date').groupby('basin'):
+                ax.plot(group['date'], group['temperature_max_c'], linewidth=2.0, label=f'{basin} max')
+                ax.plot(group['date'], group['temperature_min_c'], linewidth=1.4, linestyle='--', alpha=0.8, label=f'{basin} min')
+            self._style_axis(ax, grid_axis='y')
+            ax.set_title('Daily Temperature Envelope By Basin', fontweight='bold', fontsize=19, color=self.INK, pad=12)
+            ax.set_ylabel('Temperature (deg C)')
+            ax.legend(ncol=2, fontsize=8, frameon=False)
+            self._save_figure(fig, self._plots_dir() / 'weather_temperature_range.png', rect=[0, 0, 1, 0.94])
+
+            fig, axes = self._new_figure(1, 3, figsize=(16, 5.6))
+            metrics = [
+                ('precipitation_mm', 'Latest rainfall (mm)', '#0057b8'),
+                ('wind_speed_max_kmh', 'Max wind (km/h)', '#cd2e3a'),
+                ('et0_mm', 'Reference ET0 (mm)', '#f08a5d'),
+            ]
+            for ax, (column, title, color) in zip(axes, metrics):
+                ordered = latest.sort_values(column)
+                ax.barh(ordered['basin'], ordered[column], color=color, edgecolor='white')
+                self._style_axis(ax, grid_axis='x')
+                ax.set_title(title, fontweight='bold', color=self.INK)
+            self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.95])
+            self._write_weather_interactive_plots(df, latest)
+        except Exception as exc:
+            self.logger.error(f"Error in weather hydrometeorology plots: {exc}")
+
+    def _write_weather_interactive_plots(self, df, latest):
+        base_layout = {
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
+            'paper_bgcolor': '#ffffff',
+            'plot_bgcolor': '#f6faff',
+            'margin': {'l': 80, 'r': 42, 't': 76, 'b': 78},
+            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+        }
+        recent = df[df['date'] >= pd.to_datetime(df['date']).max() - pd.Timedelta(days=13)].copy()
+        traces = []
+        for basin, group in recent.sort_values('date').groupby('basin'):
+            traces.append({
+                'type': 'bar',
+                'name': basin,
+                'x': pd.to_datetime(group['date']).dt.strftime('%Y-%m-%d').tolist(),
+                'y': pd.to_numeric(group['precipitation_mm'], errors='coerce').round(2).tolist(),
+                'hovertemplate': '<b>%{fullData.name}</b><br>Date: %{x}<br>Rainfall: %{y:.2f} mm<extra></extra>',
+            })
+        layout = dict(base_layout)
+        layout.update({
+            'title': {'text': 'Clickable Basin Rainfall And Runoff-Pressure Signal', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+            'barmode': 'group',
+            'xaxis': {'title': {'text': 'Date', 'standoff': 16}, 'tickangle': -35},
+            'yaxis': {'title': {'text': 'Daily precipitation (mm)', 'standoff': 16}, 'gridcolor': '#d8e3f1'},
+        })
+        self._write_plotly_html('weather_basin_rainfall_interactive.html', 'Interactive Basin Rainfall', traces, layout)
+
+        traces = [{
+            'type': 'scattergeo',
+            'mode': 'markers+text',
+            'lon': latest['longitude'].round(5).tolist(),
+            'lat': latest['latitude'].round(5).tolist(),
+            'text': latest['basin'].astype(str).tolist(),
+            'textposition': 'top center',
+            'customdata': np.column_stack([
+                latest['focus_area'].astype(str).to_numpy(),
+                latest['precipitation_mm'].round(2).astype(str).to_numpy(),
+                latest['temperature_max_c'].round(2).astype(str).to_numpy(),
+                latest['wind_speed_max_kmh'].round(2).astype(str).to_numpy(),
+                pd.to_datetime(latest['date']).dt.strftime('%Y-%m-%d').to_numpy(),
+            ]).tolist(),
+            'marker': {
+                'size': np.clip(pd.to_numeric(latest['precipitation_mm'], errors='coerce').fillna(0) * 0.7 + 12, 12, 34).tolist(),
+                'color': pd.to_numeric(latest['precipitation_mm'], errors='coerce').fillna(0).tolist(),
+                'colorscale': [[0, '#0057b8'], [0.5, '#f7f9fc'], [1, '#cd2e3a']],
+                'colorbar': {'title': {'text': 'rain mm', 'side': 'right'}, 'thickness': 16, 'len': 0.72},
+                'line': {'color': '#ffffff', 'width': 1.2},
+                'opacity': 0.88,
+            },
+            'hovertemplate': '<b>%{text}</b><br>%{customdata[0]}<br>Date: %{customdata[4]}<br>Rainfall: %{customdata[1]} mm<br>Tmax: %{customdata[2]} deg C<br>Max wind: %{customdata[3]} km/h<extra></extra>',
+        }]
+        layout = dict(base_layout)
+        layout.update({
+            'title': {'text': 'Clickable Hydrometeorological Basin Map', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
+            'margin': {'l': 28, 'r': 86, 't': 76, 'b': 34},
+            'geo': {
+                'scope': 'asia',
+                'projection': {'type': 'mercator', 'scale': 5.4},
+                'center': {'lon': 127.8, 'lat': 36.25},
+                'lonaxis': {'range': [124.2, 131.9], 'showgrid': True, 'gridcolor': '#dce8f4'},
+                'lataxis': {'range': [33.0, 39.8], 'showgrid': True, 'gridcolor': '#dce8f4'},
+                'showland': True,
+                'landcolor': '#f8fbff',
+                'showocean': True,
+                'oceancolor': '#edf5ff',
+                'showrivers': True,
+                'rivercolor': '#b7d1ea',
+                'showcoastlines': True,
+                'coastlinecolor': '#7d98b5',
+                'showcountries': True,
+                'countrycolor': '#93a9c4',
+            },
+        })
+        self._write_plotly_html('weather_basin_map_interactive.html', 'Interactive Basin Weather Map', traces, layout)
+
     def _plot_parameter_maps(self, df):
         """Plot each water quality parameter on a South Korea map using station coordinates."""
         try:
@@ -3146,15 +3447,20 @@ class DashboardGenerator:
         spatial_map_cards = self._spatial_map_cards(str(latest_date))
         trend_plot_cards = self._trend_plot_cards(str(latest_date))
         algal_plot_cards = self._algal_plot_cards(str(latest_date))
+        weather_plot_cards = self._weather_plot_cards(str(latest_date))
         province_rows = self._province_rows(latest_df)
         history_rows = self._history_rows(limit=30)
         historical_option_rows = self._historical_option_rows()
         trend_rows = self._historical_trend_rows()
         cleaning_rows = self._cleaning_rows()
-        algal_rows = self._algal_bloom_rows()
+        algal_rows = self._algal_bloom_rows(scope='national')
+        namgang_algal_rows = self._algal_bloom_rows(scope='namgang')
         algal_standard_rows = self._algal_standard_rows()
-        watershed_rows = self._watershed_status_rows()
+        watershed_rows = self._watershed_status_rows(scope='national')
+        namgang_watershed_rows = self._watershed_status_rows(scope='namgang')
         algal_scenario_rows = self._algal_scenario_rows()
+        weather_rows = self._weather_rows()
+        weather_summary_rows = self._weather_summary_rows()
         side_rail_html = ''
         csv_link = self._file_uri(Config.daily_csv_file(str(latest_date))) if latest_date else self._file_uri(Config.CSV_FILE)
         historical_measurements_path = Config.HISTORICAL_MEASUREMENTS_FILE if Config.HISTORICAL_MEASUREMENTS_FILE.exists() else Config.DERIVED_HISTORICAL_MEASUREMENTS_FILE
@@ -5346,9 +5652,132 @@ class DashboardGenerator:
       body.page-spatial .spatial-maps,
       body.page-spatial #latestCharts .plots,
       body.page-algal .plots,
-      body.page-trends .plots {{
+      body.page-trends .plots,
+      body.page-weather .plots {{
         grid-template-columns: 1fr;
       }}
+    }}
+
+    /* K-WaterGuard correction layer v10: modern scientific workspace and page routing. */
+    :root {{
+      --bg: #edf5ff;
+      --panel: rgba(255,255,255,.96);
+      --panel-soft: #f5faff;
+      --ink: #06192f;
+      --muted: #53677f;
+      --line: #d5e4f5;
+      --blue: #0758bd;
+      --blue-soft: #e7f2ff;
+      --red: #d73345;
+      --red-soft: #fff0f2;
+      --black: #071426;
+      --shadow: 0 18px 48px rgba(6, 25, 47, .10);
+    }}
+    body {{
+      background:
+        linear-gradient(112deg, rgba(7,20,38,.98) 0 300px, transparent 300px),
+        radial-gradient(circle at 78% 9%, rgba(7,88,189,.16), transparent 30%),
+        radial-gradient(circle at 94% 64%, rgba(215,51,69,.13), transparent 32%),
+        linear-gradient(135deg, #edf7ff 0%, #fbfdff 54%, #fff6f8 100%);
+    }}
+    header {{
+      min-height: 320px;
+      border-bottom: 1px solid rgba(7,88,189,.18);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.97) 0%, rgba(255,255,255,.86) 45%, rgba(7,88,189,.22) 100%),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center right;
+    }}
+    h1 {{ color: #0758bd; text-shadow: 0 1px 0 rgba(255,255,255,.8); }}
+    .nav-tabs {{
+      position: sticky;
+      top: 10px;
+      z-index: 20;
+      padding: 10px;
+      border: 1px solid rgba(213,228,245,.9);
+      background: rgba(255,255,255,.86);
+      backdrop-filter: blur(18px);
+      border-radius: 10px;
+      box-shadow: 0 12px 34px rgba(6,25,47,.09);
+    }}
+    .nav-tabs a {{
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #17324f;
+      transition: background .18s ease, color .18s ease, transform .18s ease;
+    }}
+    .nav-tabs a:hover {{ background: #eaf4ff; transform: translateY(-1px); }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-data .nav-tabs a[href="data.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-spatial .nav-tabs a[href="spatial.html"] {{
+      color: white;
+      background: linear-gradient(135deg, #0758bd, #0d75d9);
+      box-shadow: 0 10px 24px rgba(7,88,189,.24);
+    }}
+    body.page-home .page:not(.page-home),
+    body.page-data .page:not(.page-data),
+    body.page-trends .page:not(.page-trends),
+    body.page-algal .page:not(.page-algal),
+    body.page-weather .page:not(.page-weather),
+    body.page-spatial .page:not(.page-spatial) {{ display: none !important; }}
+    .section, .card {{
+      border-color: rgba(213,228,245,.92);
+      box-shadow: 0 18px 48px rgba(6,25,47,.09);
+    }}
+    .button, button.button {{
+      border: 0;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #0758bd, #0d75d9);
+      box-shadow: 0 10px 22px rgba(7,88,189,.20);
+      font-weight: 800;
+    }}
+    .home-overview {{
+      background:
+        linear-gradient(115deg, rgba(6,25,47,.84), rgba(7,88,189,.72) 48%, rgba(215,51,69,.66)),
+        url("{self._asset_uri('Kwater.png')}");
+      background-size: cover;
+      background-position: center;
+    }}
+    .overview-panel {{
+      background: rgba(8,32,63,.54);
+      border-color: rgba(255,255,255,.28);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
+    }}
+    .overview-panel p, .overview-list li {{
+      font-size: 16px;
+      line-height: 1.56;
+      text-shadow: 0 1px 1px rgba(0,0,0,.22);
+    }}
+    .overview-panel .button {{
+      background: #ffffff;
+      color: #0758bd;
+      box-shadow: 0 10px 22px rgba(0,0,0,.16);
+    }}
+    .plots, body.page-weather .plots {{
+      grid-template-columns: repeat(2, minmax(360px, 1fr));
+    }}
+    .plot h3 {{
+      background: linear-gradient(90deg, #f4f9ff, #fff7f8);
+      color: #06192f;
+    }}
+    .plot.interactive-plot iframe {{ background: white; }}
+    .table-wrap {{
+      border-radius: 10px;
+      border: 1px solid rgba(213,228,245,.92);
+    }}
+    th {{
+      background: linear-gradient(90deg, #eaf4ff, #f7fbff);
+      color: #06192f;
+    }}
+    @media (max-width: 900px) {{
+      body {{ background: linear-gradient(135deg, #edf7ff 0%, #fbfdff 56%, #fff6f8 100%); }}
+      header {{ min-height: 280px; }}
+      .plots, body.page-weather .plots {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
@@ -5373,7 +5802,8 @@ class DashboardGenerator:
       <a href="data.html">Data Downloads</a>
       <a href="trends.html">Historical Trends</a>
       <a href="algal-bloom.html">Algal Bloom Status</a>
-      <a href="spatial.html">Spatial Maps</a>
+      <a href="weather.html">Hydrometeorological Risk</a>
+      <a href="spatial.html">WQ Status</a>
     </nav>
     <div class="toolbar">
       <input class="search" id="stationSearch" type="search" placeholder="Search station, city, province, or parameter values">
@@ -5398,6 +5828,7 @@ class DashboardGenerator:
             <a class="button" href="data.html">Open Data Page</a>
             <a class="button" href="trends.html">Open Trend Page</a>
             <a class="button" href="algal-bloom.html">Open Algal Bloom Page</a>
+            <a class="button" href="weather.html">Open Weather Page</a>
           </div>
         </div>
         <div class="overview-panel">
@@ -5436,6 +5867,10 @@ class DashboardGenerator:
         <article class="card capability-card">
           <h3>Spatial Evidence</h3>
           <p>Inspect one-point-per-station spatial maps with corrected station identity and coolwarm parameter visualization.</p>
+        </article>
+        <article class="card capability-card">
+          <h3>Hydrometeorology</h3>
+          <p>Track rainfall, temperature, wind, humidity, and evapotranspiration signals that influence runoff and bloom pressure.</p>
         </article>
       </div>
     </section>
@@ -5511,17 +5946,31 @@ class DashboardGenerator:
         {self._stat_card('Korean Warning', '10,000 cells/mL')}
         {self._stat_card('Bloom Outbreak', '1,000,000 cells/mL')}
       </div>
-      <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts in cells/mL. This page combines the national NIER recent algae-warning feed for Han, Nakdong, Geum, and Yeongsan/Seomjin basins with the local historical cyanobacteria archive for Jinyang Lake / Namgang Dam.</p>
+      <p class="muted">Korean algae alerts use harmful cyanobacteria cell counts in cells/mL. This page keeps a persistent national history from the NIER algae-warning feed for all available Korean watersheds and keeps Namgang Dam / Jinyang Lake as a separate local focus area.</p>
       <p><a class="history-link" href="{national_cyanobacteria_link}">Download national NIER cyanobacteria feed</a> &nbsp; <a class="history-link" href="{cyanobacteria_station_link}">Download local station cyanobacteria archive</a> &nbsp; <a class="history-link" href="{cyanobacteria_lakewide_link}">Download local lakewide archive</a></p>
+      <h3>Section 1 - All Korean Watersheds</h3>
+      <p class="muted">National watershed status is based on harmful cyanobacteria cell-count observations where available. Daily runs append new NIER records to the local historical archive so previous watersheds remain visible when the live feed changes.</p>
       <div class="grid plots">{algal_plot_cards}</div>
       <div class="grid two-col">
         <div>
-          <h3>Current / Historical Alerts</h3>
+          <h3>National Current / Historical Alerts</h3>
           <div class="table-wrap"><table id="algalTable"><thead><tr><th>Status</th><th>Date</th><th>Station</th><th>Watershed</th><th>Value</th><th>Unit</th><th>Basis</th></tr></thead><tbody>{algal_rows}</tbody></table></div>
         </div>
         <div>
-          <h3>Watershed And Lake Focus</h3>
+          <h3>All-Watershed Status</h3>
           <div class="table-wrap"><table><thead><tr><th>Watershed / Basin</th><th>Stations</th><th>Max Cyanobacteria</th><th>Status</th></tr></thead><tbody>{watershed_rows}</tbody></table></div>
+        </div>
+      </div>
+      <h3>Section 2 - Namgang Dam / Jinyang Lake Focus</h3>
+      <p class="muted">This focus section uses the local Namgang Dam and Jinyang Lake cyanobacteria archive, kept separate from the national watershed feed so local lake records do not replace the national all-watershed view.</p>
+      <div class="grid two-col">
+        <div>
+          <h3>Namgang Historical Alerts</h3>
+          <div class="table-wrap"><table><thead><tr><th>Status</th><th>Date</th><th>Station</th><th>Watershed</th><th>Value</th><th>Unit</th><th>Basis</th></tr></thead><tbody>{namgang_algal_rows}</tbody></table></div>
+        </div>
+        <div>
+          <h3>Namgang Lake Status</h3>
+          <div class="table-wrap"><table><thead><tr><th>Watershed / Basin</th><th>Stations</th><th>Max Cyanobacteria</th><th>Status</th></tr></thead><tbody>{namgang_watershed_rows}</tbody></table></div>
         </div>
       </div>
       <div class="table-wrap" style="margin-top: 14px;"><table><thead><tr><th>Rule</th><th>Caution</th><th>Warning</th><th>Bloom Outbreak</th><th>Unit</th></tr></thead><tbody>{algal_standard_rows}</tbody></table></div>
@@ -5529,8 +5978,29 @@ class DashboardGenerator:
       <div class="table-wrap"><table><thead><tr><th>Source</th><th>Scenario</th><th>Mean Chlorophyll-a</th><th>P90/P95</th><th>Threshold Exceedance</th><th>Management Note</th></tr></thead><tbody>{algal_scenario_rows}</tbody></table></div>
     </section>
 
+    <section class="card section page page-weather" id="weatherPage">
+      <h2>Hydrometeorological Risk Outlook</h2>
+      <div class="grid three-col">
+        {self._stat_card('Rainfall Watch', '>= 25 mm/day')}
+        {self._stat_card('Runoff Pressure', '>= 50 mm/day')}
+        {self._stat_card('Heat Stress', '>= 33 deg C')}
+      </div>
+      <p class="muted">This scientific weather page uses basin-scale daily meteorological data to support water-quality interpretation. Rainfall, temperature, humidity, wind, and reference evapotranspiration are screened as drivers of runoff, dilution, irrigation pressure, and algal-bloom development.</p>
+      <div class="grid plots">{weather_plot_cards}</div>
+      <div class="grid two-col">
+        <div>
+          <h3>Latest Basin Weather Signals</h3>
+          <div class="table-wrap"><table id="weatherTable"><thead><tr><th>Basin</th><th>Date</th><th>Rainfall</th><th>Temperature</th><th>Humidity</th><th>Wind</th><th>ET0</th><th>Signal</th></tr></thead><tbody>{weather_rows}</tbody></table></div>
+        </div>
+        <div>
+          <h3>Fourteen-Day Basin Summary</h3>
+          <div class="table-wrap"><table><thead><tr><th>Basin</th><th>Rain Total</th><th>Max Temperature</th><th>Mean Humidity</th><th>Status</th></tr></thead><tbody>{weather_summary_rows}</tbody></table></div>
+        </div>
+      </div>
+    </section>
+
     <section class="card section page page-spatial" id="spatialPage">
-      <h2>Latest Water Quality Alerts</h2>
+      <h2>WQ Status Alerts</h2>
       <div class="table-wrap">
         <table id="alertTable">
           <thead>
@@ -5758,6 +6228,7 @@ class DashboardGenerator:
             'data.html': 'page-data',
             'trends.html': 'page-trends',
             'algal-bloom.html': 'page-algal',
+            'weather.html': 'page-weather',
             'spatial.html': 'page-spatial',
         }
 
@@ -5768,13 +6239,15 @@ class DashboardGenerator:
                 'page-data': 'Data Downloads',
                 'page-trends': 'Historical Trends',
                 'page-algal': 'Algal Bloom Status',
-                'page-spatial': 'Spatial Maps',
+                'page-weather': 'Hydrometeorological Risk',
+                'page-spatial': 'WQ Status',
             }.get(page_class, 'Dashboard')
             page_subtitle = {
                 'page-data': 'Download current records, archived daily runs, station metadata, and the national annual historical dataset for research use.',
                 'page-trends': 'Explore cleaned historical water-quality records with Mann-Kendall statistics, Sen slope summaries, and annual trend plots.',
                 'page-algal': 'Track Korean algal bloom thresholds with harmful cyanobacteria cell-count data, watershed maps, lake/reservoir risk, and HSPF scenario support data.',
-                'page-spatial': 'Review corrected station coverage, latest alerts, province summaries, and coolwarm spatial parameter maps across South Korea.',
+                'page-weather': 'Review basin-scale rainfall, temperature, humidity, wind, and evapotranspiration signals that shape water-quality and bloom risk.',
+                'page-spatial': 'Review corrected station coverage, latest alerts, province summaries, and coolwarm water-quality status maps across South Korea.',
             }.get(page_class, 'Daily South Korea water-quality intelligence dashboard.')
             page_html = page_html.replace(
                 '<h1>Water Quality Dashboard</h1>',
@@ -6227,11 +6700,13 @@ class DashboardGenerator:
             return 'Caution'
         return 'Normal'
 
-    def _algal_bloom_rows(self, limit=80):
+    def _algal_bloom_rows(self, limit=80, scope=None):
         df = load_cyanobacteria_records(self.logger)
         if df.empty or 'cyanobacteria_cells_ml' not in df.columns:
             return '<tr><td colspan="7">Cyanobacteria cell-count data are not available in the algae support archive.</td></tr>'
         working = df.dropna(subset=['sample_date', 'cyanobacteria_cells_ml']).copy()
+        if scope and 'source_scope' in working.columns:
+            working = working[working['source_scope'].fillna('').astype(str).str.lower().eq(str(scope).lower())].copy()
         if working.empty:
             return '<tr><td colspan="7">No cyanobacteria cell-count records are available.</td></tr>'
         rule = Config.ALGAL_BLOOM_RULES['cyanobacteria_cells_ml']
@@ -6261,11 +6736,15 @@ class DashboardGenerator:
             )
         return ''.join(rows)
 
-    def _watershed_status_rows(self):
+    def _watershed_status_rows(self, scope=None):
         df = load_cyanobacteria_records(self.logger)
         if df.empty or 'cyanobacteria_cells_ml' not in df.columns:
             return '<tr><td colspan="4">Watershed algal status is not available.</td></tr>'
         working = df.dropna(subset=['cyanobacteria_cells_ml']).copy()
+        if scope and 'source_scope' in working.columns:
+            working = working[working['source_scope'].fillna('').astype(str).str.lower().eq(str(scope).lower())].copy()
+        if working.empty:
+            return '<tr><td colspan="4">Watershed algal status is not available for this section.</td></tr>'
         watershed_column = 'middle_watershed' if 'middle_watershed' in working.columns else 'river_basin'
         if watershed_column not in working.columns:
             working[watershed_column] = 'Unknown'
@@ -6288,6 +6767,87 @@ class DashboardGenerator:
                 '</tr>'
             )
         return ''.join(rows)
+
+    def _weather_signal(self, row):
+        rain = pd.to_numeric(row.get('precipitation_mm'), errors='coerce')
+        tmax = pd.to_numeric(row.get('temperature_max_c'), errors='coerce')
+        wind = pd.to_numeric(row.get('wind_speed_max_kmh'), errors='coerce')
+        signals = []
+        if pd.notna(rain) and rain >= 50:
+            signals.append('Runoff pressure')
+        elif pd.notna(rain) and rain >= 25:
+            signals.append('Rainfall watch')
+        if pd.notna(tmax) and tmax >= 33:
+            signals.append('Heat stress')
+        if pd.notna(wind) and wind >= 45:
+            signals.append('Wind mixing')
+        return 'Normal' if not signals else ', '.join(signals)
+
+    def _weather_rows(self, limit=20):
+        df = load_weather_records(self.logger)
+        if df.empty:
+            return '<tr><td colspan="8">Basin weather data are not available yet.</td></tr>'
+        working = df.copy()
+        working['date_dt'] = pd.to_datetime(working.get('date'), errors='coerce')
+        working = working.dropna(subset=['date_dt'])
+        if working.empty:
+            return '<tr><td colspan="8">Basin weather dates are not available.</td></tr>'
+        latest = working.sort_values('date_dt').groupby('basin', as_index=False).tail(1)
+        rows = []
+        for _, row in latest.sort_values('basin').head(limit).iterrows():
+            signal = self._weather_signal(row)
+            pill = 'critical' if 'Runoff pressure' in signal else 'warning' if signal != 'Normal' else 'ok'
+            date_text = row['date_dt'].strftime('%Y-%m-%d')
+            rain = pd.to_numeric(row.get('precipitation_mm'), errors='coerce')
+            tmax = pd.to_numeric(row.get('temperature_max_c'), errors='coerce')
+            tmin = pd.to_numeric(row.get('temperature_min_c'), errors='coerce')
+            humidity = pd.to_numeric(row.get('relative_humidity_mean_pct'), errors='coerce')
+            wind = pd.to_numeric(row.get('wind_speed_max_kmh'), errors='coerce')
+            et0 = pd.to_numeric(row.get('et0_mm'), errors='coerce')
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(str(row.get("basin", "")))}</td>'
+                f'<td>{html.escape(date_text)}</td>'
+                f'<td>{"" if pd.isna(rain) else f"{float(rain):.1f} mm"}</td>'
+                f'<td>{"" if pd.isna(tmax) or pd.isna(tmin) else f"{float(tmin):.1f}-{float(tmax):.1f} deg C"}</td>'
+                f'<td>{"" if pd.isna(humidity) else f"{float(humidity):.0f}%"}</td>'
+                f'<td>{"" if pd.isna(wind) else f"{float(wind):.1f} km/h"}</td>'
+                f'<td>{"" if pd.isna(et0) else f"{float(et0):.1f} mm"}</td>'
+                f'<td><span class="alert-pill {pill}">{html.escape(signal)}</span></td>'
+                '</tr>'
+            )
+        return ''.join(rows) if rows else '<tr><td colspan="8">Basin weather data are not available yet.</td></tr>'
+
+    def _weather_summary_rows(self):
+        df = load_weather_records(self.logger)
+        if df.empty:
+            return '<tr><td colspan="5">Fourteen-day basin weather history is not available yet.</td></tr>'
+        working = df.copy()
+        working['date_dt'] = pd.to_datetime(working.get('date'), errors='coerce')
+        working = working.dropna(subset=['date_dt'])
+        if working.empty:
+            return '<tr><td colspan="5">Fourteen-day basin weather dates are not available.</td></tr>'
+        latest_date = working['date_dt'].max()
+        recent = working[working['date_dt'] >= latest_date - pd.Timedelta(days=13)].copy()
+        grouped = recent.groupby('basin').agg(
+            rain_total=('precipitation_mm', 'sum'),
+            max_temp=('temperature_max_c', 'max'),
+            mean_humidity=('relative_humidity_mean_pct', 'mean'),
+        ).sort_values('rain_total', ascending=False)
+        rows = []
+        for basin, row in grouped.iterrows():
+            status = 'Runoff pressure' if row.rain_total >= 100 else 'Rainfall watch' if row.rain_total >= 50 else 'Normal'
+            pill = 'critical' if status == 'Runoff pressure' else 'warning' if status == 'Rainfall watch' else 'ok'
+            rows.append(
+                '<tr>'
+                f'<td>{html.escape(str(basin))}</td>'
+                f'<td>{float(row.rain_total):.1f} mm</td>'
+                f'<td>{float(row.max_temp):.1f} deg C</td>'
+                f'<td>{float(row.mean_humidity):.0f}%</td>'
+                f'<td><span class="alert-pill {pill}">{html.escape(status)}</span></td>'
+                '</tr>'
+            )
+        return ''.join(rows) if rows else '<tr><td colspan="5">Fourteen-day basin weather history is not available yet.</td></tr>'
 
     def _algal_scenario_rows(self):
         scenario_files = [
@@ -6744,6 +7304,19 @@ class DashboardGenerator:
             'Algal bloom plots will appear here after plots are generated.'
         )
 
+    def _weather_plot_cards(self, date_label):
+        return self._named_plot_cards(
+            date_label,
+            [
+                ('weather_basin_rainfall_interactive.html', 'Clickable Basin Rainfall And Runoff-Pressure Signal'),
+                ('weather_basin_map_interactive.html', 'Clickable Hydrometeorological Basin Map'),
+                ('weather_basin_precipitation.png', 'Recent Basin Rainfall Accumulation'),
+                ('weather_temperature_range.png', 'Daily Temperature Envelope By Basin'),
+                ('weather_hydrometeorology_summary.png', 'Hydrometeorological Summary'),
+            ],
+            'Hydrometeorological plots will appear here after weather data are downloaded.'
+        )
+
     def _named_plot_cards(self, date_label, plot_specs, empty_message):
         plots_dir = Config.daily_plots_dir(date_label)
         cards = []
@@ -6966,6 +7539,7 @@ class DashboardGenerator:
             "./data.html",
             "./trends.html",
             "./algal-bloom.html",
+            "./weather.html",
             "./spatial.html",
             "./manifest.webmanifest",
             "./assets/logo.png",
@@ -6983,6 +7557,11 @@ class DashboardGenerator:
             "algal_watershed_cyanobacteria_interactive.html",
             "algal_cyanobacteria_watershed_map_interactive.html",
             "algal_status_timeline_interactive.html",
+            "weather_basin_precipitation.png",
+            "weather_temperature_range.png",
+            "weather_hydrometeorology_summary.png",
+            "weather_basin_rainfall_interactive.html",
+            "weather_basin_map_interactive.html",
         ]:
             if (bundle_dir / filename).exists():
                 cache_files.append(f"./{filename}")
