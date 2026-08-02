@@ -2767,6 +2767,62 @@ class PlotGenerator:
                 fig.suptitle('Basin Hydrometeorological Risk Matrix', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
                 fig.text(0.12, 0.925, 'Fourteen-day rainfall, heat, humidity, wind, ET0, and composite pressure for water-quality interpretation', fontsize=12, color='#53677f')
                 self._save_figure(fig, self._plots_dir() / 'weather_hydrometeorology_summary.png', rect=[0, 0, 1, 0.90])
+
+                fig, ax = self._new_figure(figsize=(13.8, 8.0))
+                scatter = ax.scatter(
+                    recent_summary['rain_14d'],
+                    recent_summary['tmax'],
+                    s=180 + recent_summary['risk_index'] * 900,
+                    c=recent_summary['wind'],
+                    cmap='coolwarm',
+                    edgecolor='#ffffff',
+                    linewidth=1.4,
+                    alpha=0.88,
+                    zorder=4,
+                )
+                for _, row in recent_summary.iterrows():
+                    ax.annotate(
+                        str(row['basin']),
+                        (row['rain_14d'], row['tmax']),
+                        xytext=(10, 8),
+                        textcoords='offset points',
+                        fontsize=10,
+                        fontweight='bold',
+                        color=self.INK,
+                        bbox={'boxstyle': 'round,pad=0.22', 'fc': 'white', 'ec': '#d5e4f5', 'alpha': 0.86},
+                    )
+                ax.axvline(50, color='#f08a5d', linestyle='--', linewidth=1.3)
+                ax.axvline(100, color='#d73345', linestyle='--', linewidth=1.3)
+                ax.axhline(33, color='#d73345', linestyle='--', linewidth=1.3)
+                ax.text(50, ax.get_ylim()[1], ' runoff watch', ha='left', va='top', fontsize=10, color='#a86124')
+                ax.text(100, ax.get_ylim()[1], ' extreme runoff', ha='left', va='top', fontsize=10, color='#d73345')
+                ax.text(ax.get_xlim()[1], 33, ' heat stress', ha='right', va='bottom', fontsize=10, color='#d73345')
+                self._style_axis(ax, grid_axis='both')
+                ax.set_xlabel('Fourteen-day rainfall accumulation (mm)')
+                ax.set_ylabel('Latest 14-day maximum temperature (deg C)')
+                cbar = fig.colorbar(scatter, ax=ax, fraction=0.036, pad=0.025)
+                cbar.set_label('Maximum wind speed (km/h)', fontsize=11)
+                fig.suptitle('Rainfall-Heat-Wind Compound Risk Space', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+                fig.text(0.115, 0.93, 'Bubble size is composite hydrometeorological pressure; thresholds show runoff and heat-stress interpretation zones', fontsize=12, color='#53677f')
+                self._save_figure(fig, self._plots_dir() / 'weather_compound_risk_space.png', rect=[0, 0, 1, 0.90])
+
+                balance = recent_summary.copy()
+                balance['atmospheric_water_demand'] = balance['et0'] * 14.0
+                balance['rain_minus_et0'] = balance['rain_14d'] - balance['atmospheric_water_demand']
+                balance = balance.sort_values('rain_minus_et0')
+                fig, ax = self._new_figure(figsize=(14.0, 7.6))
+                colors = ['#d73345' if value < -40 else '#f08a5d' if value < 0 else '#176f63' for value in balance['rain_minus_et0']]
+                bars = ax.barh(balance['basin'], balance['rain_minus_et0'], color=colors, edgecolor='#ffffff', linewidth=1.1)
+                ax.axvline(0, color='#071426', linewidth=1.2)
+                ax.axvspan(balance['rain_minus_et0'].min() - 10, 0, color='#d73345', alpha=0.06)
+                for bar, value in zip(bars, balance['rain_minus_et0']):
+                    ax.text(value + (1.2 if value >= 0 else -1.2), bar.get_y() + bar.get_height() / 2, f'{value:.1f}', va='center', ha='left' if value >= 0 else 'right', fontsize=11, fontweight='bold', color=self.INK)
+                self._style_axis(ax, grid_axis='x')
+                ax.set_xlabel('Rainfall minus 14-day atmospheric water demand (mm)')
+                ax.set_ylabel('')
+                fig.suptitle('Basin Water-Balance Stress Proxy', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+                fig.text(0.125, 0.93, 'Negative values indicate rainfall did not meet estimated ET0 demand, a useful screening signal for irrigation pressure', fontsize=12, color='#53677f')
+                self._save_figure(fig, self._plots_dir() / 'weather_water_balance_stress.png', rect=[0, 0, 1, 0.90])
             self._write_weather_interactive_plots(df, latest)
         except Exception as exc:
             self.logger.error(f"Error in weather hydrometeorology plots: {exc}")
@@ -3057,6 +3113,59 @@ class PlotGenerator:
             fig.suptitle('Drought Versus Extreme-Runoff Risk Space', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
             fig.text(0.105, 0.93, 'Bubble size scales with the K-WaterGuard prediction index; quadrants separate hot-dry stress from rainfall-driven runoff pressure', fontsize=12, color='#53677f')
             self._save_figure(fig, self._plots_dir() / 'agroclimate_drought_runoff_risk_space.png', rect=[0, 0, 1, 0.90])
+
+            greenhouse = model.copy().sort_values('kwaterguard_prediction_index', ascending=True)
+            greenhouse['greenhouse_cooling_pressure'] = (greenhouse['heat_stress'] * 0.55 + greenhouse['et0'].clip(0, 8) / 8.0 * 0.45).clip(0, 1)
+            greenhouse['water_curtain_supply_pressure'] = (greenhouse['drought_stress'] * 0.62 + greenhouse['dry_days'].clip(0, 14) / 14.0 * 0.38).clip(0, 1)
+            greenhouse['post_storm_quality_pressure'] = (greenhouse['runoff_extreme'] * 0.70 + greenhouse['bloom_agri_pressure'] * 0.30).clip(0, 1)
+            y_pos = np.arange(len(greenhouse))
+            fig, ax = self._new_figure(figsize=(15.2, 7.4))
+            left = np.zeros(len(greenhouse))
+            components = [
+                ('greenhouse_cooling_pressure', 'Greenhouse cooling / ventilation', '#0758bd'),
+                ('water_curtain_supply_pressure', 'Water-curtain supply reliability', '#d73345'),
+                ('post_storm_quality_pressure', 'Post-storm water-quality pressure', '#f08a5d'),
+            ]
+            for column, label, color in components:
+                values = greenhouse[column].to_numpy()
+                ax.barh(y_pos, values, left=left, color=color, edgecolor='#ffffff', linewidth=0.9, label=label)
+                left += values
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(greenhouse['basin'].astype(str), fontsize=12)
+            ax.set_xlabel('Stacked protected-agriculture pressure score')
+            ax.set_ylabel('')
+            self._style_axis(ax, grid_axis='x')
+            ax.legend(loc='lower right', frameon=True, framealpha=0.92, edgecolor='#d5e4f5', fontsize=10)
+            fig.suptitle('Protected Agriculture And Water-Curtain Risk Components', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.125, 0.93, 'Screening output for greenhouse cooling demand, winter water-curtain supply reliability, and post-storm irrigation-quality pressure', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_greenhouse_water_curtain_components.png', rect=[0, 0, 1, 0.90])
+
+            fig, ax = self._new_figure(figsize=(14.0, 8.0))
+            greenhouse_size = 220 + (model['heat_stress'] * 0.55 + np.clip(model['et0'] / 8.0, 0, 1) * 0.45) * 700
+            scatter = ax.scatter(
+                model['dry_days'],
+                model['et0'],
+                s=greenhouse_size,
+                c=model['kwaterguard_prediction_index'],
+                cmap='coolwarm',
+                edgecolor='#ffffff',
+                linewidth=1.5,
+                alpha=0.88,
+                zorder=4,
+            )
+            for _, row in model.iterrows():
+                ax.annotate(str(row['basin']), (row['dry_days'], row['et0']), xytext=(9, 8), textcoords='offset points', fontsize=10, fontweight='bold', color=self.INK, bbox={'boxstyle': 'round,pad=0.22', 'fc': 'white', 'ec': '#d5e4f5', 'alpha': 0.86})
+            ax.axvline(7, color='#f08a5d', linestyle='--', linewidth=1.3)
+            ax.axvline(10, color='#d73345', linestyle='--', linewidth=1.3)
+            ax.axhline(6, color='#d73345', linestyle='--', linewidth=1.3)
+            self._style_axis(ax, grid_axis='both')
+            ax.set_xlabel('Dry days in latest 14-day window')
+            ax.set_ylabel('Mean reference ET0 (mm/day)')
+            cbar = fig.colorbar(scatter, ax=ax, fraction=0.036, pad=0.025)
+            cbar.set_label('K-WaterGuard prediction index', fontsize=11)
+            fig.suptitle('Greenhouse Irrigation And Water-Curtain Reliability Space', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.115, 0.93, 'Dry-day frequency and ET0 indicate irrigation demand and possible groundwater/surface-water pressure for protected cultivation systems', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_greenhouse_reliability_space.png', rect=[0, 0, 1, 0.90])
 
             geo = model.dropna(subset=['latitude', 'longitude']).copy()
             if not geo.empty:
@@ -9217,7 +9326,7 @@ class DashboardGenerator:
     def _plot_cards(self, date_label):
         plots_dir = Config.daily_plots_dir(date_label)
         plot_specs = [
-            ('latest_station_parameter_map_interactive.html', 'OpenStreetMap WQ Station Parameter Explorer'),
+            ('latest_station_parameter_map_interactive.html', 'Clickable South Korea Station Parameter Map'),
             ('station_coverage_map.png', 'Station Coverage Map'),
             ('quality_summary.png', 'Quality Summary'),
             ('water_quality_signal_board.png', 'Water Quality Signal Board'),
@@ -9280,6 +9389,8 @@ class DashboardGenerator:
                 ('weather_basin_precipitation.png', 'Fourteen-Day Rainfall Risk Ranking With Thresholds'),
                 ('weather_temperature_range.png', 'Temperature Envelope And Heat-Stress Screen'),
                 ('weather_hydrometeorology_summary.png', 'Basin Hydrometeorological Risk Matrix'),
+                ('weather_compound_risk_space.png', 'Rainfall-Heat-Wind Compound Risk Space'),
+                ('weather_water_balance_stress.png', 'Basin Water-Balance Stress Proxy'),
             ],
             'Hydrometeorological plots will appear here after weather data are downloaded.'
         )
@@ -9292,6 +9403,8 @@ class DashboardGenerator:
                 ('agroclimate_prediction_matrix.png', 'K-WaterGuard AgroClimate Prediction Model'),
                 ('agroclimate_drought_runoff_risk_space.png', 'Drought Versus Extreme-Runoff Risk Space'),
                 ('agroclimate_scenario_sensitivity.png', 'Agriculture Drought And Extreme-Event Scenario Sensitivity'),
+                ('agroclimate_greenhouse_water_curtain_components.png', 'Protected Agriculture And Water-Curtain Risk Components'),
+                ('agroclimate_greenhouse_reliability_space.png', 'Greenhouse Irrigation And Water-Curtain Reliability Space'),
             ],
             'Agrometeorology prediction plots will appear here after the hybrid model is generated.'
         )
@@ -9327,13 +9440,6 @@ class DashboardGenerator:
             return '<p class="muted">Spatial parameter maps are not available for the latest date yet.</p>'
 
         cards = []
-        interactive_path = plots_dir / 'latest_station_parameter_map_interactive.html'
-        if interactive_path.exists():
-            cards.append(
-                f'<article class="card plot interactive-plot wide-plot"><h3>Clickable South Korea Station Parameter Map</h3>'
-                f'<iframe src="{self._file_uri(interactive_path)}" title="Clickable South Korea Station Parameter Map" loading="lazy"></iframe>'
-                f'<a class="history-link open-interactive" href="{self._file_uri(interactive_path)}">Open full interactive view</a></article>'
-            )
         for path in map_paths:
             parameter_key = path.name.replace(f'_map_{safe_day}.png', '')
             title = f"{self._format_map_title(parameter_key)} Spatial Map"
@@ -9549,12 +9655,16 @@ class DashboardGenerator:
             "weather_basin_precipitation.png",
             "weather_temperature_range.png",
             "weather_hydrometeorology_summary.png",
+            "weather_compound_risk_space.png",
+            "weather_water_balance_stress.png",
             "weather_basin_rainfall_interactive.html",
             "weather_basin_map_interactive.html",
             "agroclimate_prediction_map_interactive.html",
             "agroclimate_prediction_matrix.png",
             "agroclimate_drought_runoff_risk_space.png",
             "agroclimate_scenario_sensitivity.png",
+            "agroclimate_greenhouse_water_curtain_components.png",
+            "agroclimate_greenhouse_reliability_space.png",
         ]:
             if (bundle_dir / filename).exists():
                 cache_files.append(f"./{filename}")
