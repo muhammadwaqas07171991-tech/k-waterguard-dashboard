@@ -7719,7 +7719,7 @@ class DashboardGenerator:
   </div>
   <div class="install-sheet" id="installSheet" aria-hidden="true">
     <h3>Install K-WaterGuard AI</h3>
-    <p>Add this dashboard to your mobile home screen for an app-like experience with cached navigation and daily dashboard access.</p>
+    <p id="installSheetText">Add this dashboard to your mobile home screen for an app-like experience with cached navigation and daily dashboard access.</p>
     <div class="install-actions">
       <button class="button" id="installSheetButton" type="button">Install Mobile App</button>
       <button class="button secondary" id="installSheetClose" type="button">Not now</button>
@@ -7883,10 +7883,14 @@ class DashboardGenerator:
     async function runAppInstall() {{
       if (!deferredInstallPrompt) {{
         const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-        const message = isiOS
-          ? 'To install on iPhone or iPad: tap Share, then Add to Home Screen.'
-          : 'To install: use your browser menu and choose Install app or Add to Home screen. Chrome/Edge will show the install prompt when available.';
-        alert(message);
+        const installText = document.getElementById('installSheetText');
+        if (installText) {{
+          installText.textContent = isiOS
+            ? 'On iPhone or iPad, tap the Safari Share button, then choose Add to Home Screen. The dashboard will open like a mobile app from your home screen.'
+            : 'Use the browser menu and choose Install app or Add to Home screen. Chrome or Edge will show a one-tap install prompt when the browser confirms the app is ready.';
+        }}
+        installSheet?.classList.add('open');
+        installSheet?.setAttribute('aria-hidden', 'false');
         return;
       }}
       deferredInstallPrompt.prompt();
