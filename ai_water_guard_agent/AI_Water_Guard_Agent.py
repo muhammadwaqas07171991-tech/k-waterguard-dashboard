@@ -6856,6 +6856,255 @@ class DashboardGenerator:
       body .nav-tabs {{ grid-template-columns: 1fr !important; }}
       body.page-agro .plots {{ grid-template-columns: 1fr; }}
     }}
+
+    /* K-WaterGuard correction layer v17: readable dark-academic shell and mobile-app behavior. */
+    body {{
+      background:
+        radial-gradient(circle at 12% 8%, rgba(34, 81, 119, .18), transparent 34%),
+        radial-gradient(circle at 88% 6%, rgba(166, 43, 57, .13), transparent 30%),
+        linear-gradient(135deg, #dfeaf3 0%, #f3f7fa 48%, #f4e7e9 100%) !important;
+      color: #0b1726 !important;
+      overflow-x: hidden !important;
+    }}
+    main.wrap,
+    footer {{
+      width: min(100% - 28px, 1760px) !important;
+      max-width: none !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }}
+    header {{
+      border-bottom: 1px solid rgba(58, 89, 120, .20) !important;
+    }}
+    body .nav-tabs {{
+      position: sticky !important;
+      top: 8px !important;
+      z-index: 80 !important;
+      margin: 0 auto 18px !important;
+      padding: 8px !important;
+      border-radius: 16px !important;
+      background: rgba(248, 252, 255, .94) !important;
+      backdrop-filter: blur(18px) !important;
+      box-shadow: 0 18px 42px rgba(23, 52, 80, .18) !important;
+      grid-template-columns: repeat(6, minmax(132px, 1fr)) !important;
+    }}
+    body .nav-tabs a {{
+      min-height: 42px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 12px !important;
+      color: #17314c !important;
+      background: rgba(232, 241, 249, .92) !important;
+      box-shadow: none !important;
+    }}
+    body.page-home .nav-tabs a[href="index.html"],
+    body.page-trends .nav-tabs a[href="trends.html"],
+    body.page-algal .nav-tabs a[href="algal-bloom.html"],
+    body.page-weather .nav-tabs a[href="weather.html"],
+    body.page-agro .nav-tabs a[href="agrometeorology.html"],
+    body.page-contact .nav-tabs a[href="contact.html"] {{
+      background: linear-gradient(135deg, #0e385d, #1f7897) !important;
+      color: #ffffff !important;
+    }}
+    .language-corner {{
+      position: fixed !important;
+      top: 12px !important;
+      right: 14px !important;
+      z-index: 260 !important;
+      box-shadow: 0 10px 24px rgba(14, 56, 93, .20) !important;
+    }}
+    .home-overview {{
+      background:
+        linear-gradient(90deg, rgba(5, 18, 34, .94), rgba(21, 76, 128, .86) 58%, rgba(118, 33, 54, .78)),
+        url('{self._asset_uri('waterguard_overview_scene.png')}') center/cover no-repeat !important;
+      color: #ffffff !important;
+    }}
+    .home-overview h2,
+    .home-overview h3,
+    .home-overview p,
+    .home-overview li,
+    .home-overview .muted,
+    .home-overview .overview-kicker {{
+      color: #ffffff !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .32) !important;
+    }}
+    .home-overview .overview-panel {{
+      background: rgba(5, 18, 34, .56) !important;
+      border-color: rgba(255, 255, 255, .23) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 20px 44px rgba(0, 0, 0, .18) !important;
+    }}
+    .home-overview .button,
+    .home-overview .history-link {{
+      background: rgba(255, 255, 255, .96) !important;
+      color: #0e4f8c !important;
+      text-shadow: none !important;
+      border-color: rgba(255, 255, 255, .45) !important;
+    }}
+    .card,
+    .section,
+    .rail-card {{
+      border-color: rgba(154, 178, 202, .74) !important;
+      box-shadow: 0 18px 44px rgba(31, 58, 84, .12) !important;
+    }}
+    .plot.interactive-plot:first-child {{
+      grid-column: 1 / -1 !important;
+    }}
+    .plot.interactive-plot:first-child iframe {{
+      min-height: 640px !important;
+    }}
+    body.page-algal .plot.interactive-plot:first-child iframe,
+    body.page-weather .plot.interactive-plot:first-child iframe,
+    body.page-agro .plot.interactive-plot:first-child iframe,
+    body.page-trends .plot.interactive-plot:first-child iframe {{
+      min-height: 660px !important;
+    }}
+    .edge-rail {{
+      top: 224px !important;
+      width: 228px !important;
+    }}
+    .edge-rail.left {{ left: 18px !important; }}
+    .edge-rail.right {{ right: 18px !important; }}
+    .rail-card {{
+      background: rgba(255, 255, 255, .86) !important;
+      backdrop-filter: blur(12px) !important;
+      margin-bottom: 16px !important;
+      overflow: hidden !important;
+    }}
+    .rail-card h3,
+    .rail-card p,
+    .rail-card li {{
+      overflow-wrap: anywhere !important;
+      line-height: 1.35 !important;
+    }}
+    .toolbar {{
+      position: relative !important;
+      z-index: 20 !important;
+    }}
+    body:not(.page-contact) #installAppButton,
+    body:not(.page-contact) .toolbar a.button {{
+      display: none !important;
+    }}
+    body.page-contact #installAppButton,
+    body.page-contact .toolbar a.button {{
+      display: inline-flex !important;
+    }}
+    .agro-sector-grid .objective-card {{
+      border-top: 4px solid #1f7897 !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(236,246,250,.88)) !important;
+    }}
+    @media (max-width: 1500px) {{
+      .edge-rail {{ display: none !important; }}
+      main.wrap, footer {{ width: min(100% - 24px, 1540px) !important; }}
+    }}
+    @media (max-width: 900px) {{
+      body {{
+        background: #eef4f8 !important;
+      }}
+      header {{
+        min-height: auto !important;
+        padding: 18px 14px 92px !important;
+      }}
+      header h1 {{
+        font-size: clamp(30px, 9vw, 48px) !important;
+        line-height: 1.02 !important;
+      }}
+      header .subtitle {{
+        max-width: 100% !important;
+        font-size: 15px !important;
+      }}
+      .language-corner {{
+        top: 10px !important;
+        right: 10px !important;
+      }}
+      main.wrap,
+      body.page-agro main.wrap,
+      body.page-trends main.wrap,
+      body.page-contact main.wrap {{
+        width: 100% !important;
+        padding: 0 12px 96px !important;
+      }}
+      body .nav-tabs {{
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important;
+        margin: 0 !important;
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) !important;
+        border-radius: 18px 18px 0 0 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 6px !important;
+        z-index: 220 !important;
+        box-shadow: 0 -14px 34px rgba(7, 20, 38, .24) !important;
+      }}
+      body .nav-tabs a {{
+        min-height: 48px !important;
+        padding: 6px 4px !important;
+        font-size: 11px !important;
+        line-height: 1.08 !important;
+        text-align: center !important;
+      }}
+      .toolbar {{
+        grid-template-columns: 1fr !important;
+        margin: 10px 0 !important;
+      }}
+      .card.section {{
+        border-radius: 14px !important;
+        padding: 18px !important;
+        margin-bottom: 14px !important;
+      }}
+      .home-overview,
+      .stats,
+      .capability-grid,
+      .objective-grid,
+      .param-grid,
+      .plots,
+      .spatial-maps,
+      .two-col,
+      .three-col {{
+        grid-template-columns: 1fr !important;
+      }}
+      .home-overview {{
+        min-height: 0 !important;
+        padding: 18px !important;
+      }}
+      .home-overview h2 {{
+        font-size: 30px !important;
+      }}
+      .overview-panel {{
+        padding: 16px !important;
+      }}
+      .page-actions {{
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+      }}
+      .plot.interactive-plot iframe,
+      .plot.interactive-plot:first-child iframe {{
+        min-height: 520px !important;
+      }}
+      .plot img {{
+        padding: 6px !important;
+      }}
+      table {{
+        font-size: 13px !important;
+      }}
+      .table-wrap {{
+        max-height: 70vh !important;
+        overflow: auto !important;
+      }}
+      .chat-launch {{
+        bottom: 88px !important;
+        right: 14px !important;
+      }}
+      .chat-panel {{
+        right: 10px !important;
+        left: 10px !important;
+        width: auto !important;
+        bottom: 150px !important;
+      }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -6900,6 +7149,7 @@ class DashboardGenerator:
           <h2>K-WaterGuard AI Agent Overview</h2>
           <p>K-WaterGuard AI is an autonomous water-quality intelligence dashboard for South Korea. It combines Korean monitoring data, historical station records, spatial maps, alert screening rules, trend analysis, and researcher-ready downloads into one decision-support system.</p>
           <p>The agent supports farmers, watershed managers, lake and reservoir operators, researchers, extension officers, policy experts, and environmental agencies by turning raw water-quality records into practical signals for irrigation safety, nutrient pressure, algal-bloom risk, pollution screening, and long-term watershed planning.</p>
+          <p>The dashboard is organized as an applied AI agent: WQ Evidence & Trends combines corrected station maps, latest status, Mann-Kendall trend statistics, and Sen slope evidence; Algal Bloom Status screens harmful cyanobacteria for national watersheds and Namgang Dam; Hydrometeorological Risk links rainfall, heat, wind, humidity, and ET0 with water-quality pressure; Agrometeorology Prediction evaluates greenhouse, water-curtain cultivation, drought, runoff, and climate-impact sensitivity; Contact & Downloads provides collaboration details and research datasets; and Ask AI helps visitors interpret the live pages.</p>
           <ul class="overview-list">
             <li>Farmers can review water-quality status before irrigation planning and understand nutrient or algal risk around nearby watersheds.</li>
             <li>Researchers can download historical station datasets and inspect Mann-Kendall and Sen's slope trend outputs.</li>
@@ -7139,6 +7389,12 @@ class DashboardGenerator:
         <article class="objective-card"><span>M1</span><h3>Model Inputs</h3><p>Daily basin weather records provide rainfall, temperature, humidity, wind, and ET0. Water-quality records provide nutrient pressure through TN and TP. Cyanobacteria records provide bloom-agriculture context where cell-count data are available. All indicators are normalized to a 0-1 screening scale for transparent comparison.</p></article>
         <article class="objective-card"><span>M2</span><h3>Academic Interpretation</h3><p>The prediction index is a weighted composite of drought stress, heat stress, runoff pressure, bloom-agriculture pressure, and climate-shift sensitivity. It should be interpreted as a relative basin-priority index for monitoring and planning, not as a calibrated probability of crop loss or an official disaster warning.</p></article>
         <article class="objective-card"><span>M3</span><h3>Geospatial Decision Layer</h3><p>The clickable map places the model output back into watershed space. Marker size and color show the integrated prediction index, while hover details expose the individual drivers so users can see whether a basin is controlled mainly by water stress, heat, runoff, or bloom-agriculture coupling.</p></article>
+      </div>
+      <div class="objective-grid agro-sector-grid">
+        <article class="objective-card"><span>A1</span><h3>Greenhouse Agriculture Exposure</h3><p>South Korea's protected horticulture and greenhouse agriculture depend on stable irrigation water, controlled thermal conditions, and reliable local water sources. When hot days, high ET0, and dry spells occur together, crop water demand and cooling demand can rise while streamflow, reservoir dilution, and shallow groundwater recharge may weaken. The model highlights basins where these combined pressures can reduce crop-water reliability, increase irrigation scheduling uncertainty, and intensify water-quality sensitivity for vegetable, fruit, and high-value greenhouse production.</p></article>
+        <article class="objective-card"><span>A2</span><h3>Water-Curtain Cultivation Sensitivity</h3><p>Water-curtain cultivation is especially sensitive because winter greenhouse heating depends on continuous water circulation and dependable groundwater or surface-water supply. A prolonged dry period can lower recharge and increase competition between irrigation, greenhouse heating, and ecological flow needs. Warmer winters may reduce heating demand in some periods, but unstable recharge, groundwater temperature changes, and nutrient or microbial contamination can still increase management risk for water-curtain systems.</p></article>
+        <article class="objective-card"><span>A3</span><h3>Drought, Nutrients, And Bloom Coupling</h3><p>Hot-dry periods can concentrate TN, TP, salts, and organic matter by reducing dilution. If heavy rainfall follows, runoff can rapidly transport nutrients, sediments, and microbial pollutants from agricultural land to streams, reservoirs, and irrigation intakes. This dry-to-wet sequence is important for farmers because it can connect drought stress, bloom risk, post-storm turbidity, and irrigation suitability within the same production season.</p></article>
+        <article class="objective-card"><span>A4</span><h3>Future Agriculture Impact Pathway</h3><p>The future lens ranks basins where +2 deg C heat sensitivity and extreme-rainfall amplification may affect irrigation demand, greenhouse ventilation, water-curtain reliability, stormwater retention needs, nutrient flushing, and crop disease pressure. Practical adaptation priorities include basin-specific water budgeting, greenhouse irrigation scheduling, groundwater monitoring around water-curtain cultivation clusters, nutrient source control, storm-runoff retention, and linking water-quality alerts with farm advisory systems.</p></article>
       </div>
       <div class="grid plots">{agro_plot_cards}</div>
       <h3>K-WaterGuard AgroClimate Model Basin Ranking</h3>
@@ -7581,6 +7837,7 @@ class DashboardGenerator:
             'Search station, city, province, or parameter values': '관측소, 도시, 도, 변수 또는 값을 검색',
             'K-WaterGuard AI is an autonomous water-quality intelligence dashboard for South Korea. It combines Korean monitoring data, historical station records, spatial maps, alert screening rules, trend analysis, and researcher-ready downloads into one decision-support system.': 'K-WaterGuard AI는 대한민국 수질 관측자료를 자동으로 통합하는 지능형 의사결정 지원 대시보드입니다. 국내 모니터링 자료, 과거 관측소 기록, 공간 지도, 경보 기준, 추세 분석, 연구용 다운로드 자료를 하나의 시스템으로 제공합니다.',
             'The agent supports farmers, watershed managers, lake and reservoir operators, researchers, extension officers, policy experts, and environmental agencies by turning raw water-quality records into practical signals for irrigation safety, nutrient pressure, algal-bloom risk, pollution screening, and long-term watershed planning.': '본 에이전트는 농업인, 유역 관리자, 호소 및 저수지 운영자, 연구자, 지도 공무원, 정책 전문가, 환경기관이 원자료를 관개 안전성, 영양염 압력, 조류 발생 위험, 오염 선별, 장기 유역 관리 신호로 해석할 수 있도록 지원합니다.',
+            'The dashboard is organized as an applied AI agent: WQ Evidence & Trends combines corrected station maps, latest status, Mann-Kendall trend statistics, and Sen slope evidence; Algal Bloom Status screens harmful cyanobacteria for national watersheds and Namgang Dam; Hydrometeorological Risk links rainfall, heat, wind, humidity, and ET0 with water-quality pressure; Agrometeorology Prediction evaluates greenhouse, water-curtain cultivation, drought, runoff, and climate-impact sensitivity; Contact & Downloads provides collaboration details and research datasets; and Ask AI helps visitors interpret the live pages.': '이 대시보드는 응용 AI 에이전트로 구성되어 있습니다. 수질 근거 및 추세 페이지는 보정된 관측소 지도, 최신 수질 현황, Mann-Kendall 추세 통계, Sen 기울기 근거를 결합합니다. 조류 발생 현황 페이지는 전국 유역과 남강댐의 유해 남조류를 선별합니다. 수문기상 위험 페이지는 강우, 고온, 바람, 습도, ET0와 수질 압력을 연결합니다. 농업기상 예측 페이지는 온실, 수막재배, 가뭄, 유출, 기후영향 민감도를 평가합니다. 문의 및 자료 페이지는 협력 정보와 연구 자료를 제공하며, Ask AI는 방문자가 실시간 페이지를 해석하도록 돕습니다.',
             'Farmers can review water-quality status before irrigation planning and understand nutrient or algal risk around nearby watersheds.': '농업인은 관개 계획 전 수질 상태와 인근 유역의 영양염 및 조류 위험을 확인할 수 있습니다.',
             "Researchers can download historical station datasets and inspect Mann-Kendall and Sen's slope trend outputs.": '연구자는 과거 관측소 자료를 다운로드하고 Mann-Kendall 및 Sen 기울기 추세 결과를 검토할 수 있습니다.',
             'Water managers can track alerts, spatial hotspots, watershed status, and station coverage with consistent Korean units and standards.': '물관리자는 국내 단위와 기준에 맞춰 경보, 공간 핫스팟, 유역 상태, 관측소 범위를 추적할 수 있습니다.',
@@ -7662,6 +7919,10 @@ class DashboardGenerator:
             'Model Inputs': '모델 입력자료',
             'Academic Interpretation': '학술적 해석',
             'Geospatial Decision Layer': '지리공간 의사결정 계층',
+            'Greenhouse Agriculture Exposure': '온실 농업 노출',
+            'Water-Curtain Cultivation Sensitivity': '수막재배 민감도',
+            'Drought, Nutrients, And Bloom Coupling': '가뭄, 영양염 및 조류 연계',
+            'Future Agriculture Impact Pathway': '미래 농업 영향 경로',
             'K-WaterGuard AgroClimate Model Basin Ranking': 'K-WaterGuard 농업기후 모델 유역 순위',
             'Prediction Index': '예측 지수',
             'Main Driver': '주요 원인',
@@ -7678,6 +7939,10 @@ class DashboardGenerator:
             'Daily basin weather records provide rainfall, temperature, humidity, wind, and ET0. Water-quality records provide nutrient pressure through TN and TP. Cyanobacteria records provide bloom-agriculture context where cell-count data are available. All indicators are normalized to a 0-1 screening scale for transparent comparison.': '일별 유역 기상자료는 강우, 기온, 습도, 바람, ET0를 제공합니다. 수질 자료는 TN과 TP를 통해 영양염 압력을 제공합니다. 남조류 자료는 세포수 자료가 있는 경우 조류-농업 연계 맥락을 제공합니다. 모든 지표는 투명한 비교를 위해 0-1 선별 척도로 정규화됩니다.',
             'The prediction index is a weighted composite of drought stress, heat stress, runoff pressure, bloom-agriculture pressure, and climate-shift sensitivity. It should be interpreted as a relative basin-priority index for monitoring and planning, not as a calibrated probability of crop loss or an official disaster warning.': '예측 지수는 가뭄 스트레스, 고온 스트레스, 유출 압력, 조류-농업 압력, 기후변화 민감도를 가중 결합한 복합 지수입니다. 이는 작물 피해 확률이나 공식 재난 경보가 아니라, 모니터링과 계획을 위한 상대적 유역 우선순위 지수로 해석해야 합니다.',
             'The clickable map places the model output back into watershed space. Marker size and color show the integrated prediction index, while hover details expose the individual drivers so users can see whether a basin is controlled mainly by water stress, heat, runoff, or bloom-agriculture coupling.': '클릭 가능한 지도는 모델 결과를 다시 유역 공간에 배치합니다. 마커의 크기와 색상은 통합 예측 지수를 나타내며, 마우스오버 상세정보는 개별 구동 인자를 보여주어 사용자가 해당 유역이 주로 수분 스트레스, 고온, 유출 또는 조류-농업 연계에 의해 지배되는지 확인할 수 있게 합니다.',
+            "South Korea's protected horticulture and greenhouse agriculture depend on stable irrigation water, controlled thermal conditions, and reliable local water sources. When hot days, high ET0, and dry spells occur together, crop water demand and cooling demand can rise while streamflow, reservoir dilution, and shallow groundwater recharge may weaken. The model highlights basins where these combined pressures can reduce crop-water reliability, increase irrigation scheduling uncertainty, and intensify water-quality sensitivity for vegetable, fruit, and high-value greenhouse production.": '한국의 시설원예와 온실 농업은 안정적인 관개용수, 제어된 열환경, 신뢰할 수 있는 지역 수원에 의존합니다. 고온일, 높은 ET0, 무강우 기간이 동시에 나타나면 작물 수분 수요와 냉방 수요가 증가하는 반면 하천 유량, 저수지 희석, 얕은 지하수 함양은 약화될 수 있습니다. 이 모델은 이러한 복합 압력이 작물용수 신뢰성을 낮추고 관개 일정의 불확실성을 높이며 채소, 과수, 고부가가치 온실 생산의 수질 민감도를 강화할 수 있는 유역을 강조합니다.',
+            'Water-curtain cultivation is especially sensitive because winter greenhouse heating depends on continuous water circulation and dependable groundwater or surface-water supply. A prolonged dry period can lower recharge and increase competition between irrigation, greenhouse heating, and ecological flow needs. Warmer winters may reduce heating demand in some periods, but unstable recharge, groundwater temperature changes, and nutrient or microbial contamination can still increase management risk for water-curtain systems.': '수막재배는 겨울철 온실 난방이 지속적인 물 순환과 안정적인 지하수 또는 지표수 공급에 의존하기 때문에 특히 민감합니다. 장기 건조 기간은 함양을 감소시키고 관개, 온실 난방, 생태유량 수요 사이의 경쟁을 증가시킬 수 있습니다. 따뜻한 겨울은 일부 기간 난방 수요를 줄일 수 있지만, 불안정한 함양, 지하수 온도 변화, 영양염 또는 미생물 오염은 수막재배 시스템의 관리 위험을 여전히 높일 수 있습니다.',
+            'Hot-dry periods can concentrate TN, TP, salts, and organic matter by reducing dilution. If heavy rainfall follows, runoff can rapidly transport nutrients, sediments, and microbial pollutants from agricultural land to streams, reservoirs, and irrigation intakes. This dry-to-wet sequence is important for farmers because it can connect drought stress, bloom risk, post-storm turbidity, and irrigation suitability within the same production season.': '고온-건조 기간은 희석을 감소시켜 TN, TP, 염류, 유기물을 농축할 수 있습니다. 이후 강한 강우가 발생하면 유출수가 농경지의 영양염, 퇴적물, 미생물 오염물질을 하천, 저수지, 관개 취수지점으로 빠르게 이동시킬 수 있습니다. 이러한 건조-습윤 전환은 한 생산시즌 안에서 가뭄 스트레스, 조류 위험, 강우 후 탁도, 관개 적합성을 연결할 수 있기 때문에 농업인에게 중요합니다.',
+            'The future lens ranks basins where +2 deg C heat sensitivity and extreme-rainfall amplification may affect irrigation demand, greenhouse ventilation, water-curtain reliability, stormwater retention needs, nutrient flushing, and crop disease pressure. Practical adaptation priorities include basin-specific water budgeting, greenhouse irrigation scheduling, groundwater monitoring around water-curtain cultivation clusters, nutrient source control, storm-runoff retention, and linking water-quality alerts with farm advisory systems.': '미래 영향 관점은 +2 deg C 고온 민감도와 극한강우 증폭이 관개 수요, 온실 환기, 수막재배 신뢰성, 우수 저류 필요성, 영양염 플러싱, 작물 병해 압력에 영향을 줄 수 있는 유역의 우선순위를 제시합니다. 실용적 적응 우선순위에는 유역별 물 예산, 온실 관개 일정 관리, 수막재배 밀집지 주변 지하수 모니터링, 영양염 배출원 관리, 폭우 유출 저류, 수질 경보와 농업 자문 시스템의 연계가 포함됩니다.',
             'OpenStreetMap Hydrometeorological Basin Explorer': 'OpenStreetMap 유역 수문기상 탐색기',
             'Fourteen-Day Rainfall Risk Ranking With Thresholds': '14일 강우 위험 순위 및 기준선',
             'Temperature Envelope And Heat-Stress Screen': '온도 범위 및 열 스트레스 선별',
@@ -8952,10 +9217,11 @@ class DashboardGenerator:
     def _plot_cards(self, date_label):
         plots_dir = Config.daily_plots_dir(date_label)
         plot_specs = [
+            ('latest_station_parameter_map_interactive.html', 'OpenStreetMap WQ Station Parameter Explorer'),
+            ('station_coverage_map.png', 'Station Coverage Map'),
             ('quality_summary.png', 'Quality Summary'),
             ('water_quality_signal_board.png', 'Water Quality Signal Board'),
             ('alert_hotspot_matrix.png', 'Alert Hotspot Matrix'),
-            ('station_coverage_map.png', 'Station Coverage Map'),
             ('regional_comparison.png', 'Station Distributions'),
             ('quality_heatmap.png', 'Daily Mean Heatmap'),
             ('distributions.png', 'Parameter Distributions'),
@@ -8964,6 +9230,13 @@ class DashboardGenerator:
         for filename, title in plot_specs:
             path = plots_dir / filename
             if path.exists():
+                if path.suffix.lower() == '.html':
+                    cards.append(
+                        f'<article class="card plot interactive-plot"><h3>{html.escape(title)}</h3>'
+                        f'<iframe src="{self._file_uri(path)}" title="{html.escape(title)}" loading="lazy"></iframe>'
+                        f'<a class="history-link open-interactive" href="{self._file_uri(path)}">Open full interactive view</a></article>'
+                    )
+                    continue
                 cards.append(
                     f'<article class="card plot"><h3>{html.escape(title)}</h3>'
                     f'<img src="{self._file_uri(path)}" alt="{html.escape(title)}" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';">'
@@ -8988,11 +9261,11 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
-                ('algal_watershed_cyanobacteria_interactive.html', 'Clickable Watershed Cyanobacteria Screening'),
                 ('algal_cyanobacteria_watershed_map_interactive.html', 'Clickable National Cyanobacteria Map'),
+                ('algal_watershed_cyanobacteria_interactive.html', 'Clickable Watershed Cyanobacteria Screening'),
                 ('algal_status_timeline_interactive.html', 'Clickable Annual Cyanobacteria Signal'),
-                ('algal_watershed_cyanobacteria.png', 'Watershed Cyanobacteria Screening'),
                 ('algal_cyanobacteria_watershed_map.png', 'Cyanobacteria Watershed Spatial Map'),
+                ('algal_watershed_cyanobacteria.png', 'Watershed Cyanobacteria Screening'),
                 ('algal_status_timeline.png', 'Annual Cyanobacteria Signal By Watershed'),
             ],
             'Algal bloom plots will appear here after plots are generated.'
@@ -9002,8 +9275,8 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
-                ('weather_basin_rainfall_interactive.html', 'Clickable Basin Rainfall And Runoff-Pressure Signal'),
                 ('weather_basin_map_interactive.html', 'OpenStreetMap Hydrometeorological Basin Explorer'),
+                ('weather_basin_rainfall_interactive.html', 'Clickable Basin Rainfall And Runoff-Pressure Signal'),
                 ('weather_basin_precipitation.png', 'Fourteen-Day Rainfall Risk Ranking With Thresholds'),
                 ('weather_temperature_range.png', 'Temperature Envelope And Heat-Stress Screen'),
                 ('weather_hydrometeorology_summary.png', 'Basin Hydrometeorological Risk Matrix'),
