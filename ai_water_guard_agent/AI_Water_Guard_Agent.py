@@ -1987,19 +1987,34 @@ class PlotGenerator:
                 return
             heatmap_data.index = [self._format_parameter_label(p) for p in heatmap_data.index]
             normalized = heatmap_data.apply(
-                lambda row: (row - row.min()) / (row.max() - row.min()) if row.max() != row.min() else row * 0,
+                lambda row: ((row - row.mean()) / row.std(ddof=0)).clip(-2, 2) if row.std(ddof=0) not in [0, np.nan] else row * 0,
                 axis=1,
+            ).fillna(0)
+            annot = heatmap_data.map(lambda value: '' if pd.isna(value) else f'{value:.2f}')
+            fig, ax = self._new_figure(figsize=(15.4, 8.0))
+            sns.heatmap(
+                normalized,
+                annot=annot,
+                fmt='',
+                cmap='coolwarm',
+                center=0,
+                vmin=-2,
+                vmax=2,
+                linewidths=1.1,
+                linecolor='#ffffff',
+                cbar_kws={'label': 'Within-parameter anomaly (z-score, clipped)'},
+                annot_kws={'fontsize': 9, 'fontweight': 'bold'},
+                ax=ax,
             )
-            fig, ax = self._new_figure(figsize=(12.5, 6.8))
-            sns.heatmap(normalized, annot=heatmap_data, fmt='.2f', cmap='coolwarm',
-                        linewidths=0.8, linecolor='white',
-                        cbar_kws={'label': 'Normalized daily mean'}, ax=ax)
-            ax.set_title('Daily Mean Water Quality Heatmap', fontsize=18, fontweight='bold', color=self.INK, pad=14)
-            ax.set_xlabel('Date')
-            ax.set_ylabel('Parameter')
-            ax.set_xticklabels([str(label) for label in heatmap_data.columns], rotation=30, ha='right')
-            ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-            self._save_figure(fig, self._plots_dir() / 'quality_heatmap.png', rect=[0, 0, 1, 0.98])
+            ax.set_title('Daily Mean Water-Quality Heatmap', fontsize=21, fontweight='bold', color=self.INK, pad=18)
+            ax.text(0, 1.035, 'Cell text shows original daily mean; color shows relative anomaly within each parameter for easier cross-date screening.',
+                    transform=ax.transAxes, fontsize=11, color=self.MUTED, ha='left')
+            ax.set_xlabel('Monitoring date', labelpad=14)
+            ax.set_ylabel('')
+            ax.set_xticklabels([str(label) for label in heatmap_data.columns], rotation=28, ha='right')
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontweight='bold')
+            ax.tick_params(length=0)
+            self._save_figure(fig, self._plots_dir() / 'quality_heatmap.png', rect=[0, 0, 1, 0.94])
             self.logger.info("Heatmap plot saved")
         except Exception as e:
             self.logger.error(f"Error in heatmap: {str(e)}")
@@ -2429,16 +2444,36 @@ class PlotGenerator:
             heatmap_data = (
                 annual_watershed[annual_watershed[watershed_column].isin(top_watersheds)]
                 .pivot_table(index=watershed_column, columns='year', values='cyanobacteria_cells_ml', aggfunc='max')
-                .sort_index()
             )
             if not heatmap_data.empty:
-                fig, ax = self._new_figure(figsize=(15, 7.2))
+                heatmap_data = heatmap_data.loc[heatmap_data.max(axis=1).sort_values(ascending=False).index]
+                fig, ax = self._new_figure(figsize=(15.8, 8.2))
                 plot_data = np.log10(heatmap_data.clip(lower=1))
-                sns.heatmap(plot_data, ax=ax, cmap='coolwarm', linewidths=0.45, linecolor='white', cbar_kws={'label': f'log10 cyanobacteria ({rule["unit"]})'})
-                ax.set_title('Annual Harmful Cyanobacteria Signal By Watershed', fontweight='bold', fontsize=19, color=self.INK, pad=14)
+                mask = heatmap_data.isna()
+                annot = heatmap_data.map(lambda value: '' if pd.isna(value) else f'{value:,.0f}')
+                sns.heatmap(
+                    plot_data,
+                    ax=ax,
+                    cmap='coolwarm',
+                    vmin=0,
+                    vmax=max(6, float(np.nanmax(plot_data.values)) if np.isfinite(plot_data.values).any() else 6),
+                    linewidths=0.9,
+                    linecolor='#ffffff',
+                    mask=mask,
+                    annot=annot,
+                    fmt='',
+                    annot_kws={'fontsize': 8, 'fontweight': 'bold'},
+                    cbar_kws={'label': f'log10 harmful cyanobacteria ({rule["unit"]})'},
+                )
+                ax.set_title('Annual Harmful Cyanobacteria Heatmap By Watershed', fontweight='bold', fontsize=21, color=self.INK, pad=18)
+                ax.text(0, 1.035, 'Rows are sorted by maximum observed cell count. Cell labels show observed cells/mL; colors use log10 scaling for bloom-event readability.',
+                        transform=ax.transAxes, fontsize=11, color=self.MUTED, ha='left')
                 ax.set_xlabel('Year')
-                ax.set_ylabel('Watershed / basin')
-                self._save_figure(fig, self._plots_dir() / 'algal_status_timeline.png', rect=[0, 0, 1, 0.98])
+                ax.set_ylabel('')
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
+                ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontweight='bold')
+                ax.tick_params(length=0)
+                self._save_figure(fig, self._plots_dir() / 'algal_status_timeline.png', rect=[0, 0, 1, 0.94])
 
             spatial_df = df.dropna(subset=['latitude', 'longitude']).copy()
             spatial_df = spatial_df[spatial_df['station_name'].isin(['Naedong', 'Panmun'])]
@@ -2645,16 +2680,19 @@ class PlotGenerator:
                 'x': [str(int(year)) for year in heatmap_data.columns],
                 'y': heatmap_data.index.astype(str).tolist(),
                 'customdata': custom,
-                'colorscale': alert_colorscale,
-                'colorbar': {'title': {'text': 'log10 cells/mL', 'side': 'right'}, 'thickness': 16, 'len': 0.72},
+                'colorscale': [[0, '#0b5fb3'], [0.28, '#6b93e6'], [0.46, '#f7f9fc'], [0.68, '#f08a5d'], [1, '#c1122f']],
+                'zmin': 0,
+                'zmax': max(6, float(np.nanmax(z.values)) if np.isfinite(z.values).any() else 6),
+                'colorbar': {'title': {'text': 'log10<br>cells/mL', 'side': 'right'}, 'thickness': 18, 'len': 0.72},
                 'xgap': 1,
                 'ygap': 1,
+                'showscale': True,
                 'hovertemplate': '<b>%{y}</b><br>Year: %{x}<br>Maximum: %{customdata} cells/mL<extra></extra>',
             }]
             layout = dict(base_layout)
             layout.update({
-                'title': {'text': 'Annual Cyanobacteria Signal By Watershed', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 22}},
-                'margin': {'l': 170, 'r': 78, 't': 78, 'b': 92},
+                'title': {'text': 'Annual Cyanobacteria Heatmap By Watershed<br><span style="font-size:14px;color:#53677f">Color uses log10 cell count; hover shows original cells/mL for each watershed-year</span>', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 23}},
+                'margin': {'l': 190, 'r': 92, 't': 96, 'b': 92},
                 'xaxis': {'title': {'text': 'Year', 'standoff': 18}, 'tickangle': 0, 'gridcolor': '#d8e3f1'},
                 'yaxis': {'title': '', 'automargin': True, 'tickfont': {'size': 15}},
             })
@@ -7102,6 +7140,89 @@ class DashboardGenerator:
       border-top: 4px solid #1f7897 !important;
       background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(236,246,250,.88)) !important;
     }}
+    .app-install-panel {{
+      display: grid !important;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr) !important;
+      gap: 18px !important;
+      align-items: stretch !important;
+      margin: 18px 0 24px !important;
+      padding: 22px !important;
+      border-radius: 18px !important;
+      background: linear-gradient(135deg, #071426, #174a7c 58%, #86253a) !important;
+      color: #ffffff !important;
+      box-shadow: 0 24px 58px rgba(7, 20, 38, .24) !important;
+    }}
+    .app-install-panel h3,
+    .app-install-panel p,
+    .app-install-panel li {{
+      color: #ffffff !important;
+    }}
+    .app-install-panel .button {{
+      background: #ffffff !important;
+      color: #0e4f8c !important;
+      border-color: rgba(255,255,255,.45) !important;
+      width: fit-content !important;
+    }}
+    .app-install-steps {{
+      margin: 0 !important;
+      padding-left: 20px !important;
+      line-height: 1.55 !important;
+    }}
+    .phone-preview {{
+      border: 1px solid rgba(255,255,255,.24) !important;
+      background: rgba(255,255,255,.12) !important;
+      border-radius: 24px !important;
+      padding: 16px !important;
+      min-height: 220px !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
+    }}
+    .phone-preview .screen {{
+      border-radius: 18px !important;
+      background: rgba(255,255,255,.92) !important;
+      color: #0b1726 !important;
+      padding: 16px !important;
+      min-height: 188px !important;
+    }}
+    .phone-preview strong {{
+      display: block !important;
+      color: #0e4f8c !important;
+      font-size: 22px !important;
+      margin-bottom: 8px !important;
+    }}
+    .install-sheet {{
+      position: fixed !important;
+      left: 50% !important;
+      bottom: 24px !important;
+      transform: translate(-50%, 150%) !important;
+      width: min(94vw, 520px) !important;
+      z-index: 300 !important;
+      border-radius: 22px !important;
+      background: rgba(255,255,255,.96) !important;
+      border: 1px solid rgba(154,178,202,.74) !important;
+      box-shadow: 0 28px 70px rgba(7,20,38,.30) !important;
+      padding: 18px !important;
+      transition: transform .32s ease !important;
+    }}
+    .install-sheet.open {{
+      transform: translate(-50%, 0) !important;
+    }}
+    .install-sheet h3 {{
+      margin: 0 0 6px !important;
+      color: #071426 !important;
+    }}
+    .install-sheet p {{
+      margin: 0 0 12px !important;
+      color: #41546c !important;
+    }}
+    .install-actions {{
+      display: flex !important;
+      gap: 10px !important;
+      flex-wrap: wrap !important;
+    }}
+    .install-actions .button.secondary {{
+      background: #eaf3fb !important;
+      color: #174a7c !important;
+    }}
     @media (max-width: 1500px) {{
       .edge-rail {{ display: none !important; }}
       main.wrap, footer {{ width: min(100% - 24px, 1540px) !important; }}
@@ -7188,6 +7309,11 @@ class DashboardGenerator:
       .page-actions {{
         display: grid !important;
         grid-template-columns: 1fr !important;
+      }}
+      .app-install-panel {{
+        grid-template-columns: 1fr !important;
+        border-radius: 16px !important;
+        padding: 18px !important;
       }}
       .plot.interactive-plot iframe,
       .plot.interactive-plot:first-child iframe {{
@@ -7340,6 +7466,26 @@ class DashboardGenerator:
     <section class="card section page page-contact" id="contactPage">
       <h2>Contact And Collaborate</h2>
       <p class="muted">K-Water Guard AI Agent is developed for collaborative research, field deployment, and practical water-management decision support. This page explains the project objectives, collaboration goals, and contact pathway for researchers, agencies, watershed managers, farmers, and technology partners.</p>
+      <div class="app-install-panel" id="mobileAppInstall">
+        <div>
+          <p class="overview-kicker">Mobile And Tablet Application</p>
+          <h3>Install K-WaterGuard AI As A Mobile App</h3>
+          <p>This dashboard is prepared as a Progressive Web App. After installation, it opens from the phone or tablet home screen, keeps the app navigation, caches the dashboard shell, and feels closer to a regular mobile application.</p>
+          <ol class="app-install-steps">
+            <li>Android / Chrome / Edge: tap <strong>Install Mobile App</strong> and confirm the browser install prompt.</li>
+            <li>iPhone / iPad Safari: tap Share, then choose <strong>Add to Home Screen</strong>.</li>
+            <li>After installation, open K-WaterGuard AI from the device home screen for the best mobile layout.</li>
+          </ol>
+          <p><button class="button install-button ready" id="installAppButtonPanel" type="button">Install Mobile App</button></p>
+        </div>
+        <div class="phone-preview" aria-hidden="true">
+          <div class="screen">
+            <strong>K-WaterGuard AI</strong>
+            <p>Daily water-quality, algal bloom, hydrometeorology, and agrometeorology intelligence in a mobile app shell.</p>
+            <div class="edge-pill-list"><span>Offline shell</span><span>Home screen</span><span>Daily update</span></div>
+          </div>
+        </div>
+      </div>
       <div class="objective-grid">
         <article class="objective-card">
           <span>01</span>
@@ -7571,6 +7717,14 @@ class DashboardGenerator:
       </div>
     </div>
   </div>
+  <div class="install-sheet" id="installSheet" aria-hidden="true">
+    <h3>Install K-WaterGuard AI</h3>
+    <p>Add this dashboard to your mobile home screen for an app-like experience with cached navigation and daily dashboard access.</p>
+    <div class="install-actions">
+      <button class="button" id="installSheetButton" type="button">Install Mobile App</button>
+      <button class="button secondary" id="installSheetClose" type="button">Not now</button>
+    </div>
+  </div>
   <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt on the daily agent cycle. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
   <script>
     const search = document.getElementById('stationSearch');
@@ -7583,6 +7737,10 @@ class DashboardGenerator:
     const lightboxTitle = document.getElementById('lightboxTitle');
     const lightboxClose = document.getElementById('lightboxClose');
     const installAppButton = document.getElementById('installAppButton');
+    const installAppButtonPanel = document.getElementById('installAppButtonPanel');
+    const installSheet = document.getElementById('installSheet');
+    const installSheetButton = document.getElementById('installSheetButton');
+    const installSheetClose = document.getElementById('installSheetClose');
     let activeParameter = '';
     let deferredInstallPrompt = null;
 
@@ -7712,9 +7870,17 @@ class DashboardGenerator:
       event.preventDefault();
       deferredInstallPrompt = event;
       installAppButton?.classList.add('ready');
+      installAppButtonPanel?.classList.add('ready');
+      const mobileLike = window.matchMedia('(max-width: 900px)').matches || /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (mobileLike && localStorage.getItem('kwaterguard-install-dismissed') !== '1') {{
+        setTimeout(() => {{
+          installSheet?.classList.add('open');
+          installSheet?.setAttribute('aria-hidden', 'false');
+        }}, 1200);
+      }}
     }});
 
-    installAppButton?.addEventListener('click', async () => {{
+    async function runAppInstall() {{
       if (!deferredInstallPrompt) {{
         const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
         const message = isiOS
@@ -7727,11 +7893,26 @@ class DashboardGenerator:
       await deferredInstallPrompt.userChoice.catch(() => null);
       deferredInstallPrompt = null;
       installAppButton.classList.add('ready');
+      installAppButtonPanel?.classList.add('ready');
+      installSheet?.classList.remove('open');
+      installSheet?.setAttribute('aria-hidden', 'true');
+    }}
+
+    installAppButton?.addEventListener('click', runAppInstall);
+    installAppButtonPanel?.addEventListener('click', runAppInstall);
+    installSheetButton?.addEventListener('click', runAppInstall);
+    installSheetClose?.addEventListener('click', () => {{
+      installSheet?.classList.remove('open');
+      installSheet?.setAttribute('aria-hidden', 'true');
+      localStorage.setItem('kwaterguard-install-dismissed', '1');
     }});
 
     window.addEventListener('appinstalled', () => {{
       deferredInstallPrompt = null;
       installAppButton?.classList.add('ready');
+      installAppButtonPanel?.classList.add('ready');
+      installSheet?.classList.remove('open');
+      installSheet?.setAttribute('aria-hidden', 'true');
     }});
     {chatbot_script}
   </script>
@@ -7907,6 +8088,22 @@ class DashboardGenerator:
             'Contact, Collaborate And Downloads': '문의, 협력 및 자료 다운로드',
             'Data Downloads': '자료 다운로드',
             'Download App': '앱 다운로드',
+            'Install Mobile App': '모바일 앱 설치',
+            'Mobile And Tablet Application': '모바일 및 태블릿 애플리케이션',
+            'Install K-WaterGuard AI As A Mobile App': 'K-WaterGuard AI를 모바일 앱으로 설치',
+            'This dashboard is prepared as a Progressive Web App. After installation, it opens from the phone or tablet home screen, keeps the app navigation, caches the dashboard shell, and feels closer to a regular mobile application.': '이 대시보드는 프로그레시브 웹 앱(PWA)으로 준비되어 있습니다. 설치 후 휴대폰 또는 태블릿 홈 화면에서 열 수 있으며, 앱형 내비게이션과 대시보드 셸 캐시를 유지하여 일반 모바일 애플리케이션에 가까운 사용감을 제공합니다.',
+            'Android / Chrome / Edge: tap': 'Android / Chrome / Edge:',
+            'and confirm the browser install prompt.': '버튼을 누른 뒤 브라우저 설치 안내를 확인하세요.',
+            'iPhone / iPad Safari: tap Share, then choose': 'iPhone / iPad Safari: 공유 버튼을 누른 뒤',
+            'Add to Home Screen': '홈 화면에 추가',
+            'After installation, open K-WaterGuard AI from the device home screen for the best mobile layout.': '설치 후 최적의 모바일 레이아웃을 위해 기기 홈 화면에서 K-WaterGuard AI를 여세요.',
+            'Daily water-quality, algal bloom, hydrometeorology, and agrometeorology intelligence in a mobile app shell.': '수질, 조류 발생, 수문기상, 농업기상 정보를 모바일 앱 셸에서 제공합니다.',
+            'Offline shell': '오프라인 셸',
+            'Home screen': '홈 화면',
+            'Daily update': '일별 갱신',
+            'Install K-WaterGuard AI': 'K-WaterGuard AI 설치',
+            'Add this dashboard to your mobile home screen for an app-like experience with cached navigation and daily dashboard access.': '캐시된 내비게이션과 일별 대시보드 접근을 위해 이 대시보드를 모바일 홈 화면에 추가하세요.',
+            'Not now': '나중에',
             'Open latest CSV': '최신 CSV 열기',
             'English': 'English',
             '한국어': '한국어',
@@ -9593,12 +9790,13 @@ class DashboardGenerator:
         manifest = {
             "name": "K-Water Guard AI Dashboard",
             "short_name": "K-Water AI",
-            "description": "Daily South Korea water quality monitoring dashboard.",
+            "description": "Installable South Korea water-quality, algal bloom, hydrometeorology, and agrometeorology intelligence app.",
             "start_url": "./",
             "scope": "./",
             "display": "standalone",
-            "background_color": "#f4f6fb",
-            "theme_color": "#0047a0",
+            "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+            "background_color": "#dfeaf3",
+            "theme_color": "#0e385d",
             "orientation": "portrait-primary",
             "icons": [
                 {
@@ -9615,6 +9813,13 @@ class DashboardGenerator:
                 }
             ],
             "categories": ["utilities", "productivity"],
+            "shortcuts": [
+                {"name": "WQ Evidence", "short_name": "WQ", "url": "./trends.html", "description": "Open corrected WQ maps and trend evidence."},
+                {"name": "Algal Bloom", "short_name": "Bloom", "url": "./algal-bloom.html", "description": "Open cyanobacteria and watershed bloom status."},
+                {"name": "Hydrometeorology", "short_name": "Weather", "url": "./weather.html", "description": "Open rainfall, heat, wind, and ET0 risk outputs."},
+                {"name": "Agrometeorology", "short_name": "Agro", "url": "./agrometeorology.html", "description": "Open greenhouse, water-curtain, drought, and climate-impact outputs."},
+                {"name": "Downloads", "short_name": "Data", "url": "./contact.html", "description": "Open app install, contact, and data downloads."}
+            ],
         }
         (bundle_dir / "manifest.webmanifest").write_text(
             json.dumps(manifest, indent=2),
