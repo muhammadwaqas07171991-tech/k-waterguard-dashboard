@@ -1,4 +1,4 @@
-﻿"""
+"""
 AI Water Guard Agent
 - Autonomous data collection from Korean water quality sources
 - Automatic data storage and updates
@@ -7595,6 +7595,166 @@ class DashboardGenerator:
       .plot img {{
         max-height: none !important;
       }}
+    }}
+    /* K-WaterGuard correction layer v19: laptop/mobile layout guard. */
+    html, body {{
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      background: linear-gradient(135deg, #d8e4ed 0%, #edf3f8 48%, #efe3e7 100%) !important;
+    }}
+    body > .edge-rail,
+    body > .insight-rail,
+    .edge-rail,
+    .insight-rail {{
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }}
+    header {{
+      min-height: 220px !important;
+      padding: 18px 0 22px !important;
+    }}
+    header .wrap {{
+      width: min(100% - 40px, 1680px) !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+    }}
+    header h1 {{
+      max-width: min(920px, calc(100vw - 64px)) !important;
+      font-size: clamp(42px, 4.2vw, 78px) !important;
+      line-height: 1.02 !important;
+      margin: 22px 0 8px !important;
+    }}
+    header .subtitle {{
+      max-width: min(820px, calc(100vw - 64px)) !important;
+      font-size: clamp(15px, 1.1vw, 19px) !important;
+      line-height: 1.28 !important;
+    }}
+    main.wrap,
+    footer {{
+      width: min(100% - 40px, 1680px) !important;
+      max-width: 1680px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }}
+    main.wrap {{ margin-top: 18px !important; }}
+    body .nav-tabs {{
+      position: sticky !important;
+      top: 10px !important;
+      z-index: 120 !important;
+      width: 100% !important;
+      margin: 0 0 18px !important;
+      display: grid !important;
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+      gap: 8px !important;
+      padding: 8px !important;
+      background: rgba(247, 251, 255, .96) !important;
+      border: 1px solid rgba(159, 184, 207, .72) !important;
+      border-radius: 18px !important;
+      box-shadow: 0 16px 42px rgba(24, 57, 87, .14) !important;
+      transform: none !important;
+    }}
+    body .nav-tabs a {{
+      min-width: 0 !important;
+      min-height: 46px !important;
+      padding: 8px 10px !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere !important;
+      line-height: 1.12 !important;
+      font-size: clamp(12px, .82vw, 15px) !important;
+    }}
+    .toolbar {{
+      width: 100% !important;
+      margin: 0 0 14px !important;
+      grid-template-columns: minmax(0, 1fr) auto auto !important;
+      align-items: center !important;
+    }}
+    body:not(.page-contact) .toolbar {{ grid-template-columns: minmax(0, 1fr) !important; }}
+    .search-status {{ margin: 0 0 18px !important; color: #51657a !important; }}
+    .card.section,
+    .section {{
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 0 22px !important;
+      padding: clamp(22px, 2vw, 34px) !important;
+      overflow: visible !important;
+      border-radius: 18px !important;
+    }}
+    .page h2:first-child,
+    .section h2:first-child {{ margin-top: 0 !important; line-height: 1.08 !important; }}
+    body.page-agro .agro-sector-grid,
+    body.page-agro .objective-grid,
+    .agro-sector-grid,
+    .objective-grid {{
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 18px !important;
+    }}
+    body.page-agro .plots,
+    body.page-weather .plots,
+    body.page-algal .plots,
+    body.page-trends .plots {{
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 18px !important;
+    }}
+    body.page-agro .plot.interactive-plot:first-child,
+    body.page-weather .plot.interactive-plot:first-child,
+    body.page-algal .plot.interactive-plot:first-child,
+    body.page-trends .plot.interactive-plot:first-child {{ grid-column: 1 / -1 !important; }}
+    .plot {{ min-width: 0 !important; overflow: hidden !important; }}
+    .plot img {{ width: 100% !important; height: auto !important; object-fit: contain !important; }}
+    @media (max-width: 1366px) {{
+      header {{ min-height: 190px !important; }}
+      header h1 {{ font-size: clamp(34px, 4vw, 56px) !important; }}
+      main.wrap, footer {{ width: min(100% - 28px, 1280px) !important; }}
+      body .nav-tabs {{ gap: 6px !important; padding: 6px !important; }}
+      body .nav-tabs a {{ min-height: 42px !important; font-size: 12px !important; }}
+      body.page-agro .agro-sector-grid,
+      body.page-agro .objective-grid,
+      .agro-sector-grid,
+      .objective-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }}
+      body.page-agro .plots,
+      body.page-weather .plots,
+      body.page-algal .plots,
+      body.page-trends .plots {{ grid-template-columns: 1fr !important; }}
+    }}
+    @media (max-width: 900px) {{
+      header {{ min-height: 170px !important; padding: 14px 0 16px !important; }}
+      header .wrap {{ width: min(100% - 24px, 100%) !important; }}
+      header h1 {{ font-size: clamp(30px, 9vw, 44px) !important; margin-top: 30px !important; }}
+      header .subtitle {{ font-size: 14px !important; }}
+      main.wrap, footer {{ width: 100% !important; padding-left: 12px !important; padding-right: 12px !important; }}
+      body .nav-tabs {{
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        margin: 0 !important;
+        border-radius: 18px 18px 0 0 !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        z-index: 240 !important;
+      }}
+      body .nav-tabs a {{ min-height: 48px !important; font-size: 11px !important; }}
+      .toolbar {{ grid-template-columns: 1fr !important; }}
+      .card.section, .section {{ padding: 18px !important; border-radius: 16px !important; }}
+      body.page-agro .agro-sector-grid,
+      body.page-agro .objective-grid,
+      .agro-sector-grid,
+      .objective-grid,
+      body.page-agro .plots,
+      body.page-weather .plots,
+      body.page-algal .plots,
+      body.page-trends .plots,
+      .stats,
+      .capability-grid,
+      .param-grid,
+      .two-col,
+      .three-col {{ grid-template-columns: 1fr !important; }}
     }}
   </style>
 </head>
