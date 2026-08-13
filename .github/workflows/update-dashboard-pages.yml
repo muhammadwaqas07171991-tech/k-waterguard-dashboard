@@ -82,6 +82,32 @@ jobs:
           REQUIRE_DASHBOARD_SUPPORT_DATA: "1"
         run: python ai_water_guard_agent/AI_Water_Guard_Agent.py
 
+      - name: Validate generated dashboard record health
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          data_dir = Path("water_quality_data")
+          csv_path = data_dir / "water_quality_records.csv"
+          if not csv_path.exists():
+              raise SystemExit("water_quality_records.csv was not generated")
+          df = pd.read_csv(csv_path)
+          if "timestamp" not in df.columns:
+              raise SystemExit("timestamp column is missing from water_quality_records.csv")
+          df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+          latest_day = df["timestamp"].dt.strftime("%Y-%m-%d").dropna().max()
+          latest = df[df["timestamp"].dt.strftime("%Y-%m-%d") == latest_day].copy()
+          record_count = len(latest)
+          station_cols = [c for c in ["station_identity", "station_code", "station_name", "display_location"] if c in latest.columns]
+          station_count = latest[station_cols[0]].astype(str).nunique() if station_cols else 0
+          if record_count < 1000 or station_count < 100:
+              raise SystemExit(
+                  f"Refusing to deploy weak dashboard batch for {latest_day}: "
+                  f"{record_count} records, {station_count} stations"
+              )
+          print(f"Dashboard record-health check passed: {latest_day}, {record_count:,} records, {station_count:,} stations")
+          PY
+
       - name: Prepare GitHub Pages artifact
         run: |
           test -f "$WATER_QUALITY_DATA_DIR/google_site_dashboard/index.html"

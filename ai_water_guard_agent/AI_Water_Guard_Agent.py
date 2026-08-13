@@ -241,6 +241,9 @@ class Config:
     WFS_SRS_NAME = "EPSG:5179"
     WFS_MAX_FEATURES = 5000
     WFS_RESULT_TYPE = "results"
+    MIN_HEALTHY_LIVE_RECORDS = int(os.environ.get("MIN_HEALTHY_LIVE_RECORDS", "1000"))
+    MIN_HEALTHY_LIVE_STATIONS = int(os.environ.get("MIN_HEALTHY_LIVE_STATIONS", "100"))
+    ALLOW_PLACEHOLDER_FALLBACK = os.environ.get("ALLOW_PLACEHOLDER_FALLBACK", "").lower() in {"1", "true", "yes"}
     
     # Alternative: Local environmental agency data
     GYEONGNAM_API = "https://www.wamis.go.kr/web/mainContent.do"  # Water Management Information System
@@ -873,22 +876,87 @@ class WaterQualityCollector:
         """
         try:
             data = self._fetch_api_data()
-            if data:
+            if self._is_healthy_api_batch(data):
                 self.logger.info(f"Successfully collected {len(data)} records from API")
                 return data
 
-            self.logger.warning("API fetch returned no data; falling back to a South Korea placeholder record")
-            fallback_data = []
-            for region in Config.MONITORING_REGIONS:
-                record = self._fetch_region_data(region)
-                if record:
-                    fallback_data.append(record)
-            self.logger.info(f"Successfully collected {len(fallback_data)} fallback records")
-            return fallback_data
+            self.logger.warning(
+                "API fetch returned an empty or weak batch; refusing to publish placeholder data "
+                f"(records={len(data) if data else 0}, minimum={Config.MIN_HEALTHY_LIVE_RECORDS})"
+            )
+            archive_data = self._load_latest_healthy_archive()
+            if archive_data:
+                self.logger.warning(
+                    f"Using latest healthy local archive for dashboard continuity: {len(archive_data)} records"
+                )
+                return archive_data
+
+            if Config.ALLOW_PLACEHOLDER_FALLBACK:
+                self.logger.warning("Placeholder fallback explicitly enabled by environment")
+                fallback_data = []
+                for region in Config.MONITORING_REGIONS:
+                    record = self._fetch_region_data(region)
+                    if record:
+                        fallback_data.append(record)
+                self.logger.info(f"Successfully collected {len(fallback_data)} fallback records")
+                return fallback_data
+
+            self.logger.warning("No healthy archive is available; skipping data storage for this cycle")
+            return []
 
         except Exception as e:
             self.logger.error(f"Error fetching data: {str(e)}")
             return None
+
+    def _is_healthy_api_batch(self, records):
+        """Reject one-row placeholder or partial API batches before they replace the dashboard."""
+        if not records or len(records) < Config.MIN_HEALTHY_LIVE_RECORDS:
+            return False
+        station_keys = set()
+        numeric_rows = 0
+        for record in records:
+            station_key = self._get_best_value(record, [
+                'station_identity', 'station_code', 'monitoring_point_id', 'MGTNO',
+                'OBJECTID', 'display_location', 'station_name', 'location_name'
+            ])
+            if station_key:
+                station_keys.add(str(station_key))
+            if any(self._to_float(record.get(column)) is not None for column in Config.WATER_QUALITY_COLUMNS):
+                numeric_rows += 1
+        if len(station_keys) < Config.MIN_HEALTHY_LIVE_STATIONS:
+            return False
+        return numeric_rows >= max(50, int(len(records) * 0.08))
+
+    def _to_float(self, value):
+        try:
+            if value is None:
+                return None
+            if pd.isna(value):
+                return None
+            return float(value)
+        except Exception:
+            return None
+
+    def _load_latest_healthy_archive(self):
+        try:
+            if not Config.CSV_FILE.exists():
+                return []
+            df = pd.read_csv(Config.CSV_FILE)
+            if df.empty or 'timestamp' not in df.columns:
+                return []
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df = df.dropna(subset=['timestamp'])
+            if df.empty:
+                return []
+            df['_archive_day'] = df['timestamp'].dt.strftime('%Y-%m-%d')
+            for _, group in df.sort_values('timestamp', ascending=False).groupby('_archive_day', sort=False):
+                records = group.drop(columns=['_archive_day']).to_dict(orient='records')
+                if self._is_healthy_api_batch(records):
+                    return records
+            return []
+        except Exception as exc:
+            self.logger.error(f"Could not load healthy archive fallback: {exc}")
+            return []
     
     def _fetch_api_data(self):
         """
@@ -1641,13 +1709,43 @@ class DataManager:
                 return None
             
             df = pd.read_csv(Config.CSV_FILE)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df = df.dropna(subset=['timestamp'])
+            if df.empty:
+                return df
             
             cutoff = Config.now() - timedelta(days=days)
-            return df[df['timestamp'] > cutoff]
+            recent = df[df['timestamp'] > cutoff].copy()
+            if self._is_healthy_recent_frame(recent):
+                return recent
+
+            self.logger.warning(
+                f"Recent {days}-day window is weak ({len(recent)} rows); "
+                "using latest healthy archived monitoring day instead"
+            )
+            df['_archive_day'] = df['timestamp'].dt.strftime('%Y-%m-%d')
+            for _, group in df.sort_values('timestamp', ascending=False).groupby('_archive_day', sort=False):
+                candidate = group.drop(columns=['_archive_day']).copy()
+                if self._is_healthy_recent_frame(candidate):
+                    return candidate
+            return recent if not recent.empty else df.drop(columns=['_archive_day']).tail(Config.MIN_HEALTHY_LIVE_RECORDS)
         except Exception as e:
             self.logger.error(f"Error retrieving data: {str(e)}")
             return None
+
+    def _is_healthy_recent_frame(self, df):
+        if df is None or df.empty or len(df) < Config.MIN_HEALTHY_LIVE_RECORDS:
+            return False
+        station_count = 0
+        try:
+            station_count = self._station_identity_series(df).nunique()
+        except Exception:
+            station_count = df.get('station_name', pd.Series(dtype='object')).nunique()
+        numeric_rows = 0
+        available_columns = [column for column in Config.WATER_QUALITY_COLUMNS if column in df.columns]
+        if available_columns:
+            numeric_rows = df[available_columns].apply(pd.to_numeric, errors='coerce').notna().any(axis=1).sum()
+        return station_count >= Config.MIN_HEALTHY_LIVE_STATIONS and numeric_rows >= max(50, int(len(df) * 0.08))
 
 # ==================== VISUALIZATION ====================
 class PlotGenerator:
@@ -2544,6 +2642,7 @@ class PlotGenerator:
     html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #071426; }}
     #plot {{ width: 100%; height: 100vh; min-height: 760px; }}
     @media (max-width: 760px) {{ #plot {{ min-height: 820px; }} }}
+
   </style>
 </head>
 <body>
@@ -3204,6 +3303,64 @@ class PlotGenerator:
             fig.suptitle('Greenhouse Irrigation And Water-Curtain Reliability Space', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
             fig.text(0.115, 0.93, 'Dry-day frequency and ET0 indicate irrigation demand and possible groundwater/surface-water pressure for protected cultivation systems', fontsize=12, color='#53677f')
             self._save_figure(fig, self._plots_dir() / 'agroclimate_greenhouse_reliability_space.png', rect=[0, 0, 1, 0.90])
+
+            radar_metrics = [
+                ('drought_stress', 'Drought'),
+                ('heat_stress', 'Heat'),
+                ('runoff_extreme', 'Runoff'),
+                ('bloom_agri_pressure', 'Bloom'),
+                ('climate_shift_sensitivity', 'Climate'),
+            ]
+            top_radar = model.sort_values('kwaterguard_prediction_index', ascending=False).head(5).copy()
+            angles = np.linspace(0, 2 * np.pi, len(radar_metrics), endpoint=False).tolist()
+            angles += angles[:1]
+            fig = plt.figure(figsize=(12.6, 9.0), facecolor=self.FIG_BG)
+            ax = fig.add_subplot(111, polar=True)
+            palette = ['#0b4f8a', '#d73345', '#f08a5d', '#1f7897', '#6b4ca0']
+            for color, (_, row) in zip(palette, top_radar.iterrows()):
+                values = [float(row[column]) for column, _ in radar_metrics]
+                values += values[:1]
+                ax.plot(angles, values, color=color, linewidth=2.4, label=str(row['basin']))
+                ax.fill(angles, values, color=color, alpha=0.12)
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels([label for _, label in radar_metrics], fontsize=12, fontweight='bold', color=self.INK)
+            ax.set_ylim(0, 1)
+            ax.set_yticks([0.25, 0.50, 0.75, 1.0])
+            ax.set_yticklabels(['0.25', '0.50', '0.75', '1.00'], color='#53677f')
+            ax.grid(color='#d8e5f4', linewidth=1.0)
+            ax.spines['polar'].set_color('#9db3cb')
+            ax.legend(loc='upper right', bbox_to_anchor=(1.20, 1.10), frameon=True, edgecolor='#d5e4f5')
+            fig.suptitle('Top Basin Multi-Hazard Agriculture Risk Fingerprints', fontweight='bold', fontsize=21, color=self.INK, y=0.98)
+            fig.text(0.11, 0.925, 'Radar profiles show why a basin is ranked high: drought demand, heat load, runoff extremes, bloom pressure, and climate sensitivity', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_multi_hazard_radar.png', rect=[0, 0, 1, 0.90])
+
+            priorities = model.copy().sort_values('kwaterguard_prediction_index', ascending=True)
+            priorities['Irrigation scheduling'] = (priorities['drought_stress'] * 0.70 + priorities['et0'].clip(0, 8) / 8.0 * 0.30).clip(0, 1)
+            priorities['Greenhouse cooling'] = (priorities['heat_stress'] * 0.75 + priorities['humidity'].clip(0, 100) / 100.0 * 0.25).clip(0, 1)
+            priorities['Water-curtain reliability'] = (priorities['drought_stress'] * 0.55 + priorities['climate_shift_sensitivity'] * 0.45).clip(0, 1)
+            priorities['Runoff quality protection'] = (priorities['runoff_extreme'] * 0.68 + priorities['bloom_agri_pressure'] * 0.32).clip(0, 1)
+            fig, ax = self._new_figure(figsize=(15.4, 7.8))
+            left = np.zeros(len(priorities))
+            priority_specs = [
+                ('Irrigation scheduling', '#0b4f8a'),
+                ('Greenhouse cooling', '#d73345'),
+                ('Water-curtain reliability', '#1f7897'),
+                ('Runoff quality protection', '#f08a5d'),
+            ]
+            y_pos = np.arange(len(priorities))
+            for column, color in priority_specs:
+                values = priorities[column].to_numpy()
+                ax.barh(y_pos, values, left=left, color=color, edgecolor='white', linewidth=0.9, label=column)
+                left += values
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(priorities['basin'].astype(str), fontsize=12)
+            ax.set_xlabel('Relative intervention priority score')
+            ax.set_ylabel('')
+            self._style_axis(ax, grid_axis='x')
+            ax.legend(loc='lower right', frameon=True, framealpha=0.94, edgecolor='#d5e4f5')
+            fig.suptitle('Agriculture Adaptation Priority Stack By Basin', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+            fig.text(0.125, 0.93, 'Operational priorities translate model drivers into management actions for irrigation, greenhouse cooling, water-curtain supply, and runoff-quality protection', fontsize=12, color='#53677f')
+            self._save_figure(fig, self._plots_dir() / 'agroclimate_adaptation_priority_stack.png', rect=[0, 0, 1, 0.90])
 
             geo = model.dropna(subset=['latitude', 'longitude']).copy()
             if not geo.empty:
@@ -7340,6 +7497,105 @@ class DashboardGenerator:
         bottom: 150px !important;
       }}
     }}
+    /* K-WaterGuard correction layer v18: laptop-safe layout and app-like mobile readability. */
+    @media (min-width: 901px) {{
+      body .nav-tabs {{
+        position: relative !important;
+        top: auto !important;
+        z-index: 40 !important;
+        margin-top: 0 !important;
+      }}
+      header .wrap {{
+        padding-top: 18px !important;
+        padding-bottom: 18px !important;
+      }}
+    }}
+    @media (max-width: 1900px) {{
+      .edge-rail {{ display: none !important; }}
+      main.wrap,
+      footer {{
+        width: min(100% - 28px, 1500px) !important;
+      }}
+    }}
+    @media (max-width: 1280px) {{
+      header {{
+        min-height: 240px !important;
+        padding-bottom: 24px !important;
+      }}
+      header h1 {{
+        font-size: clamp(44px, 6.2vw, 72px) !important;
+        max-width: calc(100vw - 56px) !important;
+      }}
+      header .subtitle {{
+        max-width: min(760px, calc(100vw - 56px)) !important;
+      }}
+      .home-overview {{
+        grid-template-columns: 1fr !important;
+      }}
+      .home-overview .overview-panel {{
+        min-height: auto !important;
+      }}
+      .stats,
+      .capability-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }}
+    }}
+    @media (max-width: 760px) {{
+      html {{ font-size: 15px !important; }}
+      header {{
+        min-height: 190px !important;
+        padding: 14px 12px 74px !important;
+      }}
+      header .brand {{ max-width: 48vw !important; }}
+      header h1 {{
+        font-size: clamp(28px, 10vw, 42px) !important;
+        line-height: 1.03 !important;
+        margin-top: 26px !important;
+      }}
+      header .subtitle {{
+        font-size: 14px !important;
+        line-height: 1.28 !important;
+      }}
+      .badge {{
+        font-size: 12px !important;
+        padding: 8px 10px !important;
+      }}
+      .language-corner {{
+        transform: scale(.88) !important;
+        transform-origin: top right !important;
+      }}
+      main.wrap,
+      footer {{
+        width: 100% !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+      }}
+      .home-overview,
+      .section,
+      .card {{
+        border-radius: 14px !important;
+      }}
+      .home-overview h2,
+      .section h2 {{
+        font-size: clamp(25px, 7vw, 34px) !important;
+        line-height: 1.08 !important;
+      }}
+      .stats,
+      .capability-grid,
+      .param-grid,
+      .plots,
+      .two-col,
+      .three-col {{
+        grid-template-columns: 1fr !important;
+      }}
+      .stat .value {{
+        font-size: clamp(25px, 8vw, 38px) !important;
+        overflow-wrap: anywhere !important;
+      }}
+      .plot img {{
+        max-height: none !important;
+      }}
+    }}
   </style>
 </head>
 <body class="page-home">
@@ -9606,6 +9862,8 @@ class DashboardGenerator:
                 ('agroclimate_scenario_sensitivity.png', 'Agriculture Drought And Extreme-Event Scenario Sensitivity'),
                 ('agroclimate_greenhouse_water_curtain_components.png', 'Protected Agriculture And Water-Curtain Risk Components'),
                 ('agroclimate_greenhouse_reliability_space.png', 'Greenhouse Irrigation And Water-Curtain Reliability Space'),
+                ('agroclimate_multi_hazard_radar.png', 'Top Basin Multi-Hazard Agriculture Risk Fingerprints'),
+                ('agroclimate_adaptation_priority_stack.png', 'Agriculture Adaptation Priority Stack By Basin'),
             ],
             'Agrometeorology prediction plots will appear here after the hybrid model is generated.'
         )
@@ -10271,4 +10529,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
