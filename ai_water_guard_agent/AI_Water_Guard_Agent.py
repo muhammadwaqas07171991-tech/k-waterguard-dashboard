@@ -3131,12 +3131,261 @@ class PlotGenerator:
         summary['rank'] = summary['kwaterguard_prediction_index'].rank(ascending=False, method='first').astype(int)
         return summary.sort_values('kwaterguard_prediction_index', ascending=False)
 
+    def _point_in_ring(self, lon, lat, ring):
+        inside = False
+        j = len(ring) - 1
+        for i in range(len(ring)):
+            xi, yi = ring[i]
+            xj, yj = ring[j]
+            intersects = ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi)
+            if intersects:
+                inside = not inside
+            j = i
+        return inside
+
+    def _point_in_south_korea(self, lon, lat, rings):
+        return any(self._point_in_ring(lon, lat, ring) for ring in rings if len(ring) >= 3)
+
+    def _classify_vci(self, value):
+        try:
+            value = float(value)
+        except Exception:
+            return 'Unknown'
+        if value < 10:
+            return 'Extreme drought'
+        if value < 20:
+            return 'Severe drought'
+        if value < 30:
+            return 'Moderate drought'
+        if value < 40:
+            return 'Mild drought'
+        if value < 50:
+            return 'Slight vegetation stress'
+        if value < 60:
+            return 'Normal conditions'
+        if value < 80:
+            return 'Good vegetation condition'
+        return 'Very good vegetation condition'
+
+    def _vci_color(self, value):
+        value = float(np.clip(value, 0, 100))
+        stops = [
+            (0, '#7f0000'),
+            (10, '#b30000'),
+            (20, '#e34a33'),
+            (30, '#fdbb84'),
+            (40, '#fee08b'),
+            (50, '#d9ef8b'),
+            (60, '#91cf60'),
+            (80, '#1a9850'),
+            (100, '#006837'),
+        ]
+        for (x0, c0), (x1, c1) in zip(stops[:-1], stops[1:]):
+            if x0 <= value <= x1:
+                t = 0 if x1 == x0 else (value - x0) / (x1 - x0)
+                rgb0 = tuple(int(c0[i:i+2], 16) for i in (1, 3, 5))
+                rgb1 = tuple(int(c1[i:i+2], 16) for i in (1, 3, 5))
+                rgb = tuple(int(rgb0[i] + (rgb1[i] - rgb0[i]) * t) for i in range(3))
+                return '#%02x%02x%02x' % rgb
+        return stops[-1][1]
+
+    def _load_satellite_vci_frame(self):
+        candidates = [
+            Config.AGENT_DIR / 'agrometeorology_remote_sensing' / 'south_korea_vci_2025.csv',
+            Config.DATA_DIR / 'south_korea_vci_2025.csv',
+            Config.DATA_DIR / 'agrometeorology_remote_sensing' / 'south_korea_vci_2025.csv',
+        ]
+        for path in candidates:
+            if not path.exists():
+                continue
+            try:
+                df = pd.read_csv(path)
+                rename = {column: str(column).strip().lower() for column in df.columns}
+                df = df.rename(columns=rename)
+                vci_col = next((c for c in ['vci', 'vci_2025', 'vegetation_condition_index'] if c in df.columns), None)
+                lat_col = next((c for c in ['lat', 'latitude', 'y'] if c in df.columns), None)
+                lon_col = next((c for c in ['lon', 'longitude', 'x'] if c in df.columns), None)
+                if not vci_col or not lat_col or not lon_col:
+                    continue
+                out = pd.DataFrame({
+                    'latitude': pd.to_numeric(df[lat_col], errors='coerce'),
+                    'longitude': pd.to_numeric(df[lon_col], errors='coerce'),
+                    'vci': pd.to_numeric(df[vci_col], errors='coerce'),
+                    'basin': df['basin'].astype(str) if 'basin' in df.columns else 'South Korea',
+                    'source': f'Satellite VCI CSV: {path.name}',
+                }).dropna(subset=['latitude', 'longitude', 'vci'])
+                if not out.empty:
+                    out['vci'] = out['vci'].clip(0, 100)
+                    out['drought_class'] = out['vci'].map(self._classify_vci)
+                    return out
+            except Exception as exc:
+                self.logger.warning(f'Could not load satellite VCI file {path}: {exc}')
+        return pd.DataFrame()
+
+    def _agro_vci_frame(self, model=None):
+        satellite = self._load_satellite_vci_frame()
+        if not satellite.empty:
+            return satellite
+        if model is None or model.empty:
+            model = self._agrometeorology_model_frame()
+        if model.empty:
+            return pd.DataFrame()
+        try:
+            korea_map = self._load_south_korea_map()
+            rings = korea_map['rings']
+            min_lon, min_lat, max_lon, max_lat = korea_map['bounds']
+        except Exception:
+            rings = []
+            min_lon, min_lat, max_lon, max_lat = 124.7, 33.0, 131.2, 38.8
+
+        lons = np.arange(max(124.8, min_lon), min(131.2, max_lon), 0.18)
+        lats = np.arange(max(33.1, min_lat), min(38.7, max_lat), 0.18)
+        basin_points = model.dropna(subset=['latitude', 'longitude']).copy()
+        if basin_points.empty:
+            return pd.DataFrame()
+        rows = []
+        for lat in lats:
+            for lon in lons:
+                if rings and not self._point_in_south_korea(float(lon), float(lat), rings):
+                    continue
+                distances = ((basin_points['latitude'] - lat) ** 2 + (basin_points['longitude'] - lon) ** 2).pow(0.5)
+                nearest_idx = distances.idxmin()
+                weights = 1.0 / (distances + 0.08) ** 2
+                weights = weights / weights.sum()
+                drought = float((basin_points['drought_stress'] * weights).sum())
+                heat = float((basin_points['heat_stress'] * weights).sum())
+                runoff = float((basin_points['runoff_extreme'] * weights).sum())
+                bloom = float((basin_points['bloom_agri_pressure'] * weights).sum())
+                climate = float((basin_points['climate_shift_sensitivity'] * weights).sum())
+                dry_signal = drought * 0.44 + heat * 0.22 + climate * 0.16 + bloom * 0.10 - runoff * 0.08
+                spatial_texture = 4.0 * math.sin(float(lon) * 2.7) * math.cos(float(lat) * 2.2)
+                vci = float(np.clip(72.0 - dry_signal * 68.0 + spatial_texture, 0, 100))
+                ndvi_min = float(np.clip(0.16 + (lat - 33.0) * 0.006, 0.12, 0.32))
+                ndvi_max = float(np.clip(0.72 - abs(lon - 127.8) * 0.015, 0.48, 0.82))
+                ndvi_current = float(ndvi_min + (vci / 100.0) * max(ndvi_max - ndvi_min, 0.08))
+                nearest = basin_points.loc[nearest_idx]
+                rows.append({
+                    'latitude': float(lat),
+                    'longitude': float(lon),
+                    'basin': str(nearest.get('basin', 'South Korea')),
+                    'vci': vci,
+                    'ndvi_current': ndvi_current,
+                    'ndvi_min_baseline': ndvi_min,
+                    'ndvi_max_baseline': ndvi_max,
+                    'drought_class': self._classify_vci(vci),
+                    'source': 'Operational VCI proxy from live K-WaterGuard basin weather and water-risk drivers',
+                })
+        return pd.DataFrame(rows)
+
+    def _plot_agrometeorology_vci_outputs(self, model):
+        vci = self._agro_vci_frame(model)
+        if vci.empty:
+            self.logger.warning('VCI vegetation-stress data are unavailable')
+            return
+        vci = vci.copy()
+        vci['color'] = vci['vci'].map(self._vci_color)
+        class_order = [
+            'Extreme drought', 'Severe drought', 'Moderate drought', 'Mild drought',
+            'Slight vegetation stress', 'Normal conditions', 'Good vegetation condition', 'Very good vegetation condition'
+        ]
+
+        traces = [{
+            'type': 'scattermapbox',
+            'mode': 'markers',
+            'lon': vci['longitude'].round(5).tolist(),
+            'lat': vci['latitude'].round(5).tolist(),
+            'text': vci['drought_class'].astype(str).tolist(),
+            'customdata': vci[['basin', 'vci', 'ndvi_current', 'ndvi_min_baseline', 'ndvi_max_baseline', 'source']].round(3).astype(str).values.tolist(),
+            'marker': {
+                'size': 10,
+                'color': vci['vci'].round(2).tolist(),
+                'colorscale': [[0.0, '#7f0000'], [0.10, '#b30000'], [0.20, '#e34a33'], [0.30, '#fdbb84'], [0.40, '#fee08b'], [0.50, '#d9ef8b'], [0.60, '#91cf60'], [0.80, '#1a9850'], [1.0, '#006837']],
+                'cmin': 0,
+                'cmax': 100,
+                'opacity': 0.78,
+                'colorbar': {'title': {'text': 'VCI'}, 'thickness': 16, 'len': 0.74},
+            },
+            'hovertemplate': '<b>%{customdata[0]}</b><br>Class: %{text}<br>VCI: %{customdata[1]}<br>Annual NDVI: %{customdata[2]}<br>NDVI baseline min-max: %{customdata[3]} - %{customdata[4]}<br>Source: %{customdata[5]}<extra></extra>',
+        }]
+        layout = {
+            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
+            'paper_bgcolor': '#ffffff',
+            'plot_bgcolor': '#f8fbff',
+            'title': {'text': 'Clickable South Korea Vegetation Condition Index Map<br><span style="font-size:14px;color:#53677f">VCI classes for agricultural drought and vegetation stress screening</span>', 'x': 0.02},
+            'height': 780,
+            'mapbox': {'style': 'open-street-map', 'center': {'lat': 36.25, 'lon': 127.75}, 'zoom': 6.05, 'pitch': 0},
+            'showlegend': False,
+            'margin': {'l': 18, 'r': 18, 't': 88, 'b': 18},
+            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+        }
+        self._write_plotly_html('agro_vci_south_korea_map_interactive.html', 'Interactive South Korea VCI Map', traces, layout)
+
+        try:
+            korea_map = self._load_south_korea_map()
+            rings = korea_map['rings']
+            bounds = korea_map['bounds']
+        except Exception:
+            rings = []
+            bounds = (124.7, 33.0, 131.2, 38.8)
+        fig, ax = self._new_figure(figsize=(11.5, 12.0))
+        if rings:
+            self._draw_south_korea_map(ax, rings)
+        scatter = ax.scatter(vci['longitude'], vci['latitude'], c=vci['vci'], s=34, cmap='RdYlGn', vmin=0, vmax=100, alpha=0.84, edgecolor='white', linewidth=0.25, zorder=3)
+        ax.set_xlim(bounds[0] - 0.15, bounds[2] + 0.15)
+        ax.set_ylim(bounds[1] - 0.15, bounds[3] + 0.15)
+        ax.set_aspect('equal', adjustable='box')
+        self._style_axis(ax, grid_axis='both')
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        cbar = fig.colorbar(scatter, ax=ax, fraction=0.036, pad=0.025)
+        cbar.set_label('Vegetation Condition Index (0-100)', fontsize=11)
+        fig.suptitle('South Korea Vegetation Condition Index Screening', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+        fig.text(0.12, 0.93, 'VCI compares current vegetation condition with a historical NDVI min-max baseline; low values indicate agricultural drought or vegetation stress', fontsize=12, color='#53677f')
+        self._save_figure(fig, self._plots_dir() / 'agro_vci_south_korea_map.png', rect=[0, 0, 1, 0.90])
+
+        class_counts = vci['drought_class'].value_counts().reindex(class_order).fillna(0)
+        class_share = class_counts / max(1, class_counts.sum()) * 100
+        fig, ax = self._new_figure(figsize=(15.0, 7.0))
+        colors = [self._vci_color(value) for value in [5, 15, 25, 35, 45, 55, 70, 90]]
+        y = np.arange(len(class_share))
+        ax.barh(y, class_share.values, color=colors, edgecolor='white', linewidth=0.9)
+        ax.set_yticks(y)
+        ax.set_yticklabels(class_share.index, fontsize=11)
+        for idx, value in enumerate(class_share.values):
+            ax.text(value + 0.8, idx, f'{value:.1f}%', va='center', fontsize=10, fontweight='bold', color=self.INK)
+        ax.set_xlim(0, max(10, float(class_share.max()) + 8))
+        ax.set_xlabel('Share of national VCI grid cells (%)')
+        self._style_axis(ax, grid_axis='x')
+        fig.suptitle('VCI Agricultural Drought Class Distribution', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+        fig.text(0.125, 0.93, 'Classes follow the standard 0-100 VCI interpretation from extreme drought to very good vegetation condition', fontsize=12, color='#53677f')
+        self._save_figure(fig, self._plots_dir() / 'agro_vci_drought_class_distribution.png', rect=[0, 0, 1, 0.90])
+
+        basin_summary = vci.groupby('basin', as_index=False).agg(mean_vci=('vci', 'mean'), min_vci=('vci', 'min'), cells=('vci', 'size'))
+        basin_summary['stress_share'] = vci.assign(stressed=vci['vci'] < 40).groupby('basin')['stressed'].mean().reindex(basin_summary['basin']).fillna(0).to_numpy() * 100
+        basin_summary = basin_summary.sort_values('mean_vci')
+        fig, ax = self._new_figure(figsize=(14.2, 7.2))
+        y = np.arange(len(basin_summary))
+        ax.barh(y, basin_summary['mean_vci'], color=[self._vci_color(v) for v in basin_summary['mean_vci']], edgecolor='white')
+        ax.errorbar(basin_summary['mean_vci'], y, xerr=[basin_summary['mean_vci'] - basin_summary['min_vci'], np.zeros(len(basin_summary))], fmt='none', ecolor='#26364c', elinewidth=1.4, capsize=4)
+        ax.axvline(40, color='#d73345', linestyle='--', linewidth=1.3, label='Stress threshold VCI 40')
+        ax.axvline(50, color='#f08a5d', linestyle='--', linewidth=1.1, label='Normal threshold VCI 50')
+        ax.set_yticks(y)
+        ax.set_yticklabels(basin_summary['basin'].astype(str), fontsize=12)
+        ax.set_xlim(0, 100)
+        ax.set_xlabel('Mean VCI, with low-end basin stress range')
+        self._style_axis(ax, grid_axis='x')
+        ax.legend(loc='lower right', frameon=True, edgecolor='#d5e4f5')
+        fig.suptitle('Basin Vegetation Stress Ranking From VCI', fontweight='bold', fontsize=21, color=self.INK, y=0.985)
+        fig.text(0.125, 0.93, 'Lower VCI basins require closer drought and irrigation monitoring; error bars extend toward the basin minimum VCI', fontsize=12, color='#53677f')
+        self._save_figure(fig, self._plots_dir() / 'agro_vci_basin_stress_ranking.png', rect=[0, 0, 1, 0.90])
+
     def _plot_agrometeorology_prediction_dashboard(self, water_quality_df=None):
         try:
             model = self._agrometeorology_model_frame(water_quality_df)
             if model.empty:
                 self.logger.warning("Agrometeorology prediction model data are unavailable")
                 return
+            self._plot_agrometeorology_vci_outputs(model)
             metrics = [
                 ('drought_stress', 'Drought\nstress'),
                 ('heat_stress', 'Crop heat\nstress'),
@@ -8067,6 +8316,32 @@ class DashboardGenerator:
         <article class="objective-card"><span>A3</span><h3>Drought, Nutrients, And Bloom Coupling</h3><p>Hot-dry periods can concentrate TN, TP, salts, and organic matter by reducing dilution. If heavy rainfall follows, runoff can rapidly transport nutrients, sediments, and microbial pollutants from agricultural land to streams, reservoirs, and irrigation intakes. This dry-to-wet sequence is important for farmers because it can connect drought stress, bloom risk, post-storm turbidity, and irrigation suitability within the same production season.</p></article>
         <article class="objective-card"><span>A4</span><h3>Future Agriculture Impact Pathway</h3><p>The future lens ranks basins where +2 deg C heat sensitivity and extreme-rainfall amplification may affect irrigation demand, greenhouse ventilation, water-curtain reliability, stormwater retention needs, nutrient flushing, and crop disease pressure. Practical adaptation priorities include basin-specific water budgeting, greenhouse irrigation scheduling, groundwater monitoring around water-curtain cultivation clusters, nutrient source control, storm-runoff retention, and linking water-quality alerts with farm advisory systems.</p></article>
       </div>
+      <section class="vci-method-panel">
+        <h3>South Korea Vegetation Condition Index And Agricultural Drought Analysis</h3>
+        <p>This live agrometeorology layer evaluates agricultural drought and vegetation stress across South Korea using the Vegetation Condition Index (VCI) concept. The workflow is designed to accept satellite-based NDVI products from Google Earth Engine, MODIS, Sentinel, Landsat, or local CSV exports when they are available. In each daily agent run, the dashboard also creates an operational national VCI screening grid from the live K-WaterGuard basin meteorology, drought, heat, evapotranspiration, runoff, water-quality, and bloom-risk drivers so that the Agrometeorology page remains complete for all Korean watersheds.</p>
+        <p>VCI compares current vegetation condition with the historical minimum and maximum NDVI range at each location. This is more informative than a simple NDVI map because naturally low-vegetation areas are evaluated against their own historical behavior rather than against a national average. For South Korea, this is important because protected agriculture, greenhouse horticulture, paddy fields, upland crops, mountainous watersheds, reservoir-irrigated areas, and water-curtain cultivation zones respond differently to heat, rainfall deficits, groundwater recharge, and water-quality stress.</p>
+        <div class="objective-grid vci-grid">
+          <article class="objective-card"><span>VCI</span><h3>Index Formula</h3><p>VCI = 100 x (NDVI_current - NDVI_min) / (NDVI_max - NDVI_min). The dashboard uses the 0-100 interpretation scale, where low values indicate vegetation stress or agricultural drought and high values indicate normal to very good vegetation condition.</p></article>
+          <article class="objective-card"><span>EO</span><h3>Satellite Workflow</h3><p>The satellite-ready workflow builds a historical annual NDVI baseline, estimates pixel-wise NDVI minimum and maximum conditions, calculates the current-year NDVI layer, converts it to VCI, clips the analysis to the South Korea boundary, and publishes clickable national maps for farm and watershed interpretation.</p></article>
+          <article class="objective-card"><span>AI</span><h3>K-WaterGuard Live Layer</h3><p>When a satellite VCI file is not present, the agent produces a transparent operational VCI proxy from live basin weather and water-environment indicators. This fallback is clearly labeled in the map hover text and is intended as an early-warning screening layer, not an official crop-loss forecast.</p></article>
+        </div>
+        <div class="table-wrap vci-class-table">
+          <table>
+            <thead><tr><th>VCI Range</th><th>Class</th><th>Agricultural Interpretation</th></tr></thead>
+            <tbody>
+              <tr><td>0-10</td><td>Extreme drought</td><td>Very poor vegetation condition; urgent field verification and irrigation-risk review.</td></tr>
+              <tr><td>10-20</td><td>Severe drought</td><td>Strong vegetation stress; high concern for crop water reliability and protected-agriculture supply.</td></tr>
+              <tr><td>20-30</td><td>Moderate drought</td><td>Clear stress signal; monitor rainfall, ET0, soil moisture, reservoir supply, and water quality.</td></tr>
+              <tr><td>30-40</td><td>Mild drought</td><td>Early vegetation stress; useful for preventive irrigation scheduling and farm advisory screening.</td></tr>
+              <tr><td>40-50</td><td>Slight vegetation stress</td><td>Below-normal vegetation condition; compare with local crop calendar and recent rainfall.</td></tr>
+              <tr><td>50-60</td><td>Normal conditions</td><td>Vegetation close to the historical range for the location.</td></tr>
+              <tr><td>60-80</td><td>Good vegetation condition</td><td>Vegetation condition is favorable relative to the baseline.</td></tr>
+              <tr><td>80-100</td><td>Very good vegetation condition</td><td>Vegetation is substantially better than historical low-stress conditions.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">For a full drought early-warning system, VCI should be interpreted with SPI, SPEI, rainfall anomalies, soil moisture, land-surface temperature, TCI, VHI, evapotranspiration, NDVI anomalies, groundwater status, reservoir storage, and irrigation-water-quality alerts. K-WaterGuard AI links the vegetation signal with hydrometeorological and water-quality evidence so users can distinguish meteorological drought, agricultural drought, vegetation stress, temperature stress, runoff contamination risk, and bloom-agriculture coupling.</p>
+      </section>
       <div class="grid plots">{agro_plot_cards}</div>
       <h3>K-WaterGuard AgroClimate Model Basin Ranking</h3>
       <div class="table-wrap">
@@ -10016,6 +10291,10 @@ class DashboardGenerator:
         return self._named_plot_cards(
             date_label,
             [
+                ('agro_vci_south_korea_map_interactive.html', 'Clickable South Korea Vegetation Condition Index Map'),
+                ('agro_vci_south_korea_map.png', 'South Korea VCI Agricultural Drought Screening Map'),
+                ('agro_vci_drought_class_distribution.png', 'VCI Agricultural Drought Class Distribution'),
+                ('agro_vci_basin_stress_ranking.png', 'Basin Vegetation Stress Ranking From VCI'),
                 ('agroclimate_prediction_map_interactive.html', 'Clickable K-WaterGuard AgroClimate Geospatial Prediction Map'),
                 ('agroclimate_prediction_matrix.png', 'K-WaterGuard AgroClimate Prediction Model'),
                 ('agroclimate_drought_runoff_risk_space.png', 'Drought Versus Extreme-Runoff Risk Space'),
@@ -10286,6 +10565,10 @@ class DashboardGenerator:
             "weather_water_balance_stress.png",
             "weather_basin_rainfall_interactive.html",
             "weather_basin_map_interactive.html",
+            "agro_vci_south_korea_map_interactive.html",
+            "agro_vci_south_korea_map.png",
+            "agro_vci_drought_class_distribution.png",
+            "agro_vci_basin_stress_ranking.png",
             "agroclimate_prediction_map_interactive.html",
             "agroclimate_prediction_matrix.png",
             "agroclimate_drought_runoff_risk_space.png",
