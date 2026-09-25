@@ -6027,6 +6027,367 @@ class DashboardGenerator:
       }}
     }}
 
+
+    /* Ambient Hero Video */
+    header {{
+      position: relative;
+      overflow: hidden;
+      min-height: 290px;
+      color: #ffffff;
+      padding: clamp(38px, 5vw, 56px) 0 clamp(30px, 4vw, 44px);
+      border-bottom: 1px solid var(--border-glass);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      background: #04090e;
+    }}
+
+    .hero-video-container {{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }}
+
+    .hero-bg-video {{
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+      opacity: 0.35;
+      filter: saturate(1.35) contrast(1.15) brightness(0.65);
+    }}
+
+    .hero-video-overlay {{
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px 420px at 15% 10%, rgba(56, 189, 248, 0.24) 0%, transparent 70%),
+        radial-gradient(900px 380px at 85% 0%, rgba(52, 211, 153, 0.18) 0%, transparent 60%),
+        linear-gradient(180deg, rgba(4, 9, 14, 0.68) 0%, rgba(7, 21, 34, 0.88) 75%, var(--bg-base) 100%);
+      pointer-events: none;
+    }}
+
+    .hero-content {{
+      position: relative;
+      z-index: 2;
+    }}
+
+    /* Suppress any legacy unstyled edge rails */
+    .edge-rail, aside.edge-rail, body > .edge-rail {{
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }}
+
+    /* Telemetry Bento Grid Matrix */
+    .telemetry-matrix-section {{
+      margin: 28px 0;
+    }}
+
+    .telemetry-bento-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }}
+
+    @media (max-width: 1100px) {{
+      .telemetry-bento-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+    }}
+
+    @media (max-width: 680px) {{
+      .telemetry-bento-grid {{
+        grid-template-columns: 1fr;
+      }}
+    }}
+
+    .bento-card {{
+      background: rgba(7, 21, 34, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }}
+
+    .bento-card::before {{
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5), transparent);
+      opacity: 0.6;
+    }}
+
+    .bento-card:hover {{
+      transform: translateY(-4px);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: var(--shadow-md), 0 0 25px rgba(56, 189, 248, 0.16);
+    }}
+
+    .bento-card.bento-glow-cyan::before {{
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }}
+
+    .bento-card.bento-glow-emerald::before {{
+      background: linear-gradient(90deg, transparent, var(--emerald), transparent);
+    }}
+
+    .bento-card.bento-glow-coral::before {{
+      background: linear-gradient(90deg, transparent, var(--coral), transparent);
+    }}
+
+    .bento-head {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }}
+
+    .bento-head h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }}
+
+    .bento-badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--cyan);
+    }}
+
+    .bento-metrics-row {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+
+    .bento-metric-item {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }}
+
+    .bento-metric-item:last-child {{
+      border-bottom: none;
+    }}
+
+    .bento-metric-item span {{
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }}
+
+    .bento-metric-item strong {{
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }}
+
+    .mini-bar {{
+      height: 6px;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+    }}
+
+    .mini-bar i {{
+      display: block;
+      height: 100%;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(90deg, #38bdf8, #00f2fe);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }}
+
+    .mini-bar.blue i {{
+      background: linear-gradient(90deg, #38bdf8, #34d399);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+    }}
+
+    .mini-bar.red i {{
+      background: linear-gradient(90deg, #fbbf24, #fb7185);
+      box-shadow: 0 0 10px rgba(251, 113, 133, 0.5);
+    }}
+
+    .edge-spark {{
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 38px;
+      padding-top: 6px;
+    }}
+
+    .edge-spark i {{
+      flex: 1;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #38bdf8 0%, rgba(56, 189, 248, 0.25) 100%);
+      transition: height 0.3s ease;
+    }}
+
+    .edge-spark.red i {{
+      background: linear-gradient(180deg, #fb7185 0%, rgba(251, 113, 133, 0.25) 100%);
+    }}
+
+    .bento-kpi-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }}
+
+    .bento-kpi-box {{
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      text-align: center;
+    }}
+
+    .bento-kpi-box span {{
+      display: block;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }}
+
+    .bento-kpi-box strong {{
+      font-family: var(--font-heading);
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--cyan);
+    }}
+
+    .bento-list {{
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }}
+
+    .bento-list li {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }}
+
+    .bento-list li::before {{
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      flex-shrink: 0;
+    }}
+
+    .bento-pill-tags {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }}
+
+    .bento-pill-tags span {{
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }}
+
+    /* Video Showcase Card */
+    .video-showcase-container {{
+      margin: 16px 0 24px;
+    }}
+
+    .video-showcase-card {{
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-glass);
+      background: var(--bg-surface);
+      box-shadow: var(--shadow-md);
+      transition: var(--transition);
+      max-height: 380px;
+    }}
+
+    .video-showcase-card:hover {{
+      border-color: var(--cyan);
+      box-shadow: var(--shadow-lg), 0 0 30px rgba(56, 189, 248, 0.25);
+    }}
+
+    .showcase-video {{
+      width: 100%;
+      height: 100%;
+      max-height: 380px;
+      object-fit: cover;
+      display: block;
+      filter: saturate(1.2) contrast(1.05);
+    }}
+
+    .video-showcase-overlay {{
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(4, 9, 14, 0.1) 0%, rgba(4, 9, 14, 0.85) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 24px;
+      pointer-events: none;
+    }}
+
+    .video-showcase-overlay h4 {{
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 8px 0 0;
+      letter-spacing: -0.01em;
+    }}
+
     @media (max-width: 600px) {{
       .stats {{ grid-template-columns: 1fr; }}
       .capability-grid {{ grid-template-columns: 1fr; }}
@@ -6040,22 +6401,31 @@ class DashboardGenerator:
 </head>
 <body class="page-home">
   <canvas id="ambient-canvas" aria-hidden="true"></canvas>
-  {side_rail_html}
   <div class="language-switch language-corner" aria-label="Language">
     <a class="active lang-en" href="__EN_PAGE__">English</a>
     <a class="lang-ko" href="__KO_PAGE__">한국어</a>
   </div>
   <header>
-    <div class="wrap">
+    <div class="hero-video-container" aria-hidden="true">
+      <video class="hero-bg-video" autoplay loop muted playsinline poster="{self._asset_uri('KwGAI logo.png')}">
+        <source src="assets/videos/bg-water.mp4" type="video/mp4">
+        <source src="bg-video-services.mp4" type="video/mp4">
+      </video>
+      <div class="hero-video-overlay"></div>
+    </div>
+    <div class="wrap hero-content">
       <div class="topline">
         <div class="brand">
           <img class="brand-logo" src="{self._asset_uri('KwGAI logo.png')}" alt="K-Water Guard AI logo">
           <span class="brand-name">K-Water Guard AI</span>
         </div>
-        <span class="badge">Daily update: Korea time</span>
+        <div class="status-pill">
+          <span class="pulse-dot"></span>
+          <span>Autonomous Water Guard AI</span>
+        </div>
       </div>
       <h1>Water Quality Dashboard</h1>
-      <p class="subtitle">Latest daily monitoring view for South Korea stations, with readable station locations, summary indicators, maps, and downloadable data.</p>
+      <p class="subtitle">Autonomous environmental AI intelligence for South Korea\'s rivers, reservoirs, and agricultural watersheds with real-time sensor analytics, algal bloom early-warning, and predictive climatology.</p>
     </div>
   </header>
   <main class="wrap">
@@ -6114,6 +6484,8 @@ class DashboardGenerator:
       {self._stat_card('Cities / Provinces', f'{city_count:,} / {province_count:,}')}
       {self._stat_card('Alert Stations', f'{alert_station_count:,}')}
     </section>
+
+  {side_rail_html}
 
     <section class="page page-home">
       <div class="capability-grid">
@@ -6331,6 +6703,17 @@ class DashboardGenerator:
     <section class="card section page page-agro" id="agrometeorologyPage">
       <h2>Agrometeorology Prediction And Climate Impact Outlook</h2>
       <div class="grid three-col">{agro_stat_cards}</div>
+      <div class="video-showcase-container">
+        <div class="video-showcase-card">
+          <video class="showcase-video" autoplay loop muted playsinline>
+            <source src="assets/videos/bg-drone.mp4" type="video/mp4">
+          </video>
+          <div class="video-showcase-overlay">
+            <span class="bento-badge">Autonomous Aerial Sensation</span>
+            <h4>Smart Agricultural Drone Surveillance &amp; Watershed Field Scanning</h4>
+          </div>
+        </div>
+      </div>
       <p class="muted">The K-WaterGuard AgroClimate Prediction Model is a transparent hybrid screening model that combines basin-scale daily meteorology, recent water-quality nutrient pressure, cyanobacteria context, evapotranspiration demand, heat-stress thresholds, and scenario sensitivity rules. The purpose is not to replace official agricultural or meteorological forecasts, but to convert the daily water-environment archive into an interpretable early-warning layer for irrigation reliability, drought tendency, runoff-driven contamination risk, bloom-agriculture coupling, and climate-change stress screening.</p>
       <div class="objective-grid">
         <article class="objective-card"><span>01</span><h3>Agriculture Water Stress</h3><p>The agriculture-water-stress score ranks each basin using the number of dry days in the latest 14-day window, reference evapotranspiration, maximum temperature, and crop heat-stress exposure. Higher scores indicate basins where irrigation demand may rise faster than natural rainfall replenishment, especially when warm conditions increase ET0 and reduce soil-water persistence. This layer is useful for farmers, watershed managers, and extension experts who need a basin-scale view of potential crop water stress before field-level decisions are made.</p></article>
@@ -6954,83 +7337,117 @@ class DashboardGenerator:
         calm_ratio = 0 if not station_count else min(100, int((calm_count / max(station_count, 1)) * 100))
         latest_date_text = html.escape(str(latest_date))
         return f"""
-  <aside class="edge-rail edge-left" aria-label="Network intelligence">
-    <div class="edge-card">
-      <h3>Network Pulse</h3>
-      <div class="edge-metric"><span>Latest date</span><strong>{latest_date_text}</strong></div>
-      <div class="edge-metric"><span>Stations</span><strong>{station_count:,}</strong></div>
-      <div class="edge-metric"><span>Daily records</span><strong>{record_count:,}</strong></div>
-      <div class="mini-bar"><i style="width:{record_ratio}%"></i></div>
-      <div class="edge-spark" aria-hidden="true">
-        <i style="height:34%"></i><i style="height:44%"></i><i style="height:51%"></i><i style="height:62%"></i>
-        <i style="height:56%"></i><i style="height:72%"></i><i style="height:68%"></i><i style="height:78%"></i>
-        <i style="height:64%"></i><i style="height:82%"></i><i style="height:76%"></i><i style="height:88%"></i>
+  <section class="card section telemetry-matrix-section page page-home" id="telemetryMatrix">
+    <div class="section-head">
+      <div>
+        <p class="section-kicker">Real-Time Sensor Telemetry &amp; Autonomous QA</p>
+        <h2>Autonomous Telemetry &amp; Risk Matrix</h2>
+      </div>
+      <span class="status-pill"><span class="pulse-dot"></span> Live Network Telemetry</span>
+    </div>
+    <div class="telemetry-bento-grid">
+      <!-- Network Pulse -->
+      <div class="bento-card bento-glow-cyan">
+        <div class="bento-head">
+          <h3>Network Pulse</h3>
+          <span class="bento-badge">Real-Time</span>
+        </div>
+        <div class="bento-metrics-row">
+          <div class="bento-metric-item"><span>Latest Date</span><strong>{latest_date_text}</strong></div>
+          <div class="bento-metric-item"><span>Active Stations</span><strong>{station_count:,}</strong></div>
+          <div class="bento-metric-item"><span>Daily Records</span><strong>{record_count:,}</strong></div>
+        </div>
+        <div class="mini-bar"><i style="width:{record_ratio}%"></i></div>
+        <div class="edge-spark" aria-hidden="true">
+          <i style="height:34%"></i><i style="height:44%"></i><i style="height:51%"></i><i style="height:62%"></i>
+          <i style="height:56%"></i><i style="height:72%"></i><i style="height:68%"></i><i style="height:78%"></i>
+          <i style="height:64%"></i><i style="height:82%"></i><i style="height:76%"></i><i style="height:88%"></i>
+        </div>
+      </div>
+
+      <!-- Coverage Signal -->
+      <div class="bento-card bento-glow-emerald">
+        <div class="bento-head">
+          <h3>Coverage Signal</h3>
+          <span class="bento-badge">National</span>
+        </div>
+        <div class="bento-metrics-row">
+          <div class="bento-metric-item"><span>Coverage Ratio</span><strong>{province_ratio}%</strong></div>
+          <div class="bento-metric-item"><span>Cities / Provinces</span><strong>{city_count:,} / {province_count:,}</strong></div>
+        </div>
+        <div class="mini-bar blue"><i style="width:{province_ratio}%"></i></div>
+        <p style="color:var(--text-secondary);font-size:0.88rem;margin:0;line-height:1.5;">National watershed coverage with verified sensor identities and continuous API records.</p>
+        <div class="bento-pill-tags">
+          <span>NIER Grid</span><span>Station QA</span><span>Daily Cycle</span>
+        </div>
+      </div>
+
+      <!-- Station Density -->
+      <div class="bento-card">
+        <div class="bento-head">
+          <h3>Station Density</h3>
+          <span class="bento-badge">Density</span>
+        </div>
+        <div class="bento-kpi-grid">
+          <div class="bento-kpi-box"><span>Network QA</span><strong>{station_ratio}%</strong></div>
+          <div class="bento-kpi-box"><span>Province Ratio</span><strong>{province_ratio}%</strong></div>
+        </div>
+        <ul class="bento-list">
+          <li>Automated hourly telemetry screening</li>
+          <li>Outlier sanitization &amp; quality check</li>
+        </ul>
+      </div>
+
+      <!-- Risk Focus -->
+      <div class="bento-card bento-glow-coral">
+        <div class="bento-head">
+          <h3>Risk Focus</h3>
+          <span class="bento-badge" style="color:var(--coral);border-color:rgba(251,113,133,0.3);background:rgba(251,113,133,0.12)">Risk QA</span>
+        </div>
+        <div class="bento-metrics-row">
+          <div class="bento-metric-item"><span>Alert Stations</span><strong style="color:var(--coral);">{alert_station_count:,}</strong></div>
+          <div class="bento-metric-item"><span>Attention Rows</span><strong>{warning_count:,}</strong></div>
+          <div class="bento-metric-item"><span>Critical Rows</span><strong>{critical_count:,}</strong></div>
+        </div>
+        <div class="mini-bar red"><i style="width:{alert_ratio}%"></i></div>
+        <div class="edge-spark red" aria-hidden="true">
+          <i style="height:28%"></i><i style="height:36%"></i><i style="height:46%"></i><i style="height:42%"></i>
+          <i style="height:55%"></i><i style="height:62%"></i><i style="height:60%"></i><i style="height:70%"></i>
+          <i style="height:66%"></i><i style="height:74%"></i><i style="height:82%"></i><i style="height:78%"></i>
+        </div>
+      </div>
+
+      <!-- Decision Balance -->
+      <div class="bento-card">
+        <div class="bento-head">
+          <h3>Decision Balance</h3>
+          <span class="bento-badge">Status</span>
+        </div>
+        <div class="bento-kpi-grid">
+          <div class="bento-kpi-box"><span>Watch / Alert</span><strong style="color:var(--amber);">{alert_ratio}%</strong></div>
+          <div class="bento-kpi-box"><span>Normal Range</span><strong style="color:var(--emerald);">{calm_ratio}%</strong></div>
+        </div>
+        <p style="color:var(--text-secondary);font-size:0.86rem;margin:0;line-height:1.5;">Coupled with spatial maps, cyanobacteria cell counts, and hydrometeorological stress before field interventions.</p>
+      </div>
+
+      <!-- Research & Decision Conduits -->
+      <div class="bento-card">
+        <div class="bento-head">
+          <h3>Decision Layers</h3>
+          <span class="bento-badge">Multi-Source</span>
+        </div>
+        <ul class="bento-list">
+          <li>Corrected WQ spatial status maps</li>
+          <li>Harmful cyanobacteria watershed alerts</li>
+          <li>Hydrometeorological compound stress</li>
+          <li>Mann-Kendall &amp; Sen trend statistics</li>
+        </ul>
+        <div class="bento-pill-tags">
+          <span>Irrigation QA</span><span>Algal Warning</span><span>API Exports</span>
+        </div>
       </div>
     </div>
-    <div class="edge-card">
-      <h3>Coverage Signal</h3>
-      <div class="edge-metric"><span>Cities / provinces</span><strong>{city_count:,} / {province_count:,}</strong></div>
-      <div class="mini-bar blue"><i style="width:{province_ratio}%"></i></div>
-      <p>National station coverage, corrected station identities, and daily API records.</p>
-    </div>
-    <div class="edge-card">
-      <h3>Station Density</h3>
-      <div class="edge-kpi-grid">
-        <div class="edge-kpi"><span>Network</span><strong>{station_ratio}%</strong></div>
-        <div class="edge-kpi"><span>Coverage</span><strong>{province_ratio}%</strong></div>
-      </div>
-      <div class="edge-pill-list">
-        <span>Daily cycle</span><span>NIER</span><span>Station QA</span>
-      </div>
-    </div>
-    <div class="edge-card">
-      <h3>Research Uses</h3>
-      <ul>
-        <li>Irrigation suitability checks</li>
-        <li>Watershed status screening</li>
-        <li>Historical trend evidence</li>
-        <li>Download-ready station data</li>
-      </ul>
-    </div>
-  </aside>
-  <aside class="edge-rail edge-right" aria-label="Risk intelligence">
-    <div class="edge-card">
-      <h3>Risk Focus</h3>
-      <div class="edge-metric"><span>Alert stations</span><strong>{alert_station_count:,}</strong></div>
-      <div class="edge-metric"><span>Attention rows</span><strong>{warning_count:,}</strong></div>
-      <div class="edge-metric"><span>Critical rows</span><strong>{critical_count:,}</strong></div>
-      <div class="mini-bar red"><i style="width:{alert_ratio}%"></i></div>
-      <div class="edge-spark red" aria-hidden="true">
-        <i style="height:28%"></i><i style="height:36%"></i><i style="height:46%"></i><i style="height:42%"></i>
-        <i style="height:55%"></i><i style="height:62%"></i><i style="height:60%"></i><i style="height:70%"></i>
-        <i style="height:66%"></i><i style="height:74%"></i><i style="height:82%"></i><i style="height:78%"></i>
-      </div>
-    </div>
-    <div class="edge-card">
-      <h3>Decision Balance</h3>
-      <div class="edge-kpi-grid">
-        <div class="edge-kpi"><span>Watch</span><strong>{alert_ratio}%</strong></div>
-        <div class="edge-kpi"><span>Normal</span><strong>{calm_ratio}%</strong></div>
-      </div>
-      <p>Use alerts with maps, cyanobacteria status, weather pressure, and trend direction before field decisions.</p>
-    </div>
-    <div class="edge-card">
-      <h3>Decision Layers</h3>
-      <ul>
-        <li>WQ status maps</li>
-        <li>Cyanobacteria alerts</li>
-        <li>Hydrometeorological pressure</li>
-        <li>Historical MK / Sen trends</li>
-      </ul>
-    </div>
-    <div class="edge-card">
-      <h3>Ask AI</h3>
-      <p>Open the assistant to ask visitors' questions about dates, stations, alerts, maps, downloads, or Korean standards.</p>
-      <div class="edge-pill-list">
-        <span>Visitor help</span><span>Page-aware</span><span>Static fallback</span>
-      </div>
-    </div>
-  </aside>"""
+  </section>"""
 
     def _page_html(self, html_text, page_class):
         page_html = re.sub(r'<body class="[^"]*">', f'<body class="{page_class}">', html_text, count=1)
@@ -7396,6 +7813,15 @@ class DashboardGenerator:
         try:
             agent_dir = Path(__file__).resolve().parent
             repo_dir = agent_dir.parent
+            videos_src = repo_dir / "assets" / "videos"
+            if videos_src.exists():
+                for directory in [Config.DATA_DIR, agent_dir]:
+                    target_videos = directory / "assets" / "videos"
+                    target_videos.mkdir(parents=True, exist_ok=True)
+                    for vf in videos_src.glob("*.mp4"):
+                        target_file = target_videos / vf.name
+                        if not target_file.exists():
+                            shutil.copyfile(vf, target_file)
             for directory in [Config.DATA_DIR, agent_dir, repo_dir]:
                 for filename, page_class in self._page_variants(html_text).items():
                     page_html = self._page_html(html_text, page_class)
@@ -8700,6 +9126,16 @@ class DashboardGenerator:
                 replacements[self._file_uri(source)] = self._site_asset_url(f"assets/{output_name}")
                 if output_name == "logo.png":
                     self._write_pwa_icons(source, assets_dir)
+
+        # Copy background and drone videos to bundle
+        videos_src_dir = Path(__file__).resolve().parent / "assets" / "videos"
+        if not videos_src_dir.exists():
+            videos_src_dir = Path(__file__).resolve().parent.parent / "assets" / "videos"
+        if videos_src_dir.exists():
+            bundle_videos_dir = assets_dir / "videos"
+            bundle_videos_dir.mkdir(parents=True, exist_ok=True)
+            for vfile in videos_src_dir.glob("*.mp4"):
+                shutil.copyfile(vfile, bundle_videos_dir / vfile.name)
 
         daily_plots_dir = Config.daily_plots_dir(date_label)
         if daily_plots_dir.exists():
