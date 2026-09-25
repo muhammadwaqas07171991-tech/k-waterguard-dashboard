@@ -6028,56 +6028,57 @@ class DashboardGenerator:
     }}
 
 
-    /* Ambient Hero Video */
-    header {{
-      position: relative;
+    
+    /* Full-Page Cinematic Ambient Video System (Fills margins & full height) */
+    .bg-video-wrapper {{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
       overflow: hidden;
-      min-height: 290px;
-      color: #ffffff;
-      padding: clamp(38px, 5vw, 56px) 0 clamp(30px, 4vw, 44px);
-      border-bottom: 1px solid var(--border-glass);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      pointer-events: none;
       background: #04090e;
     }}
 
-    .hero-video-container {{
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      z-index: 0;
-      pointer-events: none;
-    }}
-
-    .hero-bg-video {{
+    .bg-video-media {{
       position: absolute;
       top: 50%;
       left: 50%;
+      width: 100%;
+      height: 100%;
       min-width: 100%;
       min-height: 100%;
-      width: auto;
-      height: auto;
       transform: translate(-50%, -50%);
       object-fit: cover;
-      opacity: 0.35;
-      filter: saturate(1.35) contrast(1.15) brightness(0.65);
+      opacity: 0.52;
+      filter: saturate(1.4) contrast(1.12) brightness(0.78);
+      transition: opacity 1.2s ease;
     }}
 
-    .hero-video-overlay {{
+    .bg-video-overlay {{
       position: absolute;
       inset: 0;
+      z-index: 1;
       background:
-        radial-gradient(1100px 420px at 15% 10%, rgba(56, 189, 248, 0.24) 0%, transparent 70%),
-        radial-gradient(900px 380px at 85% 0%, rgba(52, 211, 153, 0.18) 0%, transparent 60%),
-        linear-gradient(180deg, rgba(4, 9, 14, 0.68) 0%, rgba(7, 21, 34, 0.88) 75%, var(--bg-base) 100%);
+        radial-gradient(ellipse 140% 95% at 50% 20%, transparent 35%, rgba(4, 9, 14, 0.45) 70%, rgba(4, 9, 14, 0.88) 100%),
+        linear-gradient(180deg, rgba(4, 9, 14, 0.3) 0%, rgba(4, 9, 14, 0.65) 100%);
       pointer-events: none;
     }}
 
-    .hero-content {{
+    header {{
       position: relative;
-      z-index: 2;
+      overflow: hidden;
+      min-height: 260px;
+      color: #ffffff;
+      padding: clamp(34px, 4.5vw, 50px) 0 clamp(26px, 3.5vw, 38px);
+      background: linear-gradient(180deg, rgba(4, 9, 14, 0.72) 0%, rgba(7, 21, 34, 0.62) 65%, rgba(4, 9, 14, 0.45) 100%);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-glass);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
     }}
+
 
     /* Suppress any legacy unstyled edge rails */
     .edge-rail, aside.edge-rail, body > .edge-rail {{
@@ -6400,19 +6401,22 @@ class DashboardGenerator:
   </style>
 </head>
 <body class="page-home">
+  <!-- Cinematic Full-Page Background Video System (Covers whole screen & wide margins) -->
+  <div class="bg-video-wrapper" aria-hidden="true">
+    <video class="bg-video-media" autoplay loop muted playsinline poster="{self._asset_uri('KwGAI logo.png')}">
+      <source src="assets/videos/bg-water.mp4" type="video/mp4">
+      <source src="assets/videos/bg-river.mp4" type="video/mp4">
+      <source src="{self._site_asset_url('assets/videos/bg-water.mp4')}" type="video/mp4">
+    </video>
+    <div class="bg-video-overlay"></div>
+  </div>
   <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+
   <div class="language-switch language-corner" aria-label="Language">
     <a class="active lang-en" href="__EN_PAGE__">English</a>
     <a class="lang-ko" href="__KO_PAGE__">한국어</a>
   </div>
   <header>
-    <div class="hero-video-container" aria-hidden="true">
-      <video class="hero-bg-video" autoplay loop muted playsinline poster="{self._asset_uri('KwGAI logo.png')}">
-        <source src="assets/videos/bg-water.mp4" type="video/mp4">
-        <source src="bg-video-services.mp4" type="video/mp4">
-      </video>
-      <div class="hero-video-overlay"></div>
-    </div>
     <div class="wrap hero-content">
       <div class="topline">
         <div class="brand">
