@@ -99,8 +99,8 @@ class Config:
     KOREA_TZ = ZoneInfo("Asia/Seoul") if ZoneInfo is not None else None
     AGENT_DIR = Path(__file__).resolve().parent
     
-    # Data storage paths
-    DATA_DIR = Path(os.environ.get("WATER_QUALITY_DATA_DIR", str(Path.home() / "water_quality_data")))
+    _repo_data_dir = AGENT_DIR.parent / "water_quality_data"
+    DATA_DIR = Path(os.environ.get("WATER_QUALITY_DATA_DIR", str(_repo_data_dir if _repo_data_dir.exists() else (Path.home() / "water_quality_data"))))
     CSV_FILE = DATA_DIR / "water_quality_records.csv"
     PLOTS_DIR = DATA_DIR / "plots"
     LOG_FILE = DATA_DIR / "agent_log.txt"
@@ -1757,7 +1757,7 @@ class PlotGenerator:
         plt.rcParams.update({
             'figure.figsize': (15, 10),
             'font.family': 'serif',
-            'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+            'font.serif': ['Plus Jakarta Sans', 'Arial', 'DejaVu Sans'],
             'axes.titlesize': 16,
             'axes.labelsize': 13,
             'xtick.labelsize': 11,
@@ -2465,12 +2465,11 @@ class PlotGenerator:
 
         layout = {
             'title': {'text': f'Clickable Historical Annual Trend - {traces[0]["name"]}', 'x': 0.02, 'xanchor': 'left'},
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
-            'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#f7fbff',
+            'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0'},
+            'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
             'margin': {'l': 76, 'r': 34, 't': 92, 'b': 74},
-            'xaxis': {'title': 'Year', 'gridcolor': '#dbe7f3', 'zeroline': False},
-            'yaxis': {'title': 'Annual mean', 'gridcolor': '#dbe7f3', 'zeroline': False},
+            'xaxis': {'title': 'Year', 'gridcolor': 'rgba(255, 255, 255, 0.08)', 'zeroline': False},
+            'yaxis': {'title': 'Annual mean', 'gridcolor': 'rgba(255, 255, 255, 0.08)', 'zeroline': False},
             'hovermode': 'closest',
             'updatemenus': [{
                 'buttons': buttons,
@@ -2481,7 +2480,7 @@ class PlotGenerator:
                 'yanchor': 'top',
                 'bgcolor': '#ffffff',
                 'bordercolor': '#c8d7e8',
-                'font': {'color': '#071426'},
+                'font': {'color': '#e2e8f0'},
             }],
             'showlegend': True,
             'legend': {'orientation': 'h', 'y': -0.22},
@@ -2637,9 +2636,12 @@ class PlotGenerator:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
-    html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #071426; }}
+    html, body {{ margin: 0; min-height: 100%; background: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; }}
     #plot {{ width: 100%; height: 100vh; min-height: 760px; }}
     @media (max-width: 760px) {{ #plot {{ min-height: 820px; }} }}
 
@@ -2674,11 +2676,10 @@ class PlotGenerator:
             [1.0, '#cd2e3a'],
         ]
         base_layout = {
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
-            'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#f6faff',
+            'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0', 'size': 14},
+            'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
             'margin': {'l': 120, 'r': 44, 't': 78, 'b': 84},
-            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+            'hoverlabel': {'font': {'family': 'Plus Jakarta Sans, sans-serif', 'size': 13}, 'bgcolor': '#ffffff', 'bordercolor': '#cbd5e1'},
         }
 
         if grouped is not None and not grouped.empty:
@@ -2702,7 +2703,7 @@ class PlotGenerator:
                 'xaxis': {
                     'title': {'text': f'Cyanobacteria ({rule["unit"]})', 'standoff': 18},
                     'type': 'log',
-                    'gridcolor': '#d8e3f1',
+                    'gridcolor': 'rgba(255, 255, 255, 0.08)',
                     'tickmode': 'array',
                     'tickvals': [100, 1000, 10000, 100000],
                     'ticktext': ['100', '1,000', '10,000', '100,000'],
@@ -2792,7 +2793,7 @@ class PlotGenerator:
             layout.update({
                 'title': {'text': 'Annual Cyanobacteria Heatmap By Watershed<br><span style="font-size:14px;color:#53677f">Color uses log10 cell count; hover shows original cells/mL for each watershed-year</span>', 'x': 0.02, 'xanchor': 'left', 'font': {'size': 23}},
                 'margin': {'l': 190, 'r': 92, 't': 96, 'b': 92},
-                'xaxis': {'title': {'text': 'Year', 'standoff': 18}, 'tickangle': 0, 'gridcolor': '#d8e3f1'},
+                'xaxis': {'title': {'text': 'Year', 'standoff': 18}, 'tickangle': 0, 'gridcolor': 'rgba(255, 255, 255, 0.08)'},
                 'yaxis': {'title': '', 'automargin': True, 'tickfont': {'size': 15}},
             })
             self._write_plotly_html('algal_status_timeline_interactive.html', 'Interactive Annual Cyanobacteria Signal', traces, layout)
@@ -2966,11 +2967,10 @@ class PlotGenerator:
 
     def _write_weather_interactive_plots(self, df, latest):
         base_layout = {
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
-            'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#f8fbff',
+            'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0', 'size': 14},
+            'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
             'margin': {'l': 86, 'r': 42, 't': 96, 'b': 82},
-            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+            'hoverlabel': {'font': {'family': 'Plus Jakarta Sans, sans-serif', 'size': 13}, 'bgcolor': '#ffffff', 'bordercolor': '#cbd5e1'},
         }
         recent = df[df['date'] >= pd.to_datetime(df['date']).max() - pd.Timedelta(days=13)].copy()
         traces = []
@@ -2999,7 +2999,7 @@ class PlotGenerator:
                 {'xref': 'paper', 'x': 1, 'yref': 'y', 'y': 50, 'text': '50 mm runoff pressure', 'showarrow': False, 'xanchor': 'right', 'yanchor': 'bottom', 'font': {'size': 12, 'color': '#d73345'}},
             ],
             'xaxis': {'title': {'text': 'Date', 'standoff': 16}, 'tickangle': -35, 'showgrid': False, 'linecolor': '#9eb4cc', 'mirror': True},
-            'yaxis': {'title': {'text': 'Daily precipitation (mm)', 'standoff': 16}, 'gridcolor': '#d8e3f1', 'zerolinecolor': '#9eb4cc', 'linecolor': '#9eb4cc', 'mirror': True},
+            'yaxis': {'title': {'text': 'Daily precipitation (mm)', 'standoff': 16}, 'gridcolor': 'rgba(255, 255, 255, 0.08)', 'zerolinecolor': '#9eb4cc', 'linecolor': '#9eb4cc', 'mirror': True},
         })
         self._write_plotly_html('weather_basin_rainfall_interactive.html', 'Interactive Basin Rainfall', traces, layout)
 
@@ -3339,15 +3339,14 @@ class PlotGenerator:
             'hovertemplate': '<b>%{customdata[0]}</b><br>Class: %{text}<br>VCI: %{customdata[1]}<br>Annual NDVI: %{customdata[2]}<br>NDVI baseline min-max: %{customdata[3]} - %{customdata[4]}<br>Source: %{customdata[5]}<extra></extra>',
         }]
         layout = {
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 15},
-            'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#f8fbff',
+            'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0', 'size': 14},
+            'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
             'title': {'text': 'Clickable South Korea VCI Agricultural Drought Screening<br><span style="font-size:14px;color:#53677f">Classed VCI-equivalent surface; click points for basin, NDVI baseline, and drought class</span>', 'x': 0.02},
             'height': 760,
             'mapbox': {'style': 'carto-positron', 'center': {'lat': 36.25, 'lon': 127.85}, 'zoom': 6.15, 'pitch': 0},
             'showlegend': False,
             'margin': {'l': 14, 'r': 14, 't': 86, 'b': 14},
-            'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 14}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+            'hoverlabel': {'font': {'family': 'Plus Jakarta Sans, sans-serif', 'size': 13}, 'bgcolor': '#ffffff', 'bordercolor': '#cbd5e1'},
         }
         self._write_plotly_html('agro_vci_south_korea_map_interactive.html', 'Interactive South Korea VCI Map', traces, layout)
 
@@ -3768,9 +3767,8 @@ class PlotGenerator:
                     },
                 }]
                 layout = {
-                    'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426', 'size': 16},
-                    'paper_bgcolor': '#ffffff',
-                    'plot_bgcolor': '#f8fbff',
+                    'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0', 'size': 14},
+                    'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
                     'title': {'text': 'Clickable K-WaterGuard AgroClimate Geospatial Prediction Map', 'x': 0.02},
                     'height': 780,
                     'mapbox': {
@@ -3781,7 +3779,7 @@ class PlotGenerator:
                     },
                     'showlegend': False,
                     'margin': {'l': 20, 'r': 20, 't': 70, 'b': 20},
-                    'hoverlabel': {'font': {'family': 'Times New Roman, Times, serif', 'size': 15}, 'bgcolor': '#ffffff', 'bordercolor': '#d8e3f1'},
+                    'hoverlabel': {'font': {'family': 'Plus Jakarta Sans, sans-serif', 'size': 13}, 'bgcolor': '#ffffff', 'bordercolor': '#cbd5e1'},
                 }
                 self._write_plotly_html('agroclimate_prediction_map_interactive.html', 'Interactive AgroClimate Prediction Map', traces, layout)
         except Exception as exc:
@@ -3947,9 +3945,8 @@ class PlotGenerator:
         center_lat = float((min_lat + max_lat) / 2)
         layout = {
             'title': {'text': f'Clickable WQ Status Map - {traces[0]["name"]} ({day_label})<br><span style="font-size:14px;color:#53677f">OpenStreetMap basemap with one corrected point per monitoring station</span>', 'x': 0.02, 'xanchor': 'left'},
-            'font': {'family': 'Times New Roman, Times, serif', 'color': '#071426'},
-            'paper_bgcolor': '#ffffff',
-            'plot_bgcolor': '#ffffff',
+            'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#e2e8f0'},
+            'paper_bgcolor': 'rgba(7, 21, 34, 0.95)', 'plot_bgcolor': 'rgba(4, 9, 14, 0.9)',
             'margin': {'l': 16, 'r': 20, 't': 96, 'b': 16},
             'mapbox': {
                 'style': 'open-street-map',
@@ -3967,7 +3964,7 @@ class PlotGenerator:
                 'yanchor': 'top',
                 'bgcolor': '#ffffff',
                 'bordercolor': '#c8d7e8',
-                'font': {'color': '#071426'},
+                'font': {'color': '#e2e8f0'},
             }],
             'showlegend': False,
         }
@@ -4485,3633 +4482,1564 @@ class DashboardGenerator:
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <title>K-WaterGuard AI Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --bg: #f4f6fb;
-      --panel: #ffffff;
-      --panel-soft: #f9fbff;
-      --ink: #121826;
-      --muted: #5f6b7a;
-      --line: #d9e1ee;
-      --blue: #0047a0;
-      --blue-soft: #e7eefb;
-      --green: #0047a0;
-      --red: #cd2e3a;
-      --red-soft: #fde9eb;
-      --amber: #191919;
-      --black: #191919;
-      --shadow: 0 14px 30px rgba(0, 35, 90, 0.09);
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      font-family: "Times New Roman", Times, serif;
-      background:
-        radial-gradient(circle at 16% 0%, rgba(205, 46, 58, 0.10), transparent 28%),
-        radial-gradient(circle at 88% 8%, rgba(0, 71, 160, 0.12), transparent 30%),
-        linear-gradient(180deg, #ffffff 0%, var(--bg) 36%, #eef3fb 100%);
-      color: var(--ink);
-    }}
-    header {{
-      min-height: 360px;
-      display: flex;
-      align-items: flex-end;
-      background:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.84) 45%, rgba(0, 71, 160, 0.12)),
-        linear-gradient(135deg, rgba(205, 46, 58, 0.18), transparent 34%),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-      color: var(--blue);
-      padding: 34px 24px 32px;
-      border-bottom: 4px solid var(--black);
-    }}
-    .wrap {{ width: min(1280px, calc(100% - 32px)); margin: 0 auto; }}
-    .topline {{ display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }}
-    .brand {{ display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.94); border: 1px solid rgba(0, 71, 160, 0.16); border-radius: 8px; box-shadow: var(--shadow); }}
-    .brand-logo {{ width: 54px; height: 54px; object-fit: contain; border-radius: 6px; background: white; }}
-    .brand-name {{ font-size: 18px; font-weight: 800; color: var(--blue); }}
-    h1 {{ margin: 18px 0 8px; font-size: 38px; line-height: 1.08; letter-spacing: 0; }}
-    .subtitle {{ max-width: 820px; color: #26364c; margin: 0; font-size: 16px; font-weight: 600; }}
-    .badge {{ border: 1px solid rgba(205, 46, 58, 0.28); padding: 7px 10px; border-radius: 6px; color: var(--red); background: rgba(255,255,255,0.88); text-decoration: none; font-weight: 700; }}
-    main {{ padding: 22px 0 44px; }}
-    .toolbar {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }}
-    .search {{ min-width: min(420px, 100%); flex: 1; padding: 11px 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }}
-    .search-status {{ margin: -4px 0 14px; color: var(--muted); font-size: 13px; min-height: 18px; }}
-    tr.search-match {{ background: #fff1f3; }}
-    .button {{ display: inline-flex; align-items: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; background: var(--blue); color: white; text-decoration: none; }}
-    .nav-tabs {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }}
-    .nav-tabs a {{ padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--blue); text-decoration: none; font-weight: 800; }}
-    .page {{ display: block; }}
-    body.page-home .page-data, body.page-home .page-trends, body.page-home .page-algal, body.page-home .page-spatial {{ display: none; }}
-    body.page-data .page-home, body.page-data .page-trends, body.page-data .page-algal, body.page-data .page-spatial {{ display: none; }}
-    body.page-trends .page-home, body.page-trends .page-data, body.page-trends .page-algal, body.page-trends .page-spatial {{ display: none; }}
-    body.page-algal .page-home, body.page-algal .page-data, body.page-algal .page-trends, body.page-algal .page-spatial {{ display: none; }}
-    body.page-spatial .page-home, body.page-spatial .page-data, body.page-spatial .page-trends, body.page-spatial .page-algal {{ display: none; }}
-    body.page-home .toolbar, body.page-home .search-status, body.page-home .insight-rail {{ display: none !important; }}
-    .home-overview {{
-      display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; align-items: stretch;
-      background:
-        linear-gradient(135deg, rgba(0, 71, 160, .96), rgba(23, 64, 112, .90) 46%, rgba(205, 46, 58, .88)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover; background-position: center;
-      color: white; border: 0; padding: 28px; overflow: hidden;
-    }}
-    .home-overview h2 {{ color: white; font-size: 28px; }}
-    .home-overview p, .home-overview .muted, .home-overview .overview-list {{ color: rgba(255,255,255,.90); }}
-    .home-overview .history-link {{ color: white; }}
-    .overview-panel {{ background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.20); border-radius: 8px; padding: 18px; backdrop-filter: blur(6px); }}
-    .overview-kicker {{ margin: 0 0 8px; color: rgba(255,255,255,.78); font-weight: 800; text-transform: uppercase; font-size: 12px; letter-spacing: .08em; }}
-    .overview-list {{ margin: 10px 0 0; padding-left: 18px; color: #26364c; line-height: 1.45; }}
-    .page-actions {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }}
-    .home-overview .button {{ background: white; color: var(--blue); font-weight: 800; }}
-    .capability-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }}
-    .capability-card {{ padding: 18px; border-top: 4px solid var(--blue); min-height: 150px; }}
-    .capability-card:nth-child(even) {{ border-top-color: var(--red); }}
-    .capability-card h3 {{ margin: 0 0 8px; font-size: 18px; }}
-    .capability-card p {{ margin: 0; color: var(--muted); line-height: 1.42; }}
-    .install-button {{ display: none; border: 0; cursor: pointer; font: inherit; }}
-    .install-button.ready {{ display: inline-flex; }}
-    .grid {{ display: grid; gap: 14px; }}
-    .stats {{ grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }}
-    .card {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }}
-    .insight-rail {{
-      display: none; position: fixed; top: 404px; width: clamp(260px, calc((100vw - 1280px) / 2 - 32px), 340px);
-      z-index: 5; gap: 14px; pointer-events: none;
-    }}
-    .insight-rail.left {{ left: max(16px, calc((100vw - 1280px) / 2 - 360px)); }}
-    .insight-rail.right {{ right: max(16px, calc((100vw - 1280px) / 2 - 360px)); }}
-    .rail-card {{
-      pointer-events: auto; overflow: hidden; background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(8px); border: 1px solid rgba(217, 225, 238, 0.92);
-      border-radius: 8px; box-shadow: var(--shadow);
-    }}
-    .rail-head {{
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      padding: 12px 13px; border-bottom: 1px solid var(--line); font-weight: 800;
-    }}
-    .rail-mark {{ width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(180deg, var(--red) 0 50%, var(--blue) 50% 100%); border: 2px solid white; box-shadow: 0 0 0 1px var(--line); }}
-    .rail-body {{ padding: 12px 13px; }}
-    .rail-metric {{ display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 0; border-bottom: 1px solid #eef2f8; }}
-    .rail-metric:last-child {{ border-bottom: 0; }}
-    .rail-value {{ font-weight: 800; color: var(--blue); }}
-    .rail-list {{ display: grid; gap: 10px; }}
-    .rail-row {{ display: grid; gap: 5px; }}
-    .rail-row-top {{ display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }}
-    .rail-bar {{ height: 8px; overflow: hidden; border-radius: 999px; background: #e8edf6; }}
-    .rail-fill {{ display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--red)); }}
-    .rail-fill.black {{ background: linear-gradient(90deg, var(--black), var(--blue)); }}
-    .mini-map {{ position: relative; min-height: 220px; background: linear-gradient(135deg, #f8fbff, #eef4ff); }}
-    .mini-map svg {{ width: 100%; height: 220px; display: block; }}
-    .korea-ring {{ fill: rgba(255,255,255,.88); stroke: #90a1b7; stroke-width: .8; }}
-    .korea-ring:nth-of-type(3n) {{ fill: rgba(0, 71, 160, .08); }}
-    .korea-ring:nth-of-type(3n+1) {{ fill: rgba(205, 46, 58, .07); }}
-    .map-dot {{ fill: var(--blue); opacity: .68; stroke: white; stroke-width: .8; }}
-    .map-dot.alert {{ fill: var(--red); opacity: .86; }}
-    .rail-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
-    .stat {{ padding: 15px; border-top: 4px solid var(--blue); }}
-    .stats > .stat:nth-child(even) {{ border-top-color: var(--red); }}
-    .stats > .stat:nth-child(3n) {{ border-top-color: var(--black); }}
-    .label {{ color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }}
-    .value {{ font-size: 28px; font-weight: 800; margin-top: 4px; color: var(--blue); }}
-    .section {{ padding: 18px; margin-top: 16px; }}
-    h2 {{ margin: 0 0 12px; font-size: 20px; }}
-    .param-grid {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
-    .param {{
-      position: relative; padding: 16px; min-height: 142px; border-left: 5px solid var(--blue);
-      background: linear-gradient(180deg, #ffffff, var(--panel-soft));
-      border-radius: 8px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-    }}
-    .param:hover {{ transform: translateY(-1px); box-shadow: 0 14px 30px rgba(0, 35, 90, 0.14); }}
-    .param:focus {{ outline: 3px solid rgba(0, 71, 160, 0.22); outline-offset: 2px; }}
-    .param.warn {{ border-left-color: var(--black); background: #fbfbfc; }}
-    .param.bad {{ border-left-color: var(--red); background: var(--red-soft); }}
-    .param.active {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 71, 160, 0.18), var(--shadow); }}
-    .alert-pill {{ display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
-    .alert-pill.critical {{ background: var(--red-soft); color: #921a24; }}
-    .alert-pill.warning {{ background: #eeeeef; color: var(--black); }}
-    .alert-pill.ok {{ background: var(--blue-soft); color: var(--blue); }}
-    .param-value {{ font-size: 26px; font-weight: 700; margin: 10px 0 5px; }}
-    .param-action {{ display: block; margin-top: 9px; color: var(--blue); font-size: 12px; font-weight: 700; }}
-    .muted {{ color: var(--muted); }}
-    .plots {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-    .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    .plot img {{ width: 100%; display: block; border-top: 1px solid var(--line); cursor: zoom-in; }}
-    .plot img:hover {{ filter: saturate(1.04) contrast(1.03); }}
-    .plot .image-missing {{ display: none; padding: 14px; border-top: 1px solid var(--line); color: var(--red); background: #fff5f6; }}
-    .plot h3 {{ margin: 12px; font-size: 15px; }}
-    .lightbox {{
-      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-      z-index: 80; padding: 24px; background: rgba(8, 13, 24, 0.86);
-    }}
-    .lightbox.open {{ display: flex; }}
-    .lightbox-panel {{
-      width: min(1500px, 96vw); max-height: 94vh; display: grid; grid-template-rows: auto minmax(0, 1fr);
-      background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.34);
-    }}
-    .lightbox-head {{ display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }}
-    .lightbox-title {{ font-weight: 800; color: var(--blue); }}
-    .lightbox-close {{ border: 0; border-radius: 6px; background: var(--red); color: white; font: inherit; font-weight: 800; padding: 8px 12px; cursor: pointer; }}
-    .lightbox-img-wrap {{ overflow: auto; background: #f7f9fd; padding: 14px; }}
-    .lightbox-img {{ display: block; max-width: 100%; height: auto; margin: 0 auto; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-    th, td {{ padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
-    th {{ background: var(--blue-soft); color: #16233a; position: sticky; top: 0; z-index: 1; }}
-    tr.filtered-match {{ background: #fff1f3; }}
-    .table-wrap {{ max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }}
-    .history-link {{ color: var(--blue); font-weight: 800; text-decoration: none; }}
-    .history-link:hover {{ text-decoration: underline; }}
-    .two-col {{ grid-template-columns: 1.2fr 0.8fr; align-items: start; }}
-    .three-col {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-    footer {{ color: var(--muted); padding: 20px 0; font-size: 13px; }}
-    .chat-launch {{
-      position: fixed; right: 22px; bottom: 22px; z-index: 30;
-      border: 0; border-radius: 999px; background: var(--blue); color: white;
-      min-height: 46px; padding: 0 16px; font: inherit; font-weight: 700;
-      box-shadow: 0 12px 26px rgba(0, 71, 160, 0.28); cursor: pointer;
-    }}
-    .chat-panel {{
-      position: fixed; right: 22px; bottom: 82px; width: min(380px, calc(100vw - 32px));
-      max-height: min(620px, calc(100vh - 110px)); display: none; flex-direction: column;
-      background: white; border: 1px solid var(--line); border-radius: 8px;
-      box-shadow: 0 18px 44px rgba(18, 24, 38, 0.22); z-index: 31;
-    }}
-    .chat-panel.open {{ display: flex; }}
-    .chat-head {{ padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; }}
-    .chat-title {{ font-weight: 800; }}
-    .chat-close {{ border: 0; background: transparent; font: inherit; cursor: pointer; color: var(--muted); }}
-    .chat-messages {{ padding: 12px; overflow: auto; display: grid; gap: 10px; }}
-    .chat-msg {{ padding: 10px 11px; border-radius: 8px; line-height: 1.4; font-size: 14px; }}
-    .chat-msg.bot {{ background: var(--blue-soft); color: var(--ink); }}
-    .chat-msg.user {{ background: var(--red-soft); color: #7d1720; justify-self: end; }}
-    .chat-form {{ padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; }}
-    .chat-input {{ flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: inherit; }}
-    .chat-send {{ border: 0; border-radius: 6px; background: var(--red); color: white; padding: 0 12px; font: inherit; font-weight: 700; cursor: pointer; }}
-    @media (max-width: 980px) {{
-      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col, .capability-grid {{ grid-template-columns: 1fr 1fr; }}
-      .home-overview {{ grid-template-columns: 1fr; }}
-    }}
-    @media (min-width: 1840px) {{
-      .insight-rail {{ display: grid; }}
-    }}
-    @media (max-width: 640px) {{
-      h1 {{ font-size: 30px; }}
-      header {{ min-height: 330px; background-position: center right; }}
-      .brand-logo {{ width: 44px; height: 44px; }}
-      .brand-name {{ font-size: 16px; }}
-      .stats, .param-grid, .plots, .spatial-maps, .two-col, .three-col, .capability-grid {{ grid-template-columns: 1fr; }}
-      .home-overview {{ grid-template-columns: 1fr; }}
+      color-scheme: dark;
+      --bg-base: #04090e;
+      --bg-surface: #071522;
+      --bg-elevated: #0c2033;
+      --bg-glass: rgba(8, 20, 32, 0.90);
+      --bg-glass-strong: rgba(5, 13, 22, 0.96);
+      --border-glass: rgba(255, 255, 255, 0.14);
+      --border-glow: rgba(56, 189, 248, 0.45);
+      --border-emerald: rgba(52, 211, 153, 0.45);
+
+      --text-primary: #ffffff;
+      --text-secondary: #e2e8f0;
+      --text-muted: #cbd5e1;
+      --text-dim: #94a3b8;
+
+      --cyan: #38bdf8;
+      --cyan-bright: #00f2fe;
+      --cyan-glow: rgba(56, 189, 248, 0.28);
+      --emerald: #34d399;
+      --emerald-glow: rgba(52, 211, 153, 0.28);
+      --teal: #14b8a6;
+      --violet: #818cf8;
+      --amber: #fbbf24;
+      --coral: #fb7185;
+      --rose: #f43f5e;
+
+      --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Space Grotesk', 'JetBrains Mono', monospace;
+
+      --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 12px 36px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.65);
+      --shadow-glow: 0 0 35px rgba(56, 189, 248, 0.2);
+
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --radius-xl: 30px;
+      --radius-pill: 9999px;
+
+      --transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }}
 
-    /* Modern dashboard refresh: white / Korean blue / Korean red, with no side rails. */
-    :root {{
-      --bg: #eef4fb;
-      --panel: rgba(255, 255, 255, 0.94);
-      --panel-soft: #f7fbff;
-      --ink: #071426;
-      --muted: #526172;
-      --line: #d5dfed;
-      --blue: #0047a0;
-      --blue-soft: #edf5ff;
-      --red: #cd2e3a;
-      --red-soft: #fff0f2;
-      --black: #101828;
-      --shadow: 0 18px 48px rgba(15, 39, 72, 0.11);
-      --shadow-soft: 0 8px 24px rgba(15, 39, 72, 0.08);
+    *, *::before, *::after {{
+      box-sizing: border-box;
     }}
+
+    html {{
+      scroll-behavior: smooth;
+      background-color: var(--bg-base);
+      -webkit-text-size-adjust: 100%;
+    }}
+
     body {{
-      min-height: 100vh;
-      background:
-        linear-gradient(140deg, rgba(255,255,255,.96), rgba(237,245,255,.92) 42%, rgba(255,240,242,.70)),
-        radial-gradient(circle at 12% 18%, rgba(0,71,160,.11), transparent 28%),
-        radial-gradient(circle at 94% 8%, rgba(205,46,58,.10), transparent 26%);
-      color: var(--ink);
-    }}
-    header {{
-      min-height: 245px;
-      align-items: center;
-      padding: 28px 24px 30px;
-      border-bottom: 1px solid rgba(0,71,160,.18);
-      box-shadow: inset 0 -1px 0 rgba(255,255,255,.72);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.88) 42%, rgba(237,245,255,.62) 66%, rgba(0,71,160,.16)),
-        linear-gradient(135deg, rgba(205,46,58,.12), transparent 34%),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    .wrap {{ width: min(1460px, calc(100% - 44px)); }}
-    .topline {{ align-items: flex-start; }}
-    .brand {{
-      border-radius: 8px;
-      padding: 9px 12px;
-      background: rgba(255,255,255,.82);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(0,71,160,.14);
-      box-shadow: var(--shadow-soft);
-    }}
-    .brand-logo {{ width: 46px; height: 46px; }}
-    .badge {{
-      border-radius: 8px;
-      background: rgba(255,255,255,.78);
-      color: var(--red);
-      border: 1px solid rgba(205,46,58,.24);
-      box-shadow: var(--shadow-soft);
-    }}
-    h1 {{
-      margin: 30px 0 9px;
-      font-size: clamp(42px, 5vw, 76px);
-      max-width: 860px;
-      color: var(--blue);
-      letter-spacing: 0;
-    }}
-    .subtitle {{
-      max-width: 930px;
-      color: #14243a;
-      font-size: clamp(17px, 1.5vw, 22px);
-      line-height: 1.25;
-      font-weight: 700;
-    }}
-    main {{
-      padding: 26px 0 56px;
-    }}
-    .nav-tabs {{
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      gap: 10px;
-      padding: 10px;
-      margin: 0 0 20px;
-      width: fit-content;
-      max-width: 100%;
-      border: 1px solid rgba(213,223,237,.85);
-      border-radius: 8px;
-      background: rgba(255,255,255,.78);
-      backdrop-filter: blur(14px);
-      box-shadow: var(--shadow-soft);
-    }}
-    .nav-tabs a {{
-      border: 0;
-      border-radius: 7px;
-      padding: 11px 14px;
-      background: transparent;
-      color: #12345b;
-      font-weight: 800;
-      transition: background .16s ease, color .16s ease, transform .16s ease;
-    }}
-    .nav-tabs a:hover {{
-      background: var(--blue);
-      color: white;
-      transform: translateY(-1px);
-      text-decoration: none;
-    }}
-    .toolbar {{
-      display: grid;
-      grid-template-columns: minmax(240px, 1fr) auto auto;
-      gap: 12px;
-      padding: 12px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.76);
-      border: 1px solid rgba(213,223,237,.88);
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(10px);
-    }}
-    .search {{
-      min-height: 48px;
-      border-radius: 8px;
-      border: 1px solid rgba(0,71,160,.17);
-      background: white;
-      color: var(--ink);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-    }}
-    .button {{
-      justify-content: center;
-      min-height: 48px;
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-weight: 800;
-      box-shadow: 0 12px 24px rgba(0,71,160,.18);
-      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
-    }}
-    .button:hover {{ transform: translateY(-1px); box-shadow: 0 16px 30px rgba(0,71,160,.24); }}
-    .search-status {{ margin: 10px 0 18px; font-size: 14px; }}
-    .insight-rail {{ display: none !important; }}
-    .card {{
-      border-radius: 8px;
-      border: 1px solid rgba(213,223,237,.82);
-      background: var(--panel);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }}
-    .section {{
-      padding: clamp(20px, 2.2vw, 32px);
-      margin-top: 20px;
-    }}
-    h2 {{
-      font-size: clamp(24px, 2vw, 34px);
-      color: var(--ink);
-      line-height: 1.1;
-      margin-bottom: 18px;
-    }}
-    h3 {{ color: var(--ink); }}
-    .stats {{
-      grid-template-columns: repeat(6, minmax(150px, 1fr));
-      gap: 14px;
-    }}
-    .stat {{
-      min-height: 122px;
-      padding: 18px;
-      border-top: 0;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,251,255,.96)),
-        linear-gradient(90deg, var(--blue), var(--red));
+      margin: 0;
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.6;
+      overflow-x: hidden;
       position: relative;
-    }}
-    .stat::before {{
-      content: "";
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 5px;
-      background: var(--blue);
-    }}
-    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
-    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
-    .label {{
-      font-size: 12px;
-      color: #66758a;
-      font-weight: 800;
-    }}
-    .value {{
-      font-size: clamp(28px, 2.2vw, 42px);
-      line-height: 1;
-      color: var(--blue);
-    }}
-    .home-overview {{
-      min-height: 430px;
-      align-items: end;
-      border-radius: 8px;
-      padding: clamp(28px, 4vw, 54px);
-      background:
-        linear-gradient(112deg, rgba(0,35,76,.94), rgba(0,71,160,.82) 48%, rgba(205,46,58,.80)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-      box-shadow: var(--shadow);
-    }}
-    .overview-panel {{
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.24);
-      border-radius: 8px;
-      padding: clamp(18px, 2vw, 28px);
-      box-shadow: 0 20px 60px rgba(0,0,0,.12);
-    }}
-    .home-overview h2 {{ font-size: clamp(32px, 3vw, 52px); line-height: 1.05; }}
-    .home-overview p {{ font-size: 17px; line-height: 1.45; }}
-    .capability-grid {{ gap: 16px; margin-top: 18px; }}
-    .capability-card {{
-      min-height: 172px;
-      padding: 22px;
-      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,251,255,.94));
-      transition: transform .16s ease, box-shadow .16s ease;
-    }}
-    .capability-card:hover {{ transform: translateY(-3px); box-shadow: 0 24px 52px rgba(15,39,72,.14); }}
-    .param {{
-      border-left: 0;
-      min-height: 160px;
-      background: linear-gradient(180deg, #ffffff, #f8fbff);
-    }}
-    .param::before {{
-      content: "";
-      display: block;
-      height: 4px;
-      border-radius: 999px;
-      background: var(--blue);
-      margin-bottom: 12px;
-    }}
-    .param.warn::before {{ background: var(--black); }}
-    .param.bad::before {{ background: var(--red); }}
-    .plots, .spatial-maps {{
-      gap: 18px;
-    }}
-    .plot h3 {{
-      margin: 0;
-      padding: 14px 16px;
-      background: linear-gradient(90deg, var(--blue-soft), white);
-      color: #10233f;
-    }}
-    .plot img {{ border-top: 0; }}
-    .table-wrap {{
-      border-radius: 8px;
-      border: 1px solid rgba(213,223,237,.9);
-      background: white;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-    }}
-    table {{ font-size: 15px; }}
-    th {{
-      background: linear-gradient(180deg, #edf5ff, #e4eefc);
-      color: #10233f;
-      font-weight: 800;
-      padding: 13px 14px;
-    }}
-    td {{
-      padding: 12px 14px;
-      color: #1f2f46;
-    }}
-    tbody tr:hover {{ background: #f8fbff; }}
-    .history-link {{
-      display: inline-flex;
-      align-items: center;
-      min-height: 38px;
-      padding: 7px 10px;
-      border-radius: 7px;
-      background: var(--blue-soft);
-      color: var(--blue);
-      margin-right: 6px;
-    }}
-    .history-link:hover {{ background: var(--blue); color: white; text-decoration: none; }}
-    footer {{
-      width: min(1460px, calc(100% - 44px));
-      margin: 0 auto 28px;
-      padding: 16px 18px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.7);
-      border: 1px solid rgba(213,223,237,.78);
-      box-shadow: var(--shadow-soft);
-    }}
-    .chat-launch {{
-      border-radius: 8px;
-      min-height: 52px;
-      box-shadow: 0 18px 38px rgba(0,71,160,.28);
-    }}
-    @media (min-width: 1840px) {{
-      .insight-rail {{ display: none !important; }}
-    }}
-    @media (max-width: 980px) {{
-      .toolbar {{ grid-template-columns: 1fr; }}
-      .nav-tabs {{ width: 100%; }}
-      header {{ min-height: 230px; }}
-    }}
-    @media (max-width: 640px) {{
-      .wrap, footer {{ width: min(100% - 24px, 1460px); }}
-      header {{ padding: 22px 12px; min-height: 220px; }}
-      .nav-tabs {{ position: static; }}
-      .nav-tabs a {{ flex: 1 1 auto; text-align: center; }}
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }}
 
-    /* K-WaterGuard professional template v4. */
-    :root {{
-      --bg: #f3f7fc;
-      --panel: rgba(255,255,255,.96);
-      --panel-solid: #ffffff;
-      --panel-soft: #f7fbff;
-      --ink: #071426;
-      --muted: #56677d;
-      --line: #d8e3f1;
-      --blue: #0047a0;
-      --blue-deep: #052e66;
-      --blue-soft: #edf5ff;
-      --red: #cd2e3a;
-      --red-soft: #fff1f3;
-      --black: #101828;
-      --shadow: 0 18px 45px rgba(20, 44, 78, .10);
-      --shadow-hover: 0 26px 60px rgba(20, 44, 78, .16);
-    }}
-    body {{
-      background:
-        linear-gradient(135deg, rgba(255,255,255,.98), rgba(239,247,255,.94) 48%, rgba(255,245,247,.82)),
-        radial-gradient(circle at 9% 16%, rgba(0,71,160,.10), transparent 26%),
-        radial-gradient(circle at 93% 6%, rgba(205,46,58,.09), transparent 25%);
-      color: var(--ink);
-    }}
-    header {{
-      min-height: 285px;
-      border-bottom: 1px solid rgba(0,71,160,.14);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.90) 43%, rgba(235,246,255,.70) 68%, rgba(0,71,160,.18)),
-        linear-gradient(135deg, rgba(205,46,58,.12), transparent 36%),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    .wrap {{ width: min(1480px, calc(100% - 48px)); }}
-    .brand {{
-      border-radius: 8px;
-      border: 1px solid rgba(0,71,160,.13);
-      box-shadow: 0 10px 28px rgba(20,44,78,.10);
-    }}
-    .brand-logo {{ border-radius: 4px; }}
-    .badge {{
-      border-radius: 8px;
-      background: #fff;
-      color: var(--red);
-      box-shadow: 0 10px 26px rgba(20,44,78,.08);
-    }}
-    h1 {{
-      font-size: clamp(44px, 5.2vw, 78px);
-      line-height: .98;
-      letter-spacing: 0;
-      max-width: 940px;
-      text-wrap: balance;
-    }}
-    .subtitle {{
-      max-width: 980px;
-      font-size: clamp(17px, 1.35vw, 23px);
-      line-height: 1.28;
-      color: #13243a;
-      text-wrap: balance;
-    }}
-    main.wrap {{
-      padding-top: 28px;
-    }}
-    .nav-tabs {{
-      position: sticky;
-      top: 12px;
-      width: fit-content;
-      max-width: 100%;
-      padding: 8px;
-      margin-bottom: 22px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.86);
-      border: 1px solid rgba(216,227,241,.95);
-      box-shadow: 0 16px 40px rgba(20,44,78,.10);
-      backdrop-filter: blur(16px);
-    }}
-    .nav-tabs a {{
-      min-height: 42px;
-      display: inline-flex;
-      align-items: center;
-      border-radius: 7px;
-      padding: 10px 15px;
-      color: #18385f;
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-data .nav-tabs a[href="data.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"] {{
-      background: var(--blue);
-      color: #fff;
-      box-shadow: 0 10px 20px rgba(0,71,160,.20);
-    }}
-    .toolbar {{
-      border-radius: 8px;
-      padding: 12px;
-      background: rgba(255,255,255,.88);
-      border: 1px solid rgba(216,227,241,.95);
-      box-shadow: var(--shadow);
-    }}
-    .search {{
-      min-height: 50px;
-      border-radius: 8px;
-      border-color: rgba(0,71,160,.17);
-      font-size: 16px;
-    }}
-    .button {{
-      border-radius: 8px;
-      min-height: 46px;
-      font-weight: 800;
-      background: var(--blue);
-      box-shadow: 0 12px 24px rgba(0,71,160,.18);
-    }}
-    .button:hover {{
-      background: var(--blue-deep);
-      transform: translateY(-1px);
-    }}
-    .card {{
-      border-radius: 8px;
-      border: 1px solid rgba(216,227,241,.96);
-      background: var(--panel);
-      box-shadow: var(--shadow);
-    }}
-    .section {{
-      padding: clamp(22px, 2.4vw, 36px);
-      margin-top: 22px;
-    }}
-    .section:hover, .capability-card:hover, .param:hover {{
-      box-shadow: var(--shadow-hover);
-    }}
-    h2 {{
-      font-size: clamp(25px, 2.1vw, 36px);
-      line-height: 1.08;
-      color: var(--ink);
-      margin-bottom: 18px;
-    }}
-    h3 {{
-      font-size: clamp(18px, 1.35vw, 24px);
-      line-height: 1.15;
-      color: var(--ink);
-    }}
-    .stats {{
-      grid-template-columns: repeat(6, minmax(150px, 1fr));
-      gap: 14px;
-    }}
-    .stat {{
-      min-height: 126px;
-      padding: 18px;
-      position: relative;
-      background: linear-gradient(180deg, #ffffff, #f7fbff);
-      border-top: 0;
-    }}
-    .stat::before {{
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 5px;
-      background: var(--blue);
-    }}
-    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
-    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
-    .value {{
-      font-size: clamp(30px, 2.3vw, 44px);
-      line-height: .98;
-      color: var(--blue);
-    }}
-    .label {{
-      font-weight: 800;
-      color: #637287;
-    }}
-    .home-overview {{
-      min-height: 470px;
-      border-radius: 8px;
-      padding: clamp(30px, 4vw, 58px);
-      background:
-        linear-gradient(115deg, rgba(4,33,74,.96), rgba(0,71,160,.84) 50%, rgba(205,46,58,.82)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-      box-shadow: var(--shadow-hover);
-    }}
-    .overview-panel {{
-      border-radius: 8px;
-      padding: clamp(20px, 2.2vw, 30px);
-      background: rgba(255,255,255,.13);
-      border: 1px solid rgba(255,255,255,.24);
-      box-shadow: 0 20px 58px rgba(0,0,0,.15);
-    }}
-    .overview-kicker {{
-      letter-spacing: .08em;
-      color: rgba(255,255,255,.82);
-    }}
-    .home-overview h2 {{
-      font-size: clamp(34px, 3vw, 54px);
-      color: white;
-    }}
-    .home-overview p, .home-overview li {{
-      font-size: 17px;
-      line-height: 1.45;
-    }}
-    .page-actions .button, .home-overview .history-link {{
-      background: #ffffff;
-      color: var(--blue);
-    }}
-    .capability-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
-    }}
-    .capability-card {{
-      min-height: 180px;
-      padding: 22px;
-      background: linear-gradient(180deg, #ffffff, #f8fbff);
-    }}
-    .param-grid {{
-      gap: 14px;
-    }}
-    .param {{
-      min-height: 164px;
-      border-left: 0;
-      background: linear-gradient(180deg, #ffffff, #f8fbff);
-    }}
-    .param::before {{
-      content: "";
-      display: block;
-      height: 4px;
-      border-radius: 999px;
-      margin-bottom: 12px;
-      background: var(--blue);
-    }}
-    .param.warn::before {{ background: var(--black); }}
-    .param.bad::before {{ background: var(--red); }}
-    .param-value {{
-      font-size: clamp(24px, 2vw, 34px);
-      color: var(--ink);
-    }}
-    .plots, .spatial-maps {{
-      gap: 18px;
-    }}
-    .plot h3 {{
-      margin: 0;
-      padding: 15px 16px;
-      background: linear-gradient(90deg, var(--blue-soft), #fff);
-    }}
-    .plot img {{
-      border-top: 1px solid rgba(216,227,241,.9);
-      background: #fff;
-    }}
-    .interactive-plot iframe {{
-      width: 100%;
-      min-height: 680px;
-      border: 0;
-      display: block;
-      background: #ffffff;
-      border-top: 1px solid rgba(216,227,241,.9);
-    }}
-    .plots .interactive-plot {{
-      grid-column: span 2;
-    }}
-    @media (max-width: 980px) {{
-      .plots .interactive-plot {{
-        grid-column: span 1;
-      }}
-      .interactive-plot iframe {{
-        min-height: 720px;
-      }}
-    }}
-    .open-interactive {{
-      margin: 12px 14px 14px;
-    }}
-    .install-button {{
-      display: inline-flex;
-      background: linear-gradient(135deg, var(--red), #9f1f2a);
-    }}
-    .install-button.ready {{
-      box-shadow: 0 16px 34px rgba(205,46,58,.26);
-    }}
-    .table-wrap {{
-      border-radius: 8px;
-      border: 1px solid rgba(216,227,241,.95);
-      background: #fff;
-      max-height: 560px;
-    }}
-    table {{
-      font-size: 15px;
-    }}
-    th {{
-      background: linear-gradient(180deg, #edf5ff, #e5effc);
-      color: #10233f;
-      padding: 13px 14px;
-      font-weight: 800;
-    }}
-    td {{
-      padding: 12px 14px;
-      color: #213149;
-    }}
-    tbody tr:hover {{ background: #f8fbff; }}
-    .history-link {{
-      display: inline-flex;
-      align-items: center;
-      min-height: 38px;
-      padding: 8px 11px;
-      margin: 3px 6px 3px 0;
-      border-radius: 7px;
-      background: var(--blue-soft);
-      color: var(--blue);
-    }}
-    .history-link:hover {{
-      background: var(--blue);
-      color: #fff;
-      text-decoration: none;
-    }}
-    .alert-pill {{
-      border-radius: 999px;
-      padding: 5px 9px;
-      font-weight: 800;
-    }}
-    footer {{
-      width: min(1480px, calc(100% - 48px));
-      margin: 0 auto 28px;
-      padding: 16px 18px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.78);
-      border: 1px solid rgba(216,227,241,.86);
-      box-shadow: 0 10px 30px rgba(20,44,78,.07);
-    }}
-    .chat-launch {{
-      border-radius: 8px;
-      min-height: 50px;
-      box-shadow: 0 18px 34px rgba(0,71,160,.24);
-    }}
-    .chat-panel {{
-      border-radius: 8px;
-      box-shadow: 0 24px 70px rgba(20,44,78,.22);
-    }}
-    @media (max-width: 1180px) {{
-      .stats, .capability-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-      .param-grid, .plots, .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    }}
-    @media (max-width: 820px) {{
-      .wrap, footer {{ width: min(100% - 24px, 1480px); }}
-      .stats, .capability-grid, .param-grid, .plots, .spatial-maps, .two-col, .three-col {{ grid-template-columns: 1fr; }}
-      .toolbar {{ grid-template-columns: 1fr; }}
-      .nav-tabs {{ position: static; width: 100%; }}
-      .nav-tabs a {{ flex: 1 1 160px; justify-content: center; }}
-      header {{ min-height: 250px; padding: 22px 12px; }}
-    }}
-
-    /* K-WaterGuard executive dashboard template v5. */
-    body {{
-      background:
-        linear-gradient(180deg, #f8fbff 0%, #eef5fc 42%, #fdf7f8 100%);
-    }}
-    header {{
-      min-height: 238px;
-      padding: 24px 24px 28px;
-      align-items: center;
-      border-bottom: 1px solid rgba(0,71,160,.16);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.92) 42%, rgba(237,246,255,.58) 68%, rgba(0,71,160,.20)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    header .wrap {{
-      display: grid;
-      gap: 18px;
-    }}
-    .topline {{
-      align-items: center;
-    }}
-    .brand {{
-      padding: 8px 11px;
-      background: rgba(255,255,255,.88);
-      border: 1px solid rgba(0,71,160,.16);
-    }}
-    .brand-logo {{
-      width: 42px;
-      height: 42px;
-    }}
-    .brand-name {{
-      font-size: 18px;
-    }}
-    .badge {{
-      min-height: 38px;
-      display: inline-flex;
-      align-items: center;
-      color: var(--red);
-      background: rgba(255,255,255,.88);
-    }}
-    h1 {{
-      margin: 12px 0 0;
-      font-size: clamp(40px, 4.1vw, 64px);
-      line-height: 1.02;
-      max-width: 780px;
-      color: var(--blue);
-    }}
-    .subtitle {{
-      max-width: 860px;
-      font-size: clamp(16px, 1.15vw, 20px);
-      line-height: 1.35;
-      font-weight: 700;
-    }}
-    main.wrap {{
-      width: min(1520px, calc(100% - 56px));
-      padding-top: 24px;
-    }}
-    .nav-tabs {{
-      top: 10px;
-      width: 100%;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px;
-      margin-bottom: 18px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid rgba(216,227,241,.96);
-    }}
-    .nav-tabs a {{
-      flex: 1 1 150px;
-      justify-content: center;
-      min-height: 44px;
-      padding: 10px 12px;
-      font-size: 15px;
-    }}
-    .toolbar {{
-      grid-template-columns: minmax(260px, 1fr) auto auto;
-      margin-bottom: 10px;
-    }}
-    .search-status {{
-      margin: 10px 4px 18px;
-    }}
-    .section {{
-      margin-top: 18px;
-      padding: clamp(20px, 2vw, 30px);
-    }}
-    .home-overview {{
-      min-height: 410px;
-      grid-template-columns: minmax(0, 1.08fr) minmax(320px, .92fr);
-      background:
-        linear-gradient(110deg, rgba(3,30,69,.96), rgba(0,71,160,.86) 51%, rgba(205,46,58,.78)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    .overview-panel {{
-      background: rgba(255,255,255,.15);
-      backdrop-filter: blur(12px);
-    }}
-    .home-overview h2 {{
-      font-size: clamp(30px, 2.7vw, 46px);
-    }}
-    .stats {{
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-    }}
-    .stat {{
-      min-height: 116px;
-      padding: 17px 18px;
-    }}
-    .value {{
-      font-size: clamp(26px, 2vw, 38px);
-      overflow-wrap: anywhere;
-    }}
-    .capability-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }}
-    .capability-card {{
-      min-height: 158px;
-      border-top-width: 3px;
-    }}
-    .param-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }}
-    .param {{
-      min-height: 146px;
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    }}
-    .param:hover {{
-      transform: translateY(-4px);
-    }}
-    .plots {{
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
-    .plot {{
-      background: #fff;
-    }}
-    .plot h3 {{
-      padding: 14px 16px;
-      border-bottom: 1px solid rgba(216,227,241,.86);
-      background: linear-gradient(90deg, #f4f8ff, #ffffff);
-      font-size: 17px;
-    }}
-    .plot img {{
-      padding: 10px;
-      border-top: 0;
-      border-radius: 0 0 8px 8px;
-    }}
-    .spatial-maps {{
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
-    .table-wrap {{
-      max-height: 600px;
-    }}
-    footer {{
-      width: min(1520px, calc(100% - 56px));
-    }}
-    @media (max-width: 1180px) {{
-      .stats, .capability-grid, .param-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      .plots, .spatial-maps, .two-col, .three-col, .home-overview {{ grid-template-columns: 1fr; }}
-    }}
-    @media (max-width: 720px) {{
-      main.wrap, .wrap, footer {{ width: min(100% - 24px, 1520px); }}
-      header {{ min-height: 220px; padding: 18px 12px 22px; }}
-      h1 {{ font-size: 38px; }}
-      .nav-tabs {{ position: static; }}
-      .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps {{ grid-template-columns: 1fr; }}
-    }}
-
-    /* K-WaterGuard command-center template v6.
-       Design direction follows current analytics dashboard patterns: compact app shell,
-       dense KPI strip, chart-first pages, reduced decorative whitespace, and clear active navigation. */
-    :root {{
-      --bg: #eef5fb;
-      --surface: #ffffff;
-      --surface-2: #f6faff;
-      --ink: #071426;
-      --muted: #5b6a7f;
-      --line: #d7e3f2;
-      --blue: #0047a0;
-      --blue-deep: #042f67;
-      --blue-soft: #eaf3ff;
-      --red: #cd2e3a;
-      --red-soft: #fff0f3;
-      --black: #101828;
-      --shadow: 0 14px 36px rgba(15, 39, 72, .10);
-      --shadow-hover: 0 22px 56px rgba(15, 39, 72, .15);
-    }}
-    html {{ scroll-behavior: smooth; }}
-    body {{
-      background:
-        linear-gradient(135deg, rgba(239,247,255,.96), rgba(255,255,255,.92) 46%, rgba(255,246,248,.90)),
-        linear-gradient(180deg, #f8fbff, #edf4fb);
-      color: var(--ink);
-    }}
-    header {{
-      min-height: 154px;
-      padding: 18px 24px 16px;
-      align-items: center;
-      border-bottom: 1px solid rgba(0,71,160,.16);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.93) 45%, rgba(235,246,255,.73) 72%, rgba(0,71,160,.18)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    header .wrap {{
-      width: min(1760px, calc(100% - 44px));
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 14px 22px;
-      align-items: center;
-    }}
-    .topline {{
-      display: contents;
-    }}
-    .brand {{
-      grid-column: 1;
-      width: max-content;
-      min-height: 48px;
-      padding: 7px 12px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid rgba(0,71,160,.14);
-      box-shadow: 0 10px 24px rgba(15,39,72,.09);
-    }}
-    .brand-logo {{ width: 34px; height: 34px; }}
-    .brand-name {{ font-size: 18px; color: var(--blue-deep); }}
-    .badge {{
-      grid-column: 2;
-      grid-row: 1;
-      justify-self: end;
-      min-height: 36px;
-      padding: 7px 11px;
-      border-radius: 999px;
-      background: #fff;
-      color: var(--red);
-      box-shadow: 0 10px 24px rgba(15,39,72,.08);
-    }}
-    h1 {{
-      grid-column: 1;
-      margin: 0;
-      max-width: none;
-      font-size: clamp(34px, 3.1vw, 58px);
-      line-height: .98;
-      color: var(--blue);
-    }}
-    .subtitle {{
-      grid-column: 1 / -1;
-      max-width: 980px;
-      margin: -6px 0 0;
-      font-size: clamp(15px, 1vw, 18px);
-      line-height: 1.28;
-      color: #142943;
-      font-weight: 700;
-    }}
-    main.wrap {{
-      width: min(1760px, calc(100% - 44px));
-      padding-top: 14px;
-      padding-bottom: 28px;
-    }}
-    body.page-data main.wrap,
-    body.page-spatial main.wrap {{
-      display: grid;
-      grid-template-columns: minmax(380px, .78fr) minmax(0, 1.22fr);
-      gap: 12px;
-      align-items: start;
-    }}
-    body.page-data .nav-tabs,
-    body.page-data .toolbar,
-    body.page-data .search-status,
-    body.page-spatial .nav-tabs,
-    body.page-spatial .toolbar,
-    body.page-spatial .search-status {{
-      grid-column: 1 / -1;
-    }}
-    body.page-data #historicalDownloads,
-    body.page-data #historicalDataPage,
-    body.page-spatial .section {{
-      margin-top: 0;
-    }}
-    body.page-spatial #latestCharts,
-    body.page-spatial #spatialParameterMaps,
-    body.page-spatial #stationMeasurements {{
-      grid-column: 1 / -1;
-    }}
-    .nav-tabs {{
-      position: sticky;
-      top: 8px;
-      z-index: 20;
-      width: 100%;
-      margin: 0 0 14px;
-      padding: 7px;
-      display: grid;
-      grid-template-columns: repeat(5, minmax(120px, 1fr));
-      gap: 6px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid rgba(215,227,242,.92);
-      box-shadow: 0 12px 34px rgba(15,39,72,.10);
-      backdrop-filter: blur(18px);
-    }}
-    .nav-tabs a {{
-      min-height: 40px;
-      padding: 9px 12px;
-      border: 0;
-      border-radius: 7px;
-      background: transparent;
-      color: #18385f;
-      font-size: 14px;
-      font-weight: 900;
-      letter-spacing: 0;
-      transition: background .16s ease, color .16s ease, transform .16s ease;
-    }}
-    .nav-tabs a:hover {{
-      background: var(--blue-soft);
-      transform: translateY(-1px);
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-data .nav-tabs a[href="data.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"] {{
-      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
-      color: #fff;
-      box-shadow: 0 12px 24px rgba(0,71,160,.22);
-    }}
-    .toolbar {{
-      display: grid;
-      grid-template-columns: minmax(320px, 1fr) auto auto;
-      align-items: center;
-      gap: 10px;
-      margin: 0 0 8px;
-      padding: 10px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.88);
-      border: 1px solid rgba(215,227,242,.9);
-      box-shadow: 0 10px 30px rgba(15,39,72,.08);
-    }}
-    .search {{
-      min-height: 42px;
-      padding: 9px 12px;
-      border-radius: 7px;
-      background: #fff;
-      border: 1px solid rgba(0,71,160,.15);
-      font-size: 15px;
-    }}
-    .button {{
-      min-height: 42px;
-      padding: 9px 13px;
-      border-radius: 7px;
-      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
-      color: #fff;
-      font-weight: 900;
-      box-shadow: 0 10px 22px rgba(0,71,160,.20);
-      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
-    }}
-    .button:hover {{
-      transform: translateY(-1px);
-      box-shadow: 0 14px 30px rgba(0,71,160,.25);
-    }}
-    .search-status {{
-      margin: 8px 4px 12px;
-      min-height: 0;
-      font-size: 13px;
-      color: var(--muted);
-    }}
-    .card {{
-      border-radius: 8px;
-      border: 1px solid rgba(215,227,242,.96);
-      background: rgba(255,255,255,.95);
-      box-shadow: var(--shadow);
-    }}
-    .section {{
-      margin-top: 12px;
-      padding: clamp(16px, 1.35vw, 24px);
-    }}
-    h2 {{
-      margin: 0 0 12px;
-      font-size: clamp(22px, 1.55vw, 30px);
-      line-height: 1.08;
-      color: var(--ink);
-    }}
-    h3 {{
-      margin: 0 0 10px;
-      font-size: clamp(16px, 1vw, 20px);
-      line-height: 1.14;
-      color: var(--ink);
-    }}
-    body.page-home .toolbar,
-    body.page-home .search-status,
-    body.page-home .insight-rail {{
-      display: none !important;
-    }}
-    #agentOverview.card {{
-      padding: 0;
-      overflow: hidden;
-      background: transparent;
-      border: 0;
-      box-shadow: none;
-    }}
-    .home-overview {{
-      min-height: 0;
-      grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
-      gap: 14px;
-      padding: 18px;
-      border-radius: 8px;
-      background:
-        linear-gradient(115deg, rgba(3,30,69,.94), rgba(0,71,160,.83) 54%, rgba(205,46,58,.80)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-      box-shadow: 0 18px 48px rgba(6,34,72,.18);
-    }}
-    .overview-panel {{
-      padding: clamp(16px, 1.6vw, 24px);
-      border-radius: 8px;
-      background: rgba(255,255,255,.14);
-      border: 1px solid rgba(255,255,255,.23);
-      box-shadow: 0 18px 42px rgba(0,0,0,.12);
-      backdrop-filter: blur(14px);
-    }}
-    .overview-kicker {{
-      margin-bottom: 7px;
-      font-size: 11px;
-      letter-spacing: .08em;
-    }}
-    .home-overview h2 {{
-      margin-bottom: 10px;
-      font-size: clamp(26px, 2.2vw, 40px);
-      line-height: 1.04;
-    }}
-    .home-overview p,
-    .home-overview li {{
-      font-size: 15px;
-      line-height: 1.38;
-    }}
-    .overview-list {{
-      margin: 8px 0 0;
-      padding-left: 18px;
-    }}
-    .page-actions {{
-      margin-top: 12px;
-      gap: 8px;
-    }}
-    .page-actions .button,
-    .home-overview .history-link {{
-      min-height: 38px;
-      background: #fff;
-      color: var(--blue);
-      box-shadow: 0 8px 18px rgba(0,0,0,.10);
-    }}
-    .stats {{
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
-      margin: 12px 0;
-    }}
-    .stat {{
-      min-height: 92px;
-      padding: 13px 14px;
-      overflow: hidden;
-      background:
-        linear-gradient(180deg, #fff, #f8fbff);
-      border-top: 0;
-      position: relative;
-    }}
-    .stat::before {{
-      content: "";
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 4px;
-      background: var(--blue);
-    }}
-    .stats > .stat:nth-child(even)::before {{ background: var(--red); }}
-    .stats > .stat:nth-child(3n)::before {{ background: var(--black); }}
-    .label {{
-      color: #66758a;
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: .02em;
-    }}
-    .value {{
-      margin-top: 5px;
-      font-size: clamp(22px, 1.65vw, 34px);
-      line-height: 1.02;
-      color: var(--blue);
-      overflow-wrap: anywhere;
-    }}
-    .capability-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }}
-    .capability-card {{
-      min-height: 118px;
-      padding: 15px;
-      border-top: 0;
-      position: relative;
-      background: linear-gradient(180deg, #fff, #f7fbff);
-    }}
-    .capability-card::before {{
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      background: var(--blue);
-    }}
-    .capability-card:nth-child(even)::before {{ background: var(--red); }}
-    .capability-card h3 {{
-      margin-bottom: 6px;
-      font-size: 17px;
-    }}
-    .capability-card p {{
-      font-size: 14px;
-      line-height: 1.36;
-    }}
-    .two-col {{
-      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
-      gap: 12px;
-    }}
-    .three-col {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-    }}
-    .param-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }}
-    .param {{
-      min-height: 118px;
-      padding: 14px;
-      border-left: 0;
-      background: linear-gradient(180deg, #fff, #f8fbff);
-    }}
-    .param::before {{
-      content: "";
-      display: block;
-      height: 3px;
-      width: 42px;
-      border-radius: 999px;
-      margin-bottom: 10px;
-      background: var(--blue);
-    }}
-    .param.warn::before {{ background: var(--black); }}
-    .param.bad::before {{ background: var(--red); }}
-    .param:hover {{
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-hover);
-    }}
-    .param-value {{
-      margin: 7px 0 3px;
-      font-size: clamp(22px, 1.55vw, 30px);
-      line-height: 1;
-    }}
-    .param-action {{
-      margin-top: 7px;
-      font-size: 12px;
-    }}
-    .alert-pill {{
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 900;
-    }}
-    .plots {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }}
-    body.page-trends .plots,
-    body.page-algal .plots {{
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
-    .spatial-maps {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }}
-    .plot {{
-      overflow: hidden;
-      background: #fff;
-    }}
-    .plot h3 {{
-      margin: 0;
-      padding: 10px 12px;
-      min-height: 42px;
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid rgba(215,227,242,.86);
-      background: linear-gradient(90deg, #f1f7ff, #ffffff);
-      color: #10233f;
-      font-size: 15px;
-    }}
-    .plot img {{
-      width: 100%;
-      padding: 8px;
-      border: 0;
-      border-radius: 0;
-      background: #fff;
-    }}
-    .table-wrap {{
-      max-height: 460px;
-      border-radius: 8px;
-      border: 1px solid rgba(215,227,242,.92);
-      background: #fff;
-    }}
-    body.page-data .table-wrap,
-    body.page-spatial #stationMeasurements .table-wrap {{
-      max-height: 620px;
-    }}
-    table {{
-      font-size: 14px;
-    }}
-    th {{
-      padding: 10px 12px;
-      background: linear-gradient(180deg, #eef6ff, #e4effb);
-      color: #10233f;
-      font-weight: 900;
-    }}
-    td {{
-      padding: 9px 12px;
-      color: #213149;
-    }}
-    tbody tr:nth-child(even) {{ background: #fbfdff; }}
-    tbody tr:hover {{ background: #f3f8ff; }}
-    .history-link {{
-      display: inline-flex;
-      align-items: center;
-      min-height: 34px;
-      padding: 7px 10px;
-      margin: 2px 5px 2px 0;
-      border-radius: 7px;
-      background: var(--blue-soft);
-      color: var(--blue);
-      font-weight: 900;
-    }}
-    .history-link:hover {{
-      background: var(--blue);
-      color: #fff;
-      text-decoration: none;
-    }}
-    footer {{
-      width: min(1760px, calc(100% - 44px));
-      margin: 0 auto 20px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.78);
-      border: 1px solid rgba(215,227,242,.86);
-      box-shadow: 0 10px 26px rgba(15,39,72,.07);
-      font-size: 12px;
-    }}
-    .chat-launch {{
-      right: 18px;
-      bottom: 18px;
-      min-height: 46px;
-      border-radius: 999px;
-    }}
-    @media (max-width: 1280px) {{
-      body.page-data main.wrap,
-      body.page-spatial main.wrap {{ display: block; }}
-      .stats {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-      .capability-grid, .param-grid, .plots, .spatial-maps {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      body.page-trends .plots, body.page-algal .plots {{ grid-template-columns: 1fr; }}
-      .two-col, .home-overview {{ grid-template-columns: 1fr; }}
-    }}
-    @media (max-width: 760px) {{
-      header .wrap, main.wrap, .wrap, footer {{ width: min(100% - 24px, 1760px); }}
-      header {{ min-height: 150px; padding: 14px 12px; }}
-      header .wrap {{ grid-template-columns: 1fr; }}
-      .badge {{ grid-column: 1; grid-row: auto; justify-self: start; }}
-      h1 {{ font-size: 34px; }}
-      .nav-tabs {{ position: static; grid-template-columns: 1fr; }}
-      .toolbar, .stats, .capability-grid, .param-grid, .plots, .spatial-maps, .three-col {{ grid-template-columns: 1fr; }}
-    }}
-
-    /* K-WaterGuard dark mission-control template v7.
-       A true app-style dashboard: dark-first shell, fixed side navigation,
-       compact header, dense data surfaces, and restrained white/blue/red semantics. */
-    :root {{
-      --app-bg: #071426;
-      --app-bg-2: #0b1f38;
-      --surface: #ffffff;
-      --surface-2: #f4f8fd;
-      --surface-dark: rgba(10, 30, 56, .78);
-      --ink: #0a1728;
-      --ink-on-dark: #f7fbff;
-      --muted: #64748b;
-      --muted-on-dark: #b8c7db;
-      --line: #dbe6f3;
-      --line-dark: rgba(211, 227, 246, .16);
-      --blue: #0057c2;
-      --blue-deep: #003b87;
-      --blue-soft: #e9f3ff;
-      --red: #cd2e3a;
-      --red-soft: #fff1f3;
-      --black: #101828;
-      --shadow: 0 18px 48px rgba(0,0,0,.18);
-      --shadow-soft: 0 10px 28px rgba(0,0,0,.10);
-    }}
-    body {{
-      background:
-        radial-gradient(circle at 20% -10%, rgba(0,87,194,.34), transparent 34%),
-        radial-gradient(circle at 98% 6%, rgba(205,46,58,.22), transparent 28%),
-        linear-gradient(135deg, #071426 0%, #0c2039 42%, #eff6ff 42%, #f8fbff 100%);
-      color: var(--ink);
-    }}
-    header {{
-      min-height: 86px;
-      padding: 14px 22px;
-      position: sticky;
-      top: 0;
-      z-index: 35;
-      border-bottom: 1px solid var(--line-dark);
-      background:
-        linear-gradient(90deg, rgba(7,20,38,.98), rgba(11,31,56,.94) 58%, rgba(0,87,194,.72)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-      box-shadow: 0 18px 44px rgba(0,0,0,.20);
-    }}
-    header .wrap {{
-      width: min(1880px, calc(100% - 36px));
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 14px;
-      align-items: center;
-    }}
-    .topline {{ display: contents; }}
-    .brand {{
-      grid-column: 1;
-      min-height: 54px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.10);
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow: none;
-      backdrop-filter: blur(14px);
-    }}
-    .brand-logo {{
-      width: 36px;
-      height: 36px;
-      background: #fff;
-      border-radius: 6px;
-    }}
-    .brand-name {{
-      color: #fff;
-      font-size: 17px;
-      letter-spacing: 0;
-    }}
-    h1 {{
-      grid-column: 2;
-      grid-row: 1;
-      margin: 0;
-      font-size: clamp(28px, 2.2vw, 46px);
-      line-height: 1;
-      color: #fff;
-      text-shadow: 0 2px 18px rgba(0,0,0,.25);
-    }}
-    .subtitle {{
-      grid-column: 2;
-      grid-row: 2;
-      margin: -8px 0 0;
-      max-width: 1100px;
-      font-size: 14px;
-      line-height: 1.25;
-      color: var(--muted-on-dark);
-      font-weight: 700;
-    }}
-    .badge {{
-      grid-column: 3;
-      grid-row: 1 / span 2;
-      justify-self: end;
-      min-height: 38px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      color: #fff;
-      background: linear-gradient(135deg, var(--red), #9f1d28);
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow: 0 12px 28px rgba(205,46,58,.25);
-    }}
-    main.wrap {{
-      width: min(1880px, calc(100% - 36px));
-      margin: 0 auto;
-      padding: 16px 0 30px 276px;
-    }}
-    .nav-tabs {{
+    /* Subtle topological grid overlay matching portfolio */
+    body::after {{
+      content: '';
       position: fixed;
-      left: max(18px, calc((100vw - 1880px) / 2 + 18px));
-      top: 112px;
-      z-index: 30;
-      width: 238px;
-      height: calc(100vh - 132px);
-      margin: 0;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      border-radius: 8px;
-      background: rgba(7,20,38,.86);
-      border: 1px solid var(--line-dark);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }}
-    .nav-tabs::before {{
-      content: "Dashboard Pages";
-      display: block;
-      padding: 4px 8px 10px;
-      color: var(--muted-on-dark);
-      font-size: 12px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-    }}
-    .nav-tabs a {{
-      width: 100%;
-      justify-content: flex-start;
-      min-height: 44px;
-      padding: 10px 12px;
-      border-radius: 7px;
-      background: rgba(255,255,255,.04);
-      color: #d8e8fb;
-      font-size: 15px;
-      border: 1px solid transparent;
-      box-shadow: none;
-    }}
-    .nav-tabs a:hover {{
-      background: rgba(255,255,255,.10);
-      border-color: rgba(255,255,255,.12);
-      transform: translateX(2px);
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-data .nav-tabs a[href="data.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"] {{
-      background: linear-gradient(135deg, #ffffff, #eaf3ff);
-      color: var(--blue-deep);
-      border-color: rgba(255,255,255,.70);
-      box-shadow: 0 12px 24px rgba(0,0,0,.20);
-    }}
-    .toolbar {{
-      position: sticky;
-      top: 100px;
-      z-index: 18;
-      grid-template-columns: minmax(320px, 1fr) auto auto;
-      margin: 0 0 10px;
-      padding: 10px;
-      border-radius: 8px;
-      background: rgba(255,255,255,.90);
-      border: 1px solid rgba(219,230,243,.92);
-      box-shadow: 0 16px 40px rgba(9,24,45,.12);
-      backdrop-filter: blur(16px);
-    }}
-    .search {{
-      min-height: 42px;
-      border-radius: 7px;
-      background: #fff;
-      font-size: 15px;
-    }}
-    .button {{
-      min-height: 42px;
-      border-radius: 7px;
-      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
-      box-shadow: 0 12px 26px rgba(0,87,194,.24);
-    }}
-    .card {{
-      background: rgba(255,255,255,.96);
-      border: 1px solid rgba(219,230,243,.92);
-      border-radius: 8px;
-      box-shadow: 0 16px 40px rgba(9,24,45,.10);
-    }}
-    .section {{
-      margin-top: 12px;
-      padding: clamp(14px, 1.1vw, 20px);
-    }}
-    #agentOverview.card {{
-      padding: 0;
-      border: 0;
-      background: transparent;
-      box-shadow: none;
-    }}
-    .home-overview {{
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(310px, .52fr);
-      gap: 12px;
-      min-height: 0;
-      padding: 0;
-      border-radius: 8px;
-      background: transparent;
-      box-shadow: none;
-    }}
-    .overview-panel {{
-      border-radius: 8px;
-      padding: clamp(16px, 1.6vw, 24px);
-      background:
-        linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.07)),
-        linear-gradient(135deg, rgba(0,87,194,.52), rgba(205,46,58,.24));
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow: var(--shadow);
-      color: #fff;
-      backdrop-filter: blur(16px);
-    }}
-    .overview-panel:first-child {{
-      background:
-        linear-gradient(115deg, rgba(7,20,38,.94), rgba(0,87,194,.74) 58%, rgba(205,46,58,.52)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    .overview-kicker {{
-      color: #d8e8fb;
-      font-size: 11px;
-      letter-spacing: .08em;
-    }}
-    .home-overview h2 {{
-      color: #fff;
-      font-size: clamp(26px, 2.15vw, 42px);
-    }}
-    .home-overview p,
-    .home-overview li,
-    .home-overview .muted {{
-      color: rgba(255,255,255,.88);
-    }}
-    .page-actions .button,
-    .home-overview .history-link {{
-      background: #fff;
-      color: var(--blue-deep);
-      box-shadow: 0 12px 24px rgba(0,0,0,.16);
-    }}
-    .stats {{
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
-      margin: 12px 0;
-    }}
-    .stat {{
-      min-height: 84px;
-      padding: 12px 13px;
-      background: linear-gradient(180deg, #fff, #f7fbff);
-      border-radius: 8px;
-    }}
-    .stat::before {{
-      width: 3px;
-      background: var(--blue);
-    }}
-    .value {{
-      font-size: clamp(22px, 1.45vw, 32px);
-      color: var(--blue-deep);
-    }}
-    .label {{
-      font-size: 10px;
-      color: #66758a;
-    }}
-    .capability-grid,
-    .param-grid {{
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }}
-    .capability-card,
-    .param {{
-      min-height: 108px;
-      padding: 13px;
-    }}
-    .capability-card h3 {{ font-size: 16px; }}
-    .capability-card p {{ font-size: 13px; }}
-    .param-value {{ font-size: clamp(21px, 1.35vw, 28px); }}
-    .two-col {{
-      grid-template-columns: minmax(0, 1fr) minmax(380px, .88fr);
-      gap: 12px;
-    }}
-    .three-col {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-    }}
-    .plots {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }}
-    body.page-trends .plots,
-    body.page-algal .plots {{
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
-    .spatial-maps {{
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }}
-    .plot {{
-      overflow: hidden;
-      background: #fff;
-    }}
-    .plot h3 {{
-      min-height: 40px;
-      padding: 10px 12px;
-      background: #fff;
-      border-bottom: 1px solid rgba(219,230,243,.9);
-      font-size: 14px;
-    }}
-    .plot img {{
-      padding: 6px;
-    }}
-    .table-wrap {{
-      max-height: 420px;
-      border-radius: 8px;
-      border: 1px solid rgba(219,230,243,.95);
-    }}
-    th {{
-      padding: 9px 10px;
-      background: #eef6ff;
-      font-size: 13px;
-    }}
-    td {{
-      padding: 8px 10px;
-      font-size: 13px;
-    }}
-    body.page-data main.wrap,
-    body.page-spatial main.wrap {{
-      display: grid;
-      grid-template-columns: minmax(370px, .72fr) minmax(0, 1.28fr);
-      gap: 12px;
-      align-items: start;
-    }}
-    body.page-data .nav-tabs,
-    body.page-data .toolbar,
-    body.page-data .search-status,
-    body.page-spatial .nav-tabs,
-    body.page-spatial .toolbar,
-    body.page-spatial .search-status {{
-      grid-column: 1 / -1;
-    }}
-    body.page-spatial #latestCharts,
-    body.page-spatial #spatialParameterMaps,
-    body.page-spatial #stationMeasurements {{
-      grid-column: 1 / -1;
-    }}
-    footer {{
-      width: min(1880px, calc(100% - 36px));
-      margin: 0 auto 20px;
-      padding: 12px 14px 12px 290px;
-      border: 0;
-      background: transparent;
-      color: #d4e2f2;
-      box-shadow: none;
-    }}
-    @media (max-width: 1320px) {{
-      main.wrap {{
-        padding-left: 0;
-      }}
-      .nav-tabs {{
-        position: sticky;
-        top: 96px;
-        width: 100%;
-        height: auto;
-        left: auto;
-        display: grid;
-        grid-template-columns: repeat(5, minmax(120px, 1fr));
-      }}
-      .nav-tabs::before {{ display: none; }}
-      body.page-data main.wrap,
-      body.page-spatial main.wrap {{
-        display: block;
-      }}
-      footer {{
-        padding-left: 14px;
-      }}
-    }}
-    @media (max-width: 980px) {{
-      header .wrap {{
-        grid-template-columns: 1fr;
-      }}
-      h1,
-      .subtitle,
-      .badge {{
-        grid-column: 1;
-        grid-row: auto;
-        justify-self: start;
-      }}
-      .toolbar,
-      .nav-tabs,
-      .stats,
-      .capability-grid,
-      .param-grid,
-      .plots,
-      body.page-trends .plots,
-      body.page-algal .plots,
-      .spatial-maps,
-      .two-col,
-      .three-col,
-      .home-overview {{
-        grid-template-columns: 1fr;
-      }}
-    }}
-
-    /* K-WaterGuard polish layer v8: readable overview, compact sidebar, integrated plots. */
-    header {{
-      background:
-        linear-gradient(90deg, rgba(7,20,38,.98), rgba(9,30,55,.96) 60%, rgba(0,87,194,.82)),
-        url("{self._asset_uri('Kwater.png')}");
-    }}
-    .nav-tabs {{
-      height: auto;
-      max-height: calc(100vh - 132px);
-      overflow: auto;
-      padding: 12px;
-      gap: 7px;
-    }}
-    .nav-tabs a {{
-      flex: 0 0 auto !important;
-      min-height: 42px;
-      height: auto;
-      display: flex;
-      align-items: center;
-      padding: 10px 12px;
-      background: rgba(255,255,255,.055);
-      color: #d9e8fb;
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-data .nav-tabs a[href="data.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"] {{
-      background: linear-gradient(135deg, #ffffff, #edf5ff);
-      color: var(--blue-deep);
-      transform: none;
-    }}
-    .home-overview {{
-      background:
-        linear-gradient(135deg, rgba(7,20,38,.98), rgba(8,34,66,.96) 54%, rgba(83,31,52,.94));
-      border: 1px solid rgba(255,255,255,.10);
-      box-shadow: 0 20px 58px rgba(0,0,0,.24);
-    }}
-    .overview-panel,
-    .overview-panel:first-child {{
-      background: rgba(255,255,255,.10);
-      border: 1px solid rgba(255,255,255,.20);
-      box-shadow: 0 16px 42px rgba(0,0,0,.20);
-    }}
-    .overview-panel:first-child {{
-      position: relative;
-      overflow: hidden;
-    }}
-    .overview-panel:first-child::after {{
-      content: "";
-      position: absolute;
       inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.06), transparent 42%),
-        radial-gradient(circle at 88% 18%, rgba(0,87,194,.30), transparent 34%),
-        radial-gradient(circle at 96% 86%, rgba(205,46,58,.20), transparent 32%);
-      opacity: .75;
-    }}
-    .overview-panel > * {{
-      position: relative;
       z-index: 1;
+      pointer-events: none;
+      opacity: 0.28;
+      background-image:
+        linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: radial-gradient(circle at 50% 30%, black 20%, transparent 80%);
     }}
-    .home-overview h2 {{
-      max-width: 840px;
+
+    /* Interactive ambient connected-nodes particle canvas */
+    #ambient-canvas {{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }}
+
+    /* Custom modern scrollbar */
+    ::-webkit-scrollbar {{
+      width: 8px;
+      height: 8px;
+    }}
+    ::-webkit-scrollbar-track {{
+      background: var(--bg-base);
+    }}
+    ::-webkit-scrollbar-thumb {{
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+    }}
+    ::-webkit-scrollbar-thumb:hover {{
+      background: rgba(56, 189, 248, 0.45);
+    }}
+
+    /* Foreground content stack */
+    header,
+    main,
+    footer,
+    .wrap {{
+      position: relative;
+      z-index: 2;
+    }}
+
+    header {{
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(1100px 420px at 15% 10%, rgba(56, 189, 248, 0.28) 0%, transparent 70%),
+        radial-gradient(900px 380px at 85% 0%, rgba(52, 211, 153, 0.22) 0%, transparent 60%),
+        radial-gradient(700px 320px at 50% 100%, rgba(0, 242, 254, 0.16) 0%, transparent 70%),
+        linear-gradient(135deg, #04090e 0%, #071522 50%, #0b1f32 100%);
       color: #ffffff;
-      text-shadow: 0 2px 18px rgba(0,0,0,.34);
+      padding: clamp(28px, 4vw, 44px) 0 clamp(24px, 3.5vw, 36px);
+      border-bottom: 1px solid var(--border-glass);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     }}
-    .home-overview p,
-    .home-overview li {{
-      max-width: 1000px;
-      color: #edf6ff;
-      text-shadow: 0 1px 10px rgba(0,0,0,.30);
+
+    .wrap {{
+      width: min(100% - 48px, 1540px);
+      margin: 0 auto;
     }}
-    .overview-kicker {{
-      color: #bcd8ff;
-    }}
-    .page-actions {{
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      max-width: 720px;
-    }}
-    .page-actions .button,
-    .home-overview .history-link {{
+
+    .topline {{
+      display: flex;
       justify-content: space-between;
-      min-height: 46px;
-      padding: 10px 13px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: linear-gradient(135deg, #ffffff, #e8f3ff);
-      color: var(--blue-deep);
-      box-shadow: 0 14px 28px rgba(0,0,0,.20);
-    }}
-    .page-actions .button::after,
-    .home-overview .history-link::after {{
-      content: ">";
-      margin-left: 10px;
-      font-weight: 900;
-      color: var(--red);
-    }}
-    .plot {{
-      background: #071426;
-      border-color: rgba(219,230,243,.16);
-      box-shadow: 0 18px 44px rgba(0,0,0,.18);
-    }}
-    .plot h3 {{
-      min-height: 44px;
-      background: linear-gradient(135deg, #071426, #0c2b50);
-      color: #f7fbff;
-      border-bottom: 1px solid rgba(219,230,243,.16);
-    }}
-    .plot img {{
-      padding: 8px;
-      background: #071426;
-    }}
-    .plot:hover {{
-      box-shadow: 0 24px 58px rgba(0,0,0,.24);
-      transform: translateY(-1px);
-    }}
-    .stat,
-    .capability-card,
-    .param {{
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 10px 28px rgba(9,24,45,.08);
-    }}
-    .capability-card {{
-      background: linear-gradient(145deg, #ffffff, #f6faff);
-    }}
-    .param {{
-      background: linear-gradient(145deg, #ffffff, #f7fbff);
-    }}
-    @media (max-width: 1320px) {{
-      .nav-tabs {{
-        max-height: none;
-        overflow: visible;
-      }}
-      .nav-tabs a {{
-        justify-content: center;
-      }}
-    }}
-    @media (max-width: 980px) {{
-      .page-actions {{
-        grid-template-columns: 1fr;
-      }}
-    }}
-
-    /* K-WaterGuard correction layer v9: clean scientific figures and calmer workspace. */
-    body {{
-      background:
-        linear-gradient(90deg, #071426 0 288px, transparent 288px),
-        linear-gradient(135deg, #eef5fb 0%, #f8fbff 54%, #fff7f8 100%);
-    }}
-    main.wrap {{
-      min-height: calc(100vh - 112px);
-    }}
-    .section {{
-      background: rgba(255,255,255,.97);
-    }}
-    .plot {{
-      background: #ffffff;
-      border: 1px solid rgba(219,230,243,.95);
-      box-shadow: 0 14px 34px rgba(9,24,45,.10);
-    }}
-    .plot h3 {{
-      background: linear-gradient(90deg, #eef6ff, #ffffff);
-      color: #0a1728;
-      border-bottom: 1px solid rgba(219,230,243,.95);
-    }}
-    .plot img {{
-      padding: 10px;
-      background: #ffffff;
-    }}
-    .plot:hover {{
-      box-shadow: 0 20px 42px rgba(9,24,45,.14);
-    }}
-    .plots {{
-      align-items: start;
-    }}
-    .spatial-maps {{
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }}
-    body.page-spatial .spatial-maps {{
-      grid-template-columns: repeat(2, minmax(420px, 1fr));
-    }}
-    body.page-spatial .plot img {{
-      padding: 12px;
-    }}
-    body.page-spatial #latestCharts .plots {{
-      grid-template-columns: repeat(2, minmax(420px, 1fr));
-    }}
-    body.page-spatial #latestCharts .plot:first-child,
-    body.page-spatial #latestCharts .plot:nth-child(2),
-    body.page-spatial #latestCharts .plot:nth-child(3) {{
-      min-height: auto;
-    }}
-    body.page-algal .plots,
-    body.page-trends .plots {{
-      grid-template-columns: repeat(2, minmax(420px, 1fr));
-    }}
-    .table-wrap {{
-      background: #ffffff;
-    }}
-    footer {{
-      color: #6b7b90;
-    }}
-    @media (max-width: 1320px) {{
-      body {{
-        background: linear-gradient(135deg, #eef5fb 0%, #f8fbff 58%, #fff7f8 100%);
-      }}
-      body.page-spatial .spatial-maps,
-      body.page-spatial #latestCharts .plots,
-      body.page-algal .plots,
-      body.page-trends .plots,
-      body.page-weather .plots {{
-        grid-template-columns: 1fr;
-      }}
-    }}
-
-    /* K-WaterGuard correction layer v10: modern scientific workspace and page routing. */
-    :root {{
-      --bg: #edf5ff;
-      --panel: rgba(255,255,255,.96);
-      --panel-soft: #f5faff;
-      --ink: #06192f;
-      --muted: #53677f;
-      --line: #d5e4f5;
-      --blue: #0758bd;
-      --blue-soft: #e7f2ff;
-      --red: #d73345;
-      --red-soft: #fff0f2;
-      --black: #071426;
-      --shadow: 0 18px 48px rgba(6, 25, 47, .10);
-    }}
-    body {{
-      background:
-        linear-gradient(112deg, rgba(7,20,38,.98) 0 300px, transparent 300px),
-        radial-gradient(circle at 78% 9%, rgba(7,88,189,.16), transparent 30%),
-        radial-gradient(circle at 94% 64%, rgba(215,51,69,.13), transparent 32%),
-        linear-gradient(135deg, #edf7ff 0%, #fbfdff 54%, #fff6f8 100%);
-    }}
-    header {{
-      min-height: 320px;
-      border-bottom: 1px solid rgba(7,88,189,.18);
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.97) 0%, rgba(255,255,255,.86) 45%, rgba(7,88,189,.22) 100%),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center right;
-    }}
-    h1 {{ color: #0758bd; text-shadow: 0 1px 0 rgba(255,255,255,.8); }}
-    .nav-tabs {{
-      position: sticky;
-      top: 10px;
-      z-index: 20;
-      padding: 10px;
-      border: 1px solid rgba(213,228,245,.9);
-      background: rgba(255,255,255,.86);
-      backdrop-filter: blur(18px);
-      border-radius: 10px;
-      box-shadow: 0 12px 34px rgba(6,25,47,.09);
-    }}
-    .nav-tabs a {{
-      border: 0;
-      border-radius: 8px;
-      background: transparent;
-      color: #17324f;
-      transition: background .18s ease, color .18s ease, transform .18s ease;
-    }}
-    .nav-tabs a:hover {{ background: #eaf4ff; transform: translateY(-1px); }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-data .nav-tabs a[href="data.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-weather .nav-tabs a[href="weather.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"] {{
-      color: white;
-      background: linear-gradient(135deg, #0758bd, #0d75d9);
-      box-shadow: 0 10px 24px rgba(7,88,189,.24);
-    }}
-    body.page-home .page:not(.page-home),
-    body.page-data .page:not(.page-data),
-    body.page-trends .page:not(.page-trends),
-    body.page-algal .page:not(.page-algal),
-    body.page-weather .page:not(.page-weather),
-    body.page-spatial .page:not(.page-spatial) {{ display: none !important; }}
-    .section, .card {{
-      border-color: rgba(213,228,245,.92);
-      box-shadow: 0 18px 48px rgba(6,25,47,.09);
-    }}
-    .button, button.button {{
-      border: 0;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #0758bd, #0d75d9);
-      box-shadow: 0 10px 22px rgba(7,88,189,.20);
-      font-weight: 800;
-    }}
-    .home-overview {{
-      background:
-        linear-gradient(115deg, rgba(6,25,47,.84), rgba(7,88,189,.72) 48%, rgba(215,51,69,.66)),
-        url("{self._asset_uri('Kwater.png')}");
-      background-size: cover;
-      background-position: center;
-    }}
-    .overview-panel {{
-      background: rgba(8,32,63,.54);
-      border-color: rgba(255,255,255,.28);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
-    }}
-    .overview-panel p, .overview-list li {{
-      font-size: 16px;
-      line-height: 1.56;
-      text-shadow: 0 1px 1px rgba(0,0,0,.22);
-    }}
-    .overview-panel .button {{
-      background: #ffffff;
-      color: #0758bd;
-      box-shadow: 0 10px 22px rgba(0,0,0,.16);
-    }}
-    .plots, body.page-weather .plots {{
-      grid-template-columns: repeat(2, minmax(360px, 1fr));
-    }}
-    .plot h3 {{
-      background: linear-gradient(90deg, #f4f9ff, #fff7f8);
-      color: #06192f;
-    }}
-    .plot.interactive-plot iframe {{ background: white; }}
-    .table-wrap {{
-      border-radius: 10px;
-      border: 1px solid rgba(213,228,245,.92);
-    }}
-    th {{
-      background: linear-gradient(90deg, #eaf4ff, #f7fbff);
-      color: #06192f;
-    }}
-    @media (max-width: 900px) {{
-      body {{ background: linear-gradient(135deg, #edf7ff 0%, #fbfdff 56%, #fff6f8 100%); }}
-      header {{ min-height: 280px; }}
-      .plots, body.page-weather .plots {{ grid-template-columns: 1fr; }}
-    }}
-
-    /* K-WaterGuard correction layer v11: professional app layout, contact page, and readable plot surfaces. */
-    body {{
-      background:
-        radial-gradient(circle at 80% 8%, rgba(7,88,189,.12), transparent 28%),
-        radial-gradient(circle at 92% 72%, rgba(215,51,69,.10), transparent 30%),
-        linear-gradient(135deg, #edf6ff 0%, #ffffff 52%, #fff7f8 100%) !important;
-    }}
-    header {{
-      min-height: 270px;
-      padding: 28px 24px 30px;
+      gap: 16px;
       align-items: center;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.90) 43%, rgba(7,88,189,.26) 100%),
-        url("{self._asset_uri('Kwater.png')}") !important;
-      background-size: cover !important;
-      background-position: center right !important;
+      flex-wrap: wrap;
     }}
-    header .wrap {{
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 16px 22px;
-      align-items: center;
-    }}
-    header h1 {{
-      grid-column: 1 / 3;
-      margin: 10px 0 0;
-      font-size: clamp(42px, 5.2vw, 72px);
-      line-height: 1;
-    }}
-    header .subtitle {{
-      grid-column: 1 / 3;
-      max-width: 980px;
-      font-size: clamp(16px, 1.5vw, 21px);
-      color: #17324f;
-    }}
-    .topline {{ display: contents; }}
-    .brand {{ grid-column: 1; width: fit-content; }}
-    .badge {{ grid-column: 3; justify-self: end; }}
-    main.wrap {{
-      width: min(1500px, calc(100% - 48px));
-      padding-top: 24px;
-    }}
-    .nav-tabs {{
-      position: sticky !important;
-      top: 12px !important;
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-      width: 100% !important;
-      max-height: none !important;
-      gap: 8px !important;
-      margin: 0 0 18px !important;
-      padding: 10px !important;
-      background: rgba(255,255,255,.92) !important;
-      border: 1px solid rgba(213,228,245,.98) !important;
-      border-radius: 12px !important;
-      box-shadow: 0 16px 38px rgba(6,25,47,.10) !important;
-      overflow: visible !important;
-    }}
-    .nav-tabs::before {{ display: none !important; }}
-    .nav-tabs a {{
-      flex: 0 0 auto !important;
-      min-height: 42px;
+
+    .brand {{
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      padding: 10px 14px !important;
-      border-radius: 10px !important;
-      color: #17324f !important;
-      background: transparent !important;
+      gap: 12px;
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.01em;
       text-decoration: none;
     }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-weather .nav-tabs a[href="weather.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"],
-    body.page-contact .nav-tabs a[href="contact.html"],
-    body.page-data .nav-tabs a[href="data.html"] {{
-      color: #ffffff !important;
-      background: linear-gradient(135deg, #0758bd, #0b76df) !important;
-    }}
-    body.page-home .page:not(.page-home),
-    body.page-trends .page:not(.page-trends),
-    body.page-algal .page:not(.page-algal),
-    body.page-weather .page:not(.page-weather),
-    body.page-spatial .page:not(.page-spatial),
-    body.page-contact .page:not(.page-contact),
-    body.page-data .page:not(.page-data) {{ display: none !important; }}
-    .toolbar {{
-      padding: 10px;
-      background: rgba(255,255,255,.82);
-      border: 1px solid rgba(213,228,245,.92);
+
+    .brand-logo {{
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
       border-radius: 12px;
-      box-shadow: 0 14px 34px rgba(6,25,47,.08);
-    }}
-    .section {{
-      padding: clamp(22px, 2.4vw, 34px);
-      border-radius: 14px;
-      background: rgba(255,255,255,.98);
-    }}
-    .home-overview {{
-      border-radius: 14px;
-      min-height: 520px;
-      align-items: end;
-    }}
-    .overview-panel {{
-      background: rgba(7, 27, 52, .66);
-      backdrop-filter: blur(12px);
-    }}
-    .stats .stat, .param, .capability-card {{
-      border-radius: 12px;
-      background: linear-gradient(145deg, #ffffff, #f8fbff);
-    }}
-    .plot {{
-      border-radius: 13px;
-      overflow: hidden;
-      background: #ffffff !important;
-      box-shadow: 0 18px 42px rgba(6,25,47,.10);
-    }}
-    .plot h3 {{
-      padding: 13px 16px;
-      font-size: 17px;
-      background: linear-gradient(90deg, #eef6ff, #ffffff) !important;
-    }}
-    .plot img {{
-      padding: 18px !important;
-      background: #ffffff !important;
-    }}
-    .interactive-plot iframe {{
-      height: 620px;
-      background: #ffffff;
-    }}
-    body.page-weather .interactive-plot:first-child,
-    body.page-weather .interactive-plot:nth-child(2) {{
-      grid-column: 1 / -1;
-    }}
-    body.page-weather .plots {{
-      grid-template-columns: repeat(2, minmax(460px, 1fr));
-    }}
-    .contact-grid {{
-      display: grid;
-      grid-template-columns: 1.05fr .95fr;
-      gap: 18px;
-      align-items: stretch;
-    }}
-    .contact-panel {{
-      padding: 22px;
-      border-radius: 13px;
-      border: 1px solid rgba(213,228,245,.95);
-      background: linear-gradient(145deg, #ffffff, #f6fbff);
-    }}
-    .contact-list {{
-      display: grid;
-      gap: 10px;
-      margin: 0;
-    }}
-    .contact-list div {{
-      display: grid;
-      grid-template-columns: 150px 1fr;
-      gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px solid #e7f0fb;
-    }}
-    .contact-list div:last-child {{ border-bottom: 0; }}
-    .contact-list dt {{ font-weight: 800; color: #0758bd; }}
-    .contact-list dd {{ margin: 0; color: #17324f; }}
-    @media (max-width: 980px) {{
-      header .wrap {{ display: block; }}
-      .badge {{ display: inline-flex; margin-top: 10px; }}
-      main.wrap {{ width: min(100% - 28px, 1500px); }}
-      .contact-grid, body.page-weather .plots {{ grid-template-columns: 1fr; }}
-      .interactive-plot iframe {{ height: 520px; }}
-      .contact-list div {{ grid-template-columns: 1fr; gap: 4px; }}
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(52, 211, 153, 0.3));
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      padding: 3px;
+      box-shadow: 0 0 20px var(--cyan-glow);
+      transition: var(--transition);
     }}
 
-    /* K-WaterGuard correction layer v12: final app shell override. */
-    body {{
-      background: #f7fbff !important;
-      background-image:
-        radial-gradient(circle at 12% 18%, rgba(7,88,189,.10), transparent 24%),
-        radial-gradient(circle at 92% 18%, rgba(215,51,69,.09), transparent 26%),
-        linear-gradient(135deg, #f7fbff 0%, #ffffff 46%, #fff7f8 100%) !important;
+    .brand:hover .brand-logo {{
+      border-color: var(--emerald);
+      box-shadow: 0 0 25px var(--emerald-glow);
+      transform: scale(1.05);
     }}
-    header {{
-      min-height: 230px !important;
-      padding: 24px 24px 26px !important;
+
+    .brand-name {{
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.015em;
     }}
+
+    /* Portfolio status-pill and kicker badges */
+    .status-pill {{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      background: rgba(6, 32, 22, 0.90);
+      border: 1px solid rgba(52, 211, 153, 0.55);
+      color: #6ee7b7;
+      font-size: 0.86rem;
+      font-weight: 600;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 14px rgba(16, 185, 129, 0.22);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }}
+
+    .pulse-dot {{
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 10px #34d399;
+      animation: pulse-dot 2s infinite;
+    }}
+
+    @keyframes pulse-dot {{
+      0% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }}
+      70% {{ transform: scale(1.1); box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }}
+      100% {{ transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }}
+    }}
+
+    .badge, .kicker {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      border-radius: var(--radius-pill);
+      background: rgba(8, 26, 46, 0.90);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #7dd3fc;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 14px rgba(56, 189, 248, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }}
+
     header h1 {{
-      font-size: clamp(40px, 4.5vw, 64px) !important;
-      margin-top: 8px !important;
+      font-family: var(--font-heading);
+      font-size: clamp(2.4rem, 4.4vw, 4.2rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #ffffff 40%, #bae6fd 75%, #a7f3d0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.9));
+      margin: 22px 0 12px;
     }}
-    main.wrap {{
-      width: min(1920px, calc(100% - 28px)) !important;
-      padding-top: 18px !important;
+
+    header .subtitle {{
+      max-width: 860px;
+      color: #f1f5f9;
+      margin: 0;
+      font-size: clamp(1.02rem, 1.35vw, 1.18rem);
+      font-weight: 450;
+      line-height: 1.65;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
     }}
-    body .nav-tabs {{
-      display: grid !important;
-      grid-template-columns: repeat(7, minmax(130px, 1fr)) !important;
-      align-items: stretch !important;
-      justify-content: stretch !important;
-      gap: 8px !important;
-      width: 100% !important;
-      max-width: none !important;
-      min-height: 0 !important;
-      margin: 0 0 14px !important;
-      padding: 8px !important;
-      background: rgba(255,255,255,.94) !important;
-      border-radius: 14px !important;
+
+    .language-corner {{
+      position: absolute;
+      top: 14px;
+      right: 24px;
+      z-index: 10;
     }}
-    body .nav-tabs a {{
-      display: flex !important;
-      width: auto !important;
-      min-width: 0 !important;
-      max-width: none !important;
-      min-height: 40px !important;
-      height: auto !important;
-      padding: 9px 10px !important;
-      margin: 0 !important;
-      align-items: center !important;
-      justify-content: center !important;
-      flex: initial !important;
-      text-align: center !important;
-      white-space: normal !important;
-      line-height: 1.12 !important;
-      border-radius: 10px !important;
-      background: #eef6ff !important;
-      color: #0b2b4d !important;
-      box-shadow: none !important;
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-weather .nav-tabs a[href="weather.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"],
-    body.page-contact .nav-tabs a[href="contact.html"],
-    body.page-data .nav-tabs a[href="data.html"] {{
-      color: #ffffff !important;
-      background: linear-gradient(135deg, #0758bd, #0c7ee8) !important;
-      box-shadow: 0 10px 22px rgba(7,88,189,.22) !important;
-    }}
-    .toolbar {{
-      display: grid !important;
-      grid-template-columns: 1fr auto auto auto !important;
-      gap: 10px !important;
-      align-items: center !important;
-      margin-bottom: 10px !important;
-    }}
+
     .language-switch {{
       display: inline-flex;
-      gap: 6px;
       align-items: center;
-      padding: 6px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid rgba(213,228,245,.95);
-      white-space: nowrap;
+      background: rgba(8, 20, 32, 0.85);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius-pill);
+      padding: 4px;
+      gap: 3px;
     }}
+
     .language-switch a {{
-      padding: 7px 10px;
-      border-radius: 999px;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cbd5e1;
       text-decoration: none;
-      color: #17324f;
-      font-weight: 800;
-      font-size: 13px;
+      transition: var(--transition);
     }}
+
     .language-switch a.active {{
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(52, 211, 153, 0.3));
+      border: 1px solid rgba(56, 189, 248, 0.5);
       color: #ffffff;
-      background: linear-gradient(135deg, #0758bd, #0c7ee8);
+      box-shadow: 0 2px 12px rgba(56, 189, 248, 0.3);
     }}
-    body:not(.page-contact) .toolbar .install-button,
-    body:not(.page-contact) .toolbar > a.button {{
-      display: none !important;
+
+    .language-switch a:hover:not(.active) {{
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
     }}
-    body:not(.page-contact) .toolbar {{
-      grid-template-columns: 1fr !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      border: 0 !important;
-      padding: 0 !important;
+
+    /* Main Container & Sticky Glass Navigation */
+    main {{
+      padding: 24px 0 60px;
     }}
-    body.page-home .toolbar,
-    body.page-home .search-status {{
-      display: none !important;
-    }}
-    .section {{
-      margin-bottom: 16px !important;
-    }}
-    .home-overview {{
-      min-height: 420px !important;
-      grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr) !important;
-      gap: 14px !important;
-    }}
-    .capability-grid {{
-      grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    }}
-    .objective-grid {{
+
+    body .nav-tabs {{
+      position: sticky;
+      top: 14px;
+      z-index: 100;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin: 16px 0 18px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(8, 20, 32, 0.88);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-md), 0 0 24px rgba(0, 0, 0, 0.6);
+      margin: 0 0 26px;
     }}
-    .objective-card {{
-      padding: 18px;
-      border-radius: 14px;
-      border: 1px solid rgba(213,228,245,.96);
-      background: linear-gradient(145deg, #f9fcff, #ffffff);
-      box-shadow: 0 12px 30px rgba(6,25,47,.06);
-    }}
-    .objective-card span {{
-      display: inline-flex;
-      width: 34px;
-      height: 34px;
+
+    body .nav-tabs a {{
+      display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
-      color: #ffffff;
-      background: linear-gradient(135deg, #0758bd, #d73345);
-      font-weight: 900;
-      margin-bottom: 10px;
-    }}
-    .objective-card h3 {{ margin: 0 0 8px; }}
-    .objective-card p {{ margin: 0; color: #53677f; line-height: 1.45; }}
-    body.page-spatial .interactive-plot iframe {{
-      height: 720px !important;
-    }}
-    body.page-weather .section,
-    body.page-spatial .section,
-    body.page-algal .section {{
-      width: 100% !important;
-    }}
-    body.page-weather .plot,
-    body.page-spatial .plot,
-    body.page-algal .plot {{
-      min-height: 0;
-    }}
-    @media (max-width: 1180px) {{
-      body .nav-tabs {{ grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }}
-      .capability-grid, .objective-grid {{ grid-template-columns: 1fr 1fr !important; }}
-      .home-overview {{ grid-template-columns: 1fr !important; }}
-    }}
-    @media (max-width: 720px) {{
-      body .nav-tabs {{ grid-template-columns: 1fr !important; }}
-      .toolbar {{ grid-template-columns: 1fr !important; }}
-      .capability-grid, .objective-grid {{ grid-template-columns: 1fr !important; }}
-    }}
-
-    /* K-WaterGuard correction layer v13: full-canvas intelligence layout. */
-    body {{
-      background:
-        linear-gradient(90deg, rgba(232,243,255,.96) 0 15vw, transparent 15vw calc(100% - 15vw), rgba(255,241,244,.96) calc(100% - 15vw) 100%),
-        linear-gradient(135deg, #f5fbff 0%, #ffffff 48%, #fff7f8 100%) !important;
-    }}
-    .language-corner {{
-      position: fixed !important;
-      top: 10px;
-      right: 16px;
-      z-index: 1000;
-      box-shadow: 0 12px 28px rgba(6,25,47,.16);
-    }}
-    header {{
-      min-height: 180px !important;
-      padding-top: 26px !important;
-      padding-right: 180px !important;
-    }}
-    header h1 {{
-      font-size: clamp(36px, 3.8vw, 56px) !important;
-    }}
-    main.wrap {{
-      width: calc(100vw - 360px) !important;
-      max-width: none !important;
-      margin-left: 180px !important;
-      margin-right: 180px !important;
-    }}
-    body .nav-tabs {{
-      position: sticky !important;
-      top: 0 !important;
-      z-index: 900 !important;
-      grid-template-columns: repeat(7, minmax(116px, 1fr)) !important;
-      backdrop-filter: blur(20px);
-    }}
-    .edge-rail {{
-      position: fixed;
-      top: 226px;
-      bottom: 22px;
-      width: 156px;
-      z-index: 12;
-      display: grid;
-      align-content: start;
-      gap: 12px;
-      pointer-events: none;
-    }}
-    .edge-left {{ left: 14px; }}
-    .edge-right {{ right: 14px; }}
-    .edge-card {{
-      pointer-events: auto;
-      padding: 13px;
-      border-radius: 14px;
-      border: 1px solid rgba(213,228,245,.95);
-      background: rgba(255,255,255,.92);
-      box-shadow: 0 16px 34px rgba(6,25,47,.10);
-      backdrop-filter: blur(16px);
-    }}
-    .edge-card h3 {{
-      margin: 0 0 10px;
-      font-size: 15px;
-      color: #06192f;
-    }}
-    .edge-card p, .edge-card li {{
-      margin: 8px 0 0;
-      color: #53677f;
-      font-size: 12px;
-      line-height: 1.35;
-    }}
-    .edge-card ul {{ padding-left: 16px; margin: 0; }}
-    .edge-metric {{
-      display: grid;
-      gap: 3px;
-      padding: 7px 0;
-      border-top: 1px solid #e7f0fb;
-    }}
-    .edge-metric span {{
-      color: #6a7d93;
-      font-size: 11px;
-      text-transform: uppercase;
-      font-weight: 800;
-    }}
-    .edge-metric strong {{
-      color: #0758bd;
-      font-size: 18px;
-      line-height: 1;
-    }}
-    .mini-bar {{
-      height: 8px;
-      border-radius: 999px;
-      background: #e8f1fb;
+      min-height: 44px;
+      padding: 8px 14px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      text-decoration: none;
+      text-align: center;
+      transition: var(--transition);
+      white-space: nowrap;
       overflow: hidden;
-      margin-top: 8px;
-    }}
-    .mini-bar i {{
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, #0758bd, #0c7ee8);
-    }}
-    .mini-bar.red i {{ background: linear-gradient(90deg, #d73345, #f08a5d); }}
-    .mini-bar.blue i {{ background: linear-gradient(90deg, #0758bd, #5ea3f1); }}
-    body.page-home .edge-rail {{ top: 206px; }}
-    .section {{
-      box-shadow: 0 14px 34px rgba(6,25,47,.07) !important;
-    }}
-    .home-overview {{
-      min-height: 360px !important;
-    }}
-    .interactive-plot iframe {{
-      height: 740px !important;
-    }}
-    .plot.interactive-plot.wide-plot iframe,
-    article:has(iframe[src*="map_interactive"]) iframe,
-    article:has(iframe[src*="parameter_map_interactive"]) iframe {{
-      height: 820px !important;
-    }}
-    @media (max-width: 1400px) {{
-      main.wrap {{
-        width: calc(100% - 32px) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }}
-      .edge-rail {{ display: none; }}
-      header {{ padding-right: 24px !important; }}
+      text-overflow: ellipsis;
+      background: transparent;
+      border: 1px solid transparent;
     }}
 
-    /* K-WaterGuard correction layer v14: non-overlapping side intelligence and working visitor AI. */
-    body {{
-      background:
-        linear-gradient(90deg, rgba(226,241,255,.98) 0 290px, transparent 290px calc(100% - 290px), rgba(255,236,241,.98) calc(100% - 290px) 100%),
-        linear-gradient(135deg, #f4fbff 0%, #ffffff 50%, #fff7f9 100%) !important;
-    }}
-    main.wrap {{
-      width: calc(100vw - 620px) !important;
-      margin-left: 310px !important;
-      margin-right: 310px !important;
-    }}
-    .edge-rail {{
-      top: 292px !important;
-      bottom: 88px !important;
-      width: 260px !important;
-      gap: 12px !important;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      padding: 2px 4px 12px;
-      scrollbar-width: thin;
-    }}
-    body.page-home .edge-rail {{ top: 292px !important; }}
-    .edge-left {{ left: 18px !important; }}
-    .edge-right {{ right: 18px !important; }}
-    .edge-card {{
-      padding: 14px 15px !important;
-      border-radius: 16px !important;
-      background: rgba(255,255,255,.96) !important;
-      box-shadow: 0 16px 38px rgba(6,25,47,.11) !important;
-    }}
-    .edge-card h3 {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 16px !important;
-      letter-spacing: .02em;
-    }}
-    .edge-card h3::after {{
-      content: "";
-      width: 38px;
-      height: 4px;
-      border-radius: 99px;
-      background: linear-gradient(90deg, #0758bd, #cd2e3a);
-    }}
-    .edge-metric {{
-      grid-template-columns: 1fr auto;
-      align-items: center;
-      gap: 8px !important;
-      padding: 9px 0 !important;
-    }}
-    .edge-metric span {{ font-size: 11px !important; line-height: 1.2; }}
-    .edge-metric strong {{ font-size: 20px !important; text-align: right; }}
-    .edge-kpi-grid {{
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 10px;
-    }}
-    .edge-kpi {{
-      padding: 10px;
-      border-radius: 12px;
-      background: linear-gradient(145deg, #f7fbff, #ffffff);
-      border: 1px solid #e2edf8;
-    }}
-    .edge-kpi span {{
-      display: block;
-      color: #6a7d93;
-      font-size: 10px;
-      text-transform: uppercase;
-      font-weight: 800;
-      line-height: 1.2;
-    }}
-    .edge-kpi strong {{
-      display: block;
-      margin-top: 5px;
-      color: #0758bd;
-      font-size: 18px;
-      line-height: 1;
-    }}
-    .edge-pill-list {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 10px;
-    }}
-    .edge-pill-list span {{
-      padding: 6px 8px;
-      border-radius: 999px;
-      background: #edf6ff;
-      color: #0758bd;
-      font-size: 11px;
-      font-weight: 800;
-    }}
-    .edge-spark {{
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      align-items: end;
-      gap: 3px;
-      height: 48px;
-      margin-top: 10px;
-    }}
-    .edge-spark i {{
-      display: block;
-      min-height: 8px;
-      border-radius: 6px 6px 2px 2px;
-      background: linear-gradient(180deg, #0b76df, #0758bd);
-    }}
-    .edge-spark.red i {{ background: linear-gradient(180deg, #f08a5d, #cd2e3a); }}
-    .edge-card .mini-bar {{ height: 10px !important; }}
-    .chat-launch {{
-      right: 26px !important;
-      bottom: 24px !important;
-      z-index: 1200 !important;
-      box-shadow: 0 18px 40px rgba(7,88,189,.28) !important;
-    }}
-    .chat-panel {{
-      right: 26px !important;
-      bottom: 88px !important;
-      width: min(430px, calc(100vw - 36px)) !important;
-      max-height: min(680px, calc(100vh - 116px)) !important;
-      border-radius: 18px !important;
-      box-shadow: 0 26px 70px rgba(6,25,47,.24) !important;
-      z-index: 1201 !important;
-    }}
-    .chat-suggestions {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      padding: 10px 12px 2px;
-      background: #f7fbff;
-      border-top: 1px solid #e3edf8;
-    }}
-    .chat-suggestions button {{
-      border: 1px solid #cfe1f5;
-      background: #ffffff;
-      color: #0758bd;
-      border-radius: 999px;
-      padding: 7px 10px;
-      font-family: "Times New Roman", Times, serif;
-      font-weight: 800;
-      cursor: pointer;
-    }}
-    .chat-suggestions button:hover {{ background: #eaf4ff; }}
-    @media (max-width: 1680px) {{
-      main.wrap {{
-        width: calc(100vw - 520px) !important;
-        margin-left: 260px !important;
-        margin-right: 260px !important;
-      }}
-      .edge-rail {{ width: 220px !important; }}
-    }}
-    @media (max-width: 1280px) {{
-      main.wrap {{
-        width: calc(100% - 32px) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }}
-      .edge-rail {{ display: none !important; }}
+    body .nav-tabs a:hover {{
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
     }}
 
-    /* K-WaterGuard correction layer v15: academic color field and calmer sticky navigation. */
-    body {{
-      background:
-        linear-gradient(90deg, rgba(232,240,247,.98) 0 290px, transparent 290px calc(100% - 290px), rgba(238,242,247,.98) calc(100% - 290px) 100%),
-        radial-gradient(circle at 18% 10%, rgba(37,99,151,.10), transparent 26%),
-        radial-gradient(circle at 82% 12%, rgba(80,110,138,.12), transparent 30%),
-        linear-gradient(135deg, #f3f7fb 0%, #ffffff 46%, #f6f8fa 100%) !important;
-    }}
-    body .nav-tabs {{
-      top: 10px !important;
-      padding: 8px !important;
-      border-radius: 16px !important;
-      border: 1px solid rgba(191,205,222,.92) !important;
-      background: rgba(255,255,255,.84) !important;
-      box-shadow: 0 12px 30px rgba(32,54,78,.10) !important;
-      backdrop-filter: blur(18px) saturate(1.15) !important;
-    }}
-    body .nav-tabs a {{
-      min-height: 36px !important;
-      padding: 8px 10px !important;
-      border-radius: 11px !important;
-      background: rgba(241,247,253,.88) !important;
-      color: #17324f !important;
-      font-size: 14px !important;
-      box-shadow: none !important;
-    }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-weather .nav-tabs a[href="weather.html"],
-    body.page-spatial .nav-tabs a[href="spatial.html"],
-    body.page-contact .nav-tabs a[href="contact.html"],
-    body.page-data .nav-tabs a[href="data.html"] {{
-      background: linear-gradient(135deg, #174a7c, #2e6f9e) !important;
-      color: #ffffff !important;
-    }}
-    .edge-card h3::after {{
-      background: linear-gradient(90deg, #174a7c, #6f879d) !important;
-    }}
-    .edge-spark i,
-    .mini-bar i {{
-      background: linear-gradient(90deg, #174a7c, #4e87b5) !important;
-    }}
-    .mini-bar.red i,
-    .edge-spark.red i {{
-      background: linear-gradient(90deg, #8b9aaa, #c45b62) !important;
-    }}
-    .button,
-    .chat-launch {{
-      background: linear-gradient(135deg, #174a7c, #2e6f9e) !important;
-    }}
-
-    /* K-WaterGuard correction layer v16: merged page architecture and agrometeorology model page. */
-    body .nav-tabs {{
-      grid-template-columns: repeat(6, minmax(132px, 1fr)) !important;
-    }}
-    body.page-home .page:not(.page-home),
-    body.page-trends .page:not(.page-trends),
-    body.page-algal .page:not(.page-algal),
-    body.page-weather .page:not(.page-weather),
-    body.page-agro .page:not(.page-agro),
-    body.page-contact .page:not(.page-contact) {{
-      display: none !important;
-    }}
     body.page-home .nav-tabs a[href="index.html"],
     body.page-trends .nav-tabs a[href="trends.html"],
     body.page-algal .nav-tabs a[href="algal-bloom.html"],
     body.page-weather .nav-tabs a[href="weather.html"],
     body.page-agro .nav-tabs a[href="agrometeorology.html"],
     body.page-contact .nav-tabs a[href="contact.html"] {{
-      background: linear-gradient(135deg, #143d66, #2d6f8f) !important;
       color: #ffffff !important;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(52, 211, 153, 0.3)) !important;
+      border: 1px solid rgba(56, 189, 248, 0.55) !important;
+      box-shadow: 0 2px 14px rgba(56, 189, 248, 0.3) !important;
+      font-weight: 600 !important;
     }}
+
+    /* Page Visibility Controller */
+    .page {{ display: block; }}
+    body.page-home .page:not(.page-home) {{ display: none !important; }}
+    body.page-trends .page:not(.page-trends) {{ display: none !important; }}
+    body.page-algal .page:not(.page-algal) {{ display: none !important; }}
+    body.page-weather .page:not(.page-weather) {{ display: none !important; }}
+    body.page-agro .page:not(.page-agro) {{ display: none !important; }}
+    body.page-contact .page:not(.page-contact) {{ display: none !important; }}
+
+    body.page-home .toolbar,
+    body.page-home .search-status {{ display: none !important; }}
+
     body.page-contact #historicalDownloads,
-    body.page-contact #historicalDataPage {{
-      display: block !important;
-    }}
+    body.page-contact #historicalDataPage {{ display: block !important; }}
+
     body.page-trends #spatialPage,
     body.page-trends #provinceCoverage,
     body.page-trends #latestCharts,
     body.page-trends #spatialParameterMaps,
-    body.page-trends #stationMeasurements {{
-      display: block !important;
-    }}
-    body.page-agro .plots {{
-      grid-template-columns: repeat(2, minmax(420px, 1fr));
-    }}
-    body.page-agro .plot img {{
-      padding: 12px;
-      background: #ffffff;
-    }}
-    body.page-agro main.wrap,
-    body.page-trends main.wrap,
-    body.page-contact main.wrap {{
-      width: min(100% - 48px, 1760px) !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-    }}
-    @media (max-width: 980px) {{
-      body .nav-tabs {{ grid-template-columns: 1fr !important; }}
-      body.page-agro .plots {{ grid-template-columns: 1fr; }}
+    body.page-trends #stationMeasurements {{ display: block !important; }}
+
+    body:not(.page-contact) #installAppButton {{ display: none !important; }}
+    body.page-contact #installAppButton {{ display: inline-flex !important; }}
+    body:not(.page-contact) .toolbar a.button {{ display: none !important; }}
+    body.page-contact .toolbar a.button {{ display: inline-flex !important; }}
+
+    /* Toolbar & Search Bar */
+    .toolbar {{
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
     }}
 
-    /* K-WaterGuard correction layer v17: readable dark-academic shell and mobile-app behavior. */
-    body {{
-      background:
-        radial-gradient(circle at 12% 8%, rgba(34, 81, 119, .18), transparent 34%),
-        radial-gradient(circle at 88% 6%, rgba(166, 43, 57, .13), transparent 30%),
-        linear-gradient(135deg, #dfeaf3 0%, #f3f7fa 48%, #f4e7e9 100%) !important;
-      color: #0b1726 !important;
-      overflow-x: hidden !important;
+    .search {{
+      flex: 1;
+      min-width: min(380px, 100%);
+      padding: 13px 22px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-glass);
+      background: rgba(8, 20, 32, 0.85);
+      backdrop-filter: blur(16px);
+      font-family: var(--font-body);
+      font-size: 0.92rem;
+      color: #ffffff;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
     }}
-    main.wrap,
-    footer {{
-      width: min(100% - 28px, 1760px) !important;
-      max-width: none !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
+
+    .search::placeholder {{
+      color: var(--text-dim);
     }}
-    header {{
-      border-bottom: 1px solid rgba(58, 89, 120, .20) !important;
+
+    .search:focus {{
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25), 0 0 24px rgba(56, 189, 248, 0.25);
     }}
-    body .nav-tabs {{
-      position: sticky !important;
-      top: 8px !important;
-      z-index: 80 !important;
-      margin: 0 auto 18px !important;
-      padding: 8px !important;
-      border-radius: 16px !important;
-      background: rgba(248, 252, 255, .94) !important;
-      backdrop-filter: blur(18px) !important;
-      box-shadow: 0 18px 42px rgba(23, 52, 80, .18) !important;
-      grid-template-columns: repeat(6, minmax(132px, 1fr)) !important;
+
+    .search-status {{
+      margin: 0 0 22px;
+      color: var(--text-dim);
+      font-size: 0.86rem;
     }}
-    body .nav-tabs a {{
-      min-height: 42px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      border-radius: 12px !important;
-      color: #17314c !important;
-      background: rgba(232, 241, 249, .92) !important;
-      box-shadow: none !important;
+
+    /* Portfolio-grade Buttons */
+    .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 12px 24px;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%);
+      color: #040e14;
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      border: 0;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(56, 189, 248, 0.4);
+      transition: var(--transition);
+      white-space: nowrap;
     }}
-    body.page-home .nav-tabs a[href="index.html"],
-    body.page-trends .nav-tabs a[href="trends.html"],
-    body.page-algal .nav-tabs a[href="algal-bloom.html"],
-    body.page-weather .nav-tabs a[href="weather.html"],
-    body.page-agro .nav-tabs a[href="agrometeorology.html"],
-    body.page-contact .nav-tabs a[href="contact.html"] {{
-      background: linear-gradient(135deg, #0e385d, #1f7897) !important;
-      color: #ffffff !important;
+
+    .button:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(56, 189, 248, 0.55);
+      filter: brightness(1.1);
     }}
-    .language-corner {{
-      position: fixed !important;
-      top: 12px !important;
-      right: 14px !important;
-      z-index: 260 !important;
-      box-shadow: 0 10px 24px rgba(14, 56, 93, .20) !important;
+
+    .button.secondary {{
+      background: rgba(12, 26, 42, 0.88);
+      color: #ffffff;
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
     }}
+
+    .button.secondary:hover {{
+      background: rgba(18, 42, 68, 0.95);
+      border-color: var(--cyan);
+      color: #38bdf8;
+      box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.3);
+    }}
+
+    /* Home Overview / Hero Panel */
     .home-overview {{
+      display: grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap: 24px;
+      align-items: stretch;
       background:
-        linear-gradient(90deg, rgba(5, 18, 34, .94), rgba(21, 76, 128, .86) 58%, rgba(118, 33, 54, .78)),
-        url('{self._asset_uri('waterguard_overview_scene.png')}') center/cover no-repeat !important;
-      color: #ffffff !important;
+        radial-gradient(circle at 10% 15%, rgba(56, 189, 248, 0.22) 0%, transparent 55%),
+        radial-gradient(circle at 85% 85%, rgba(52, 211, 153, 0.15) 0%, transparent 50%),
+        linear-gradient(135deg, #071522 0%, #0a1f33 50%, #0c2842 100%);
+      border-radius: var(--radius-xl);
+      padding: 34px;
+      color: #ffffff;
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
     }}
-    .home-overview h2,
-    .home-overview h3,
-    .home-overview p,
-    .home-overview li,
-    .home-overview .muted,
-    .home-overview .overview-kicker {{
-      color: #ffffff !important;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, .32) !important;
+
+    .overview-panel {{
+      background: rgba(5, 15, 26, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }}
-    .home-overview .overview-panel {{
-      background: rgba(5, 18, 34, .56) !important;
-      border-color: rgba(255, 255, 255, .23) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 20px 44px rgba(0, 0, 0, .18) !important;
+
+    .overview-kicker {{
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--cyan);
+      margin: 0 0 10px;
     }}
-    .home-overview .button,
+
+    .home-overview h2 {{
+      font-family: var(--font-heading);
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 14px;
+      letter-spacing: -0.015em;
+    }}
+
+    .home-overview p {{
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.68;
+      margin: 0 0 14px;
+    }}
+
+    .home-overview .muted {{
+      color: var(--text-dim);
+    }}
+
     .home-overview .history-link {{
-      background: rgba(255, 255, 255, .96) !important;
-      color: #0e4f8c !important;
-      text-shadow: none !important;
-      border-color: rgba(255, 255, 255, .45) !important;
+      color: var(--cyan);
+      font-weight: 600;
+      text-decoration: underline;
     }}
-    .card,
-    .section,
-    .rail-card {{
-      border-color: rgba(154, 178, 202, .74) !important;
-      box-shadow: 0 18px 44px rgba(31, 58, 84, .12) !important;
+
+    .overview-list {{
+      margin: 12px 0 20px;
+      padding-left: 20px;
+      color: #e2e8f0;
+      line-height: 1.65;
+      font-size: 0.92rem;
     }}
+
+    .overview-list li {{
+      margin-bottom: 8px;
+    }}
+
+    .page-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }}
+
+    .home-overview .button {{
+      background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%);
+      color: #040e14;
+      font-weight: 700;
+    }}
+
+    /* Bento Stats / KPI Metric Cards */
+    .grid {{ display: grid; gap: 18px; }}
+    .stats {{
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin-bottom: 24px;
+    }}
+
+    .stat {{
+      position: relative;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      overflow: hidden;
+    }}
+
+    .stat:hover {{
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-md), 0 0 25px rgba(56, 189, 248, 0.2);
+      transform: translateY(-3px);
+    }}
+
+    .stat::before {{
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+    }}
+
+    .stat:nth-child(even)::before {{
+      background: linear-gradient(90deg, #818cf8, #c084fc);
+    }}
+
+    .stat:nth-child(3n)::before {{
+      background: linear-gradient(90deg, #14b8a6, #38bdf8);
+    }}
+
+    .stat:last-child::before {{
+      background: linear-gradient(90deg, #fbbf24, #f43f5e);
+    }}
+
+    .stat .label {{
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }}
+
+    .stat .value {{
+      font-family: var(--font-heading);
+      font-size: clamp(1.6rem, 2vw, 2.2rem);
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin-top: 6px;
+      line-height: 1.1;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    }}
+
+    /* Card & Section Shells */
+    .card, .section {{
+      background: var(--bg-glass);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      transition: var(--transition);
+      position: relative;
+      z-index: 2;
+    }}
+
+    .section {{
+      padding: clamp(24px, 3.2vw, 40px);
+      margin-bottom: 26px;
+    }}
+
+    .section h2 {{
+      font-family: var(--font-heading);
+      font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin: 0 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #ffffff 50%, #93c5fd 85%, #6ee7b7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
+    }}
+
+    .section h2::before {{
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 22px;
+      background: linear-gradient(180deg, var(--cyan), var(--emerald));
+      border-radius: 4px;
+      box-shadow: 0 0 12px var(--cyan);
+    }}
+
+    .section h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.18rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 24px 0 12px;
+    }}
+
+    p.muted {{
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.68;
+      margin: 0 0 18px;
+    }}
+
+    /* Feature & Capability Grids */
+    .capability-grid {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }}
+
+    .capability-card {{
+      position: relative;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 24px 22px;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      overflow: hidden;
+    }}
+
+    .capability-card:hover {{
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-md), 0 0 25px rgba(56, 189, 248, 0.18);
+      transform: translateY(-4px);
+    }}
+
+    .capability-card::before {{
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+    }}
+
+    .capability-card:nth-child(even)::before {{
+      background: linear-gradient(90deg, #818cf8, #c084fc);
+    }}
+
+    .capability-card h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 10px;
+    }}
+
+    .capability-card p {{
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin: 0;
+    }}
+
+    /* Objective Bento Grid */
+    .objective-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin: 20px 0 26px;
+    }}
+
+    .objective-card {{
+      position: relative;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 24px 22px;
+      transition: var(--transition);
+    }}
+
+    .objective-card:hover {{
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-md), 0 0 25px rgba(56, 189, 248, 0.16);
+      transform: translateY(-3px);
+    }}
+
+    .objective-card span {{
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+    }}
+
+    .objective-card h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 10px;
+    }}
+
+    .objective-card p {{
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin: 0;
+    }}
+
+    .two-col {{
+      grid-template-columns: 1fr 1fr;
+    }}
+    .three-col {{
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }}
+
+    /* Parameter Indicator Grid */
+    .param-grid {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }}
+
+    .param {{
+      position: relative;
+      padding: 18px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: var(--shadow-sm);
+    }}
+
+    .param:hover {{
+      transform: translateY(-3px);
+      border-color: var(--cyan);
+      box-shadow: 0 8px 24px -2px rgba(56, 189, 248, 0.25);
+    }}
+
+    .param.active {{
+      border-color: var(--cyan);
+      background: rgba(14, 34, 56, 0.95);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.2);
+    }}
+
+    .param .label {{
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+    }}
+
+    .param .value {{
+      font-family: var(--font-heading);
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--cyan-bright);
+      margin-top: 6px;
+    }}
+
+    /* Plots & Spatial Map Frames */
+    .plots, .spatial-maps {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      margin: 18px 0 26px;
+    }}
+
+    .plot, .spatial-map {{
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      overflow: hidden;
+    }}
+
+    .plot:hover, .spatial-map:hover {{
+      border-color: var(--border-glow);
+      box-shadow: var(--shadow-md), 0 0 25px rgba(56, 189, 248, 0.16);
+    }}
+
+    .plot h3, .spatial-map h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 14px;
+    }}
+
+    .plot img, .spatial-map img {{
+      width: 100%;
+      height: auto;
+      border-radius: var(--radius-sm);
+      cursor: zoom-in;
+      display: block;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #ffffff;
+      padding: 4px;
+    }}
+
+    .plot.interactive-plot iframe {{
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      min-height: 580px;
+      background: #ffffff;
+    }}
+
     .plot.interactive-plot:first-child {{
-      grid-column: 1 / -1 !important;
+      grid-column: 1 / -1;
     }}
+
     .plot.interactive-plot:first-child iframe {{
-      min-height: 640px !important;
+      min-height: 680px;
     }}
-    body.page-algal .plot.interactive-plot:first-child iframe,
-    body.page-weather .plot.interactive-plot:first-child iframe,
-    body.page-agro .plot.interactive-plot:first-child iframe,
-    body.page-trends .plot.interactive-plot:first-child iframe {{
-      min-height: 660px !important;
+
+    /* Futuristic Dark-Glass Tables */
+    .table-wrap {{
+      width: 100%;
+      overflow-x: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-glass);
+      background: rgba(5, 14, 24, 0.75);
+      backdrop-filter: blur(16px);
+      margin: 14px 0 20px;
+      box-shadow: var(--shadow-sm);
     }}
-    .edge-rail {{
-      top: 224px !important;
-      width: 228px !important;
+
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      text-align: left;
     }}
-    .edge-rail.left {{ left: 18px !important; }}
-    .edge-rail.right {{ right: 18px !important; }}
-    .rail-card {{
-      background: rgba(255, 255, 255, .86) !important;
-      backdrop-filter: blur(12px) !important;
-      margin-bottom: 16px !important;
-      overflow: hidden !important;
+
+    th {{
+      background: rgba(12, 28, 48, 0.95);
+      color: #7dd3fc;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--border-glass);
+      white-space: nowrap;
     }}
-    .rail-card h3,
-    .rail-card p,
-    .rail-card li {{
-      overflow-wrap: anywhere !important;
-      line-height: 1.35 !important;
+
+    td {{
+      padding: 13px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      transition: background 0.15s ease;
     }}
-    .toolbar {{
-      position: relative !important;
-      z-index: 20 !important;
+
+    tbody tr:last-child td {{
+      border-bottom: 0;
     }}
-    body:not(.page-contact) #installAppButton,
-    body:not(.page-contact) .toolbar a.button {{
-      display: none !important;
+
+    tbody tr:hover td {{
+      background: rgba(56, 189, 248, 0.08);
+      color: #ffffff;
     }}
-    body.page-contact #installAppButton,
-    body.page-contact .toolbar a.button {{
-      display: inline-flex !important;
+
+    tr.search-match td {{
+      background: rgba(244, 63, 94, 0.22) !important;
+      color: #fda4af !important;
     }}
-    .agro-sector-grid .objective-card {{
-      border-top: 4px solid #1f7897 !important;
-      background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(236,246,250,.88)) !important;
+
+    tr.filtered-match td {{
+      background: rgba(56, 189, 248, 0.2) !important;
+      color: #7dd3fc !important;
     }}
+
+    .history-link {{
+      color: var(--cyan);
+      font-weight: 600;
+      text-decoration: none;
+      transition: var(--transition);
+    }}
+
+    .history-link:hover {{
+      color: #00f2fe;
+      text-decoration: underline;
+      text-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+    }}
+
+    /* App Install Panel & Mobile PWA */
     .app-install-panel {{
-      display: grid !important;
-      grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr) !important;
-      gap: 18px !important;
-      align-items: stretch !important;
-      margin: 18px 0 24px !important;
-      padding: 22px !important;
-      border-radius: 18px !important;
-      background: linear-gradient(135deg, #071426, #174a7c 58%, #86253a) !important;
-      color: #ffffff !important;
-      box-shadow: 0 24px 58px rgba(7, 20, 38, .24) !important;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+      gap: 28px;
+      align-items: center;
+      background:
+        radial-gradient(circle at 85% 20%, rgba(56, 189, 248, 0.28) 0%, transparent 60%),
+        linear-gradient(135deg, #071522 0%, #0c2033 60%, #102e4c 100%);
+      border-radius: var(--radius-lg);
+      padding: 34px;
+      color: #ffffff;
+      margin: 22px 0 28px;
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-lg);
     }}
-    .app-install-panel h3,
-    .app-install-panel p,
-    .app-install-panel li {{
-      color: #ffffff !important;
+
+    .app-install-panel h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 10px;
     }}
+
+    .app-install-panel p {{
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.65;
+    }}
+
     .app-install-panel .button {{
-      background: #ffffff !important;
-      color: #0e4f8c !important;
-      border-color: rgba(255,255,255,.45) !important;
-      width: fit-content !important;
+      background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%);
+      color: #040e14;
+      font-weight: 700;
     }}
+
     .app-install-steps {{
-      margin: 0 !important;
-      padding-left: 20px !important;
-      line-height: 1.55 !important;
+      margin: 16px 0 22px;
+      padding-left: 20px;
+      color: #e2e8f0;
+      line-height: 1.65;
+      font-size: 0.92rem;
     }}
+
+    .app-install-steps li {{
+      margin-bottom: 8px;
+    }}
+
     .phone-preview {{
-      border: 1px solid rgba(255,255,255,.24) !important;
-      background: rgba(255,255,255,.12) !important;
-      border-radius: 24px !important;
-      padding: 16px !important;
-      min-height: 220px !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
+      background: rgba(5, 14, 24, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
     }}
+
     .phone-preview .screen {{
-      border-radius: 18px !important;
-      background: rgba(255,255,255,.92) !important;
-      color: #0b1726 !important;
-      padding: 16px !important;
-      min-height: 188px !important;
+      background: #0b1a2a;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      color: #ffffff;
     }}
+
     .phone-preview strong {{
-      display: block !important;
-      color: #0e4f8c !important;
-      font-size: 22px !important;
-      margin-bottom: 8px !important;
+      display: block;
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--cyan);
+      margin-bottom: 8px;
     }}
+
+    .phone-preview p {{
+      color: var(--text-dim);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }}
+
+    .edge-pill-list {{
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }}
+
+    .edge-pill-list span {{
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }}
+
+    /* Contact Details */
+    .contact-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      margin-top: 22px;
+    }}
+
+    .contact-panel {{
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 26px;
+      backdrop-filter: blur(20px);
+    }}
+
+    .contact-panel h3 {{
+      font-family: var(--font-heading);
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0 0 16px;
+      color: #ffffff;
+    }}
+
+    .contact-list {{
+      display: grid;
+      gap: 12px;
+      margin: 0;
+    }}
+
+    .contact-list div {{
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 12px;
+      font-size: 0.92rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }}
+
+    .contact-list dt {{
+      font-weight: 700;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }}
+
+    .contact-list dd {{
+      margin: 0;
+      color: var(--text-secondary);
+    }}
+
+    /* Chatbot Floating Action Button & Panel */
+    .chat-launch {{
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1000;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 24px;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%);
+      color: #040e14;
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 0.95rem;
+      border: 0;
+      cursor: pointer;
+      box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45);
+      transition: var(--transition);
+    }}
+
+    .chat-launch::before {{
+      content: '⚡';
+      font-size: 15px;
+    }}
+
+    .chat-launch:hover {{
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 12px 35px rgba(56, 189, 248, 0.6);
+      filter: brightness(1.1);
+    }}
+
+    .chat-panel {{
+      display: none;
+      position: fixed;
+      bottom: 86px;
+      right: 24px;
+      width: min(440px, calc(100vw - 32px));
+      height: 560px;
+      max-height: calc(100vh - 110px);
+      background: rgba(7, 18, 30, 0.96);
+      backdrop-filter: blur(28px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      flex-direction: column;
+      overflow: hidden;
+      animation: chatFadeIn 0.25s ease-out;
+    }}
+
+    @keyframes chatFadeIn {{
+      from {{ opacity: 0; transform: translateY(12px) scale(0.96); }}
+      to {{ opacity: 1; transform: translateY(0) scale(1); }}
+    }}
+
+    .chat-panel.open {{
+      display: flex;
+    }}
+
+    .chat-head {{
+      padding: 16px 20px;
+      background: rgba(12, 28, 48, 0.9);
+      border-bottom: 1px solid var(--border-glass);
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }}
+
+    .chat-title {{
+      font-family: var(--font-heading);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+    }}
+
+    .chat-close {{
+      background: rgba(255, 255, 255, 0.12);
+      border: 0;
+      color: #ffffff;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      transition: var(--transition);
+    }}
+
+    .chat-close:hover {{
+      background: rgba(255, 255, 255, 0.25);
+      color: var(--cyan);
+    }}
+
+    .chat-messages {{
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(4, 10, 18, 0.65);
+    }}
+
+    .chat-msg {{
+      max-width: 85%;
+      padding: 11px 16px;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      word-break: break-word;
+    }}
+
+    .chat-msg.bot {{
+      align-self: flex-start;
+      background: rgba(12, 28, 46, 0.9);
+      color: #e2e8f0;
+      border: 1px solid var(--border-glass);
+      border-bottom-left-radius: 4px;
+      box-shadow: var(--shadow-sm);
+    }}
+
+    .chat-msg.user {{
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(52, 211, 153, 0.35));
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+    }}
+
+    .chat-suggestions {{
+      padding: 10px 14px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: rgba(8, 20, 32, 0.95);
+      border-top: 1px solid var(--border-glass);
+    }}
+
+    .chat-suggestions button {{
+      padding: 6px 14px;
+      background: rgba(14, 32, 52, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+      border-radius: var(--radius-pill);
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: var(--transition);
+    }}
+
+    .chat-suggestions button:hover {{
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--cyan);
+      color: #ffffff;
+    }}
+
+    .chat-form {{
+      padding: 14px;
+      background: rgba(8, 20, 32, 0.98);
+      border-top: 1px solid var(--border-glass);
+      display: flex;
+      gap: 10px;
+    }}
+
+    .chat-input {{
+      flex: 1;
+      padding: 11px 16px;
+      border: 1px solid var(--border-glass);
+      background: rgba(4, 10, 18, 0.85);
+      color: #ffffff;
+      border-radius: var(--radius-pill);
+      font-size: 0.9rem;
+      font-family: var(--font-body);
+    }}
+
+    .chat-input:focus {{
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    }}
+
+    .chat-send {{
+      padding: 11px 20px;
+      background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%);
+      color: #040e14;
+      border: 0;
+      border-radius: var(--radius-pill);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: var(--transition);
+    }}
+
+    .chat-send:hover {{
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }}
+
+    /* Lightbox Modal */
+    .lightbox {{
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(4, 9, 14, 0.92);
+      backdrop-filter: blur(12px);
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }}
+
+    .lightbox.open {{
+      display: flex;
+    }}
+
+    .lightbox-panel {{
+      background: var(--bg-surface);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-xl);
+      max-width: min(94vw, 1400px);
+      max-height: 94vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.8);
+    }}
+
+    .lightbox-head {{
+      padding: 16px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-glass);
+      background: var(--bg-elevated);
+    }}
+
+    .lightbox-title {{
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #ffffff;
+    }}
+
+    .lightbox-close {{
+      background: rgba(255, 255, 255, 0.12);
+      border: 0;
+      color: #ffffff;
+      padding: 7px 16px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: var(--transition);
+    }}
+
+    .lightbox-close:hover {{
+      background: rgba(255, 255, 255, 0.22);
+      color: var(--cyan);
+    }}
+
+    .lightbox-img-wrap {{
+      padding: 20px;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #04090e;
+    }}
+
+    .lightbox-img {{
+      max-width: 100%;
+      max-height: calc(94vh - 120px);
+      object-fit: contain;
+    }}
+
+    /* Mobile Install Sheet */
     .install-sheet {{
-      position: fixed !important;
-      left: 50% !important;
-      bottom: 24px !important;
-      transform: translate(-50%, 150%) !important;
-      width: min(94vw, 520px) !important;
-      z-index: 300 !important;
-      border-radius: 22px !important;
-      background: rgba(255,255,255,.96) !important;
-      border: 1px solid rgba(154,178,202,.74) !important;
-      box-shadow: 0 28px 70px rgba(7,20,38,.30) !important;
-      padding: 18px !important;
-      transition: transform .32s ease !important;
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 150%);
+      width: min(94vw, 500px);
+      z-index: 300;
+      border-radius: var(--radius-xl);
+      background: rgba(7, 21, 34, 0.98);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+      padding: 26px;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
     }}
+
     .install-sheet.open {{
-      transform: translate(-50%, 0) !important;
+      transform: translate(-50%, 0);
     }}
+
     .install-sheet h3 {{
-      margin: 0 0 6px !important;
-      color: #071426 !important;
+      margin: 0 0 8px;
+      font-family: var(--font-heading);
+      color: #ffffff;
+      font-size: 1.25rem;
     }}
+
     .install-sheet p {{
-      margin: 0 0 12px !important;
-      color: #41546c !important;
+      margin: 0 0 16px;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.55;
     }}
+
     .install-actions {{
-      display: flex !important;
-      gap: 10px !important;
-      flex-wrap: wrap !important;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }}
-    .install-actions .button.secondary {{
-      background: #eaf3fb !important;
-      color: #174a7c !important;
+
+    /* Footer */
+    footer {{
+      width: min(100% - 48px, 1540px);
+      margin: 36px auto 48px;
+      padding: 26px 0;
+      border-top: 1px solid var(--border-glass);
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.65;
     }}
-    @media (max-width: 1500px) {{
-      .edge-rail {{ display: none !important; }}
-      main.wrap, footer {{ width: min(100% - 24px, 1540px) !important; }}
+
+    /* Responsive Queries */
+    @media (max-width: 1280px) {{
+      .capability-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .stats {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+      .plots, .spatial-maps {{ grid-template-columns: 1fr; }}
+      .objective-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .param-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .contact-grid {{ grid-template-columns: 1fr; }}
     }}
+
     @media (max-width: 900px) {{
-      body {{
-        background: #eef4f8 !important;
-      }}
       header {{
-        min-height: auto !important;
-        padding: 18px 14px 92px !important;
+        padding: 26px 0 22px;
       }}
       header h1 {{
-        font-size: clamp(30px, 9vw, 48px) !important;
-        line-height: 1.02 !important;
-      }}
-      header .subtitle {{
-        max-width: 100% !important;
-        font-size: 15px !important;
-      }}
-      .language-corner {{
-        top: 10px !important;
-        right: 10px !important;
-      }}
-      main.wrap,
-      body.page-agro main.wrap,
-      body.page-trends main.wrap,
-      body.page-contact main.wrap {{
-        width: 100% !important;
-        padding: 0 12px 96px !important;
-      }}
-      body .nav-tabs {{
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        top: auto !important;
-        margin: 0 !important;
-        padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) !important;
-        border-radius: 18px 18px 0 0 !important;
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 6px !important;
-        z-index: 220 !important;
-        box-shadow: 0 -14px 34px rgba(7, 20, 38, .24) !important;
-      }}
-      body .nav-tabs a {{
-        min-height: 48px !important;
-        padding: 6px 4px !important;
-        font-size: 11px !important;
-        line-height: 1.08 !important;
-        text-align: center !important;
-      }}
-      .toolbar {{
-        grid-template-columns: 1fr !important;
-        margin: 10px 0 !important;
-      }}
-      .card.section {{
-        border-radius: 14px !important;
-        padding: 18px !important;
-        margin-bottom: 14px !important;
-      }}
-      .home-overview,
-      .stats,
-      .capability-grid,
-      .objective-grid,
-      .param-grid,
-      .plots,
-      .spatial-maps,
-      .two-col,
-      .three-col {{
-        grid-template-columns: 1fr !important;
+        font-size: 2.1rem;
       }}
       .home-overview {{
-        min-height: 0 !important;
-        padding: 18px !important;
-      }}
-      .home-overview h2 {{
-        font-size: 30px !important;
-      }}
-      .overview-panel {{
-        padding: 16px !important;
-      }}
-      .page-actions {{
-        display: grid !important;
-        grid-template-columns: 1fr !important;
+        grid-template-columns: 1fr;
+        padding: 22px;
       }}
       .app-install-panel {{
+        grid-template-columns: 1fr;
+        padding: 22px;
+      }}
+      .stats {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+      .two-col, .three-col {{
         grid-template-columns: 1fr !important;
-        border-radius: 16px !important;
-        padding: 18px !important;
       }}
-      .plot.interactive-plot iframe,
-      .plot.interactive-plot:first-child iframe {{
-        min-height: 520px !important;
+      .objective-grid, .agro-sector-grid {{
+        grid-template-columns: 1fr !important;
       }}
-      .plot img {{
-        padding: 6px !important;
+      
+      body .nav-tabs {{
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        margin: 0;
+        border-radius: 20px 20px 0 0;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+        background: rgba(5, 14, 24, 0.96);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-glass);
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.7);
+        z-index: 900;
       }}
-      table {{
-        font-size: 13px !important;
+      body .nav-tabs a {{
+        min-height: 42px;
+        font-size: 0.8rem;
+        padding: 6px 4px;
+        text-align: center;
+        white-space: normal;
       }}
-      .table-wrap {{
-        max-height: 70vh !important;
-        overflow: auto !important;
+      main.wrap {{
+        padding-bottom: 96px;
+        width: min(100% - 24px, 100%);
       }}
       .chat-launch {{
-        bottom: 88px !important;
-        right: 14px !important;
+        bottom: 84px;
+        right: 16px;
       }}
       .chat-panel {{
-        right: 10px !important;
-        left: 10px !important;
-        width: auto !important;
-        bottom: 150px !important;
+        bottom: 140px;
+        right: 16px;
+        left: 16px;
+        width: auto;
       }}
     }}
-    /* K-WaterGuard correction layer v18: laptop-safe layout and app-like mobile readability. */
-    @media (min-width: 901px) {{
-      body .nav-tabs {{
-        position: relative !important;
-        top: auto !important;
-        z-index: 40 !important;
-        margin-top: 0 !important;
-      }}
-      header .wrap {{
-        padding-top: 18px !important;
-        padding-bottom: 18px !important;
-      }}
-    }}
-    @media (max-width: 1900px) {{
-      .edge-rail {{ display: none !important; }}
-      main.wrap,
-      footer {{
-        width: min(100% - 28px, 1500px) !important;
-      }}
-    }}
-    @media (max-width: 1280px) {{
-      header {{
-        min-height: 240px !important;
-        padding-bottom: 24px !important;
-      }}
-      header h1 {{
-        font-size: clamp(44px, 6.2vw, 72px) !important;
-        max-width: calc(100vw - 56px) !important;
-      }}
-      header .subtitle {{
-        max-width: min(760px, calc(100vw - 56px)) !important;
-      }}
-      .home-overview {{
-        grid-template-columns: 1fr !important;
-      }}
-      .home-overview .overview-panel {{
-        min-height: auto !important;
-      }}
-      .stats,
-      .capability-grid {{
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      }}
-    }}
-    @media (max-width: 760px) {{
-      html {{ font-size: 15px !important; }}
-      header {{
-        min-height: 190px !important;
-        padding: 14px 12px 74px !important;
-      }}
-      header .brand {{ max-width: 48vw !important; }}
-      header h1 {{
-        font-size: clamp(28px, 10vw, 42px) !important;
-        line-height: 1.03 !important;
-        margin-top: 26px !important;
-      }}
-      header .subtitle {{
-        font-size: 14px !important;
-        line-height: 1.28 !important;
-      }}
-      .badge {{
-        font-size: 12px !important;
-        padding: 8px 10px !important;
-      }}
-      .language-corner {{
-        transform: scale(.88) !important;
-        transform-origin: top right !important;
-      }}
-      main.wrap,
-      footer {{
-        width: 100% !important;
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-      }}
-      .home-overview,
-      .section,
-      .card {{
-        border-radius: 14px !important;
-      }}
-      .home-overview h2,
-      .section h2 {{
-        font-size: clamp(25px, 7vw, 34px) !important;
-        line-height: 1.08 !important;
-      }}
-      .stats,
-      .capability-grid,
-      .param-grid,
-      .plots,
-      .two-col,
-      .three-col {{
-        grid-template-columns: 1fr !important;
-      }}
-      .stat .value {{
-        font-size: clamp(25px, 8vw, 38px) !important;
-        overflow-wrap: anywhere !important;
-      }}
-      .plot img {{
-        max-height: none !important;
-      }}
-    }}
-    /* K-WaterGuard correction layer v19: laptop/mobile layout guard. */
-    html, body {{
-      width: 100% !important;
-      max-width: 100% !important;
-      overflow-x: hidden !important;
-      background: linear-gradient(135deg, #d8e4ed 0%, #edf3f8 48%, #efe3e7 100%) !important;
-    }}
-    body > .edge-rail,
-    body > .insight-rail,
-    .edge-rail,
-    .insight-rail {{
-      display: none !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-    }}
-    header {{
-      min-height: 220px !important;
-      padding: 18px 0 22px !important;
-    }}
-    header .wrap {{
-      width: min(100% - 40px, 1680px) !important;
-      margin: 0 auto !important;
-      padding: 0 !important;
-    }}
-    header h1 {{
-      max-width: min(920px, calc(100vw - 64px)) !important;
-      font-size: clamp(42px, 4.2vw, 78px) !important;
-      line-height: 1.02 !important;
-      margin: 22px 0 8px !important;
-    }}
-    header .subtitle {{
-      max-width: min(820px, calc(100vw - 64px)) !important;
-      font-size: clamp(15px, 1.1vw, 19px) !important;
-      line-height: 1.28 !important;
-    }}
-    main.wrap,
-    footer {{
-      width: min(100% - 40px, 1680px) !important;
-      max-width: 1680px !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-      padding-left: 0 !important;
-      padding-right: 0 !important;
-    }}
-    main.wrap {{ margin-top: 18px !important; }}
-    body .nav-tabs {{
-      position: sticky !important;
-      top: 10px !important;
-      z-index: 120 !important;
-      width: 100% !important;
-      margin: 0 0 18px !important;
-      display: grid !important;
-      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-      gap: 8px !important;
-      padding: 8px !important;
-      background: rgba(247, 251, 255, .96) !important;
-      border: 1px solid rgba(159, 184, 207, .72) !important;
-      border-radius: 18px !important;
-      box-shadow: 0 16px 42px rgba(24, 57, 87, .14) !important;
-      transform: none !important;
-    }}
-    body .nav-tabs a {{
-      min-width: 0 !important;
-      min-height: 46px !important;
-      padding: 8px 10px !important;
-      white-space: normal !important;
-      overflow-wrap: anywhere !important;
-      line-height: 1.12 !important;
-      font-size: clamp(12px, .82vw, 15px) !important;
-    }}
-    .toolbar {{
-      width: 100% !important;
-      margin: 0 0 14px !important;
-      grid-template-columns: minmax(0, 1fr) auto auto !important;
-      align-items: center !important;
-    }}
-    body:not(.page-contact) .toolbar {{ grid-template-columns: minmax(0, 1fr) !important; }}
-    .search-status {{ margin: 0 0 18px !important; color: #51657a !important; }}
-    .card.section,
-    .section {{
-      width: 100% !important;
-      max-width: none !important;
-      margin: 0 0 22px !important;
-      padding: clamp(22px, 2vw, 34px) !important;
-      overflow: visible !important;
-      border-radius: 18px !important;
-    }}
-    .page h2:first-child,
-    .section h2:first-child {{ margin-top: 0 !important; line-height: 1.08 !important; }}
-    body.page-agro .agro-sector-grid,
-    body.page-agro .objective-grid,
-    .agro-sector-grid,
-    .objective-grid {{
-      display: grid !important;
-      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-      gap: 18px !important;
-    }}
-    body.page-agro .plots,
-    body.page-weather .plots,
-    body.page-algal .plots,
-    body.page-trends .plots {{
-      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      gap: 18px !important;
-    }}
-    body.page-agro .plot.interactive-plot:first-child,
-    body.page-weather .plot.interactive-plot:first-child,
-    body.page-algal .plot.interactive-plot:first-child,
-    body.page-trends .plot.interactive-plot:first-child {{ grid-column: 1 / -1 !important; }}
-    .plot {{ min-width: 0 !important; overflow: hidden !important; }}
-    .plot img {{ width: 100% !important; height: auto !important; object-fit: contain !important; }}
-    @media (max-width: 1366px) {{
-      header {{ min-height: 190px !important; }}
-      header h1 {{ font-size: clamp(34px, 4vw, 56px) !important; }}
-      main.wrap, footer {{ width: min(100% - 28px, 1280px) !important; }}
-      body .nav-tabs {{ gap: 6px !important; padding: 6px !important; }}
-      body .nav-tabs a {{ min-height: 42px !important; font-size: 12px !important; }}
-      body.page-agro .agro-sector-grid,
-      body.page-agro .objective-grid,
-      .agro-sector-grid,
-      .objective-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }}
-      body.page-agro .plots,
-      body.page-weather .plots,
-      body.page-algal .plots,
-      body.page-trends .plots {{ grid-template-columns: 1fr !important; }}
-    }}
-    @media (max-width: 900px) {{
-      header {{ min-height: 170px !important; padding: 14px 0 16px !important; }}
-      header .wrap {{ width: min(100% - 24px, 100%) !important; }}
-      header h1 {{ font-size: clamp(30px, 9vw, 44px) !important; margin-top: 30px !important; }}
-      header .subtitle {{ font-size: 14px !important; }}
-      main.wrap, footer {{ width: 100% !important; padding-left: 12px !important; padding-right: 12px !important; }}
-      body .nav-tabs {{
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        top: auto !important;
-        width: 100% !important;
-        margin: 0 !important;
-        border-radius: 18px 18px 0 0 !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        z-index: 240 !important;
-      }}
-      body .nav-tabs a {{ min-height: 48px !important; font-size: 11px !important; }}
-      .toolbar {{ grid-template-columns: 1fr !important; }}
-      .card.section, .section {{ padding: 18px !important; border-radius: 16px !important; }}
-      body.page-agro .agro-sector-grid,
-      body.page-agro .objective-grid,
-      .agro-sector-grid,
-      .objective-grid,
-      body.page-agro .plots,
-      body.page-weather .plots,
-      body.page-algal .plots,
-      body.page-trends .plots,
-      .stats,
-      .capability-grid,
-      .param-grid,
-      .two-col,
-      .three-col {{ grid-template-columns: 1fr !important; }}
+
+    @media (max-width: 600px) {{
+      .stats {{ grid-template-columns: 1fr; }}
+      .capability-grid {{ grid-template-columns: 1fr; }}
+      .param-grid {{ grid-template-columns: 1fr; }}
+      header h1 {{ font-size: 1.8rem; }}
+      .toolbar {{ flex-direction: column; align-items: stretch; }}
+      .search {{ min-width: 0; }}
+      .contact-list div {{ grid-template-columns: 1fr; gap: 4px; }}
     }}
   </style>
 </head>
 <body class="page-home">
+  <canvas id="ambient-canvas" aria-hidden="true"></canvas>
   {side_rail_html}
   <div class="language-switch language-corner" aria-label="Language">
     <a class="active lang-en" href="__EN_PAGE__">English</a>
@@ -8714,6 +6642,269 @@ class DashboardGenerator:
       installSheet?.setAttribute('aria-hidden', 'true');
     }});
     {chatbot_script}
+
+    // --------------------------------------------------------------------
+    // Environmental AI Interactive Connected-Nodes Canvas Engine
+    // --------------------------------------------------------------------
+    (function () {{
+      const canvas = document.getElementById('ambient-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d', {{ alpha: true }});
+      if (!ctx) return;
+
+      let width = 0;
+      let height = 0;
+      let dpr = window.devicePixelRatio || 1;
+      let animId = null;
+
+      const mouse = {{
+        x: -9999,
+        y: -9999,
+        radius: 185,
+        active: false,
+        ripples: []
+      }};
+
+      const PIGMENTS = [
+        {{ r: 56, g: 189, b: 248 }},  // Electric Cyan (Hydrology / Rivers)
+        {{ r: 0, g: 242, b: 254 }},   // Aqua (AI Nexus)
+        {{ r: 52, g: 211, b: 153 }},  // Emerald (Vegetation / Agriculture)
+        {{ r: 129, g: 140, b: 248 }}, // Violet (CMIP6 / Atmosphere)
+        {{ r: 251, g: 191, b: 36 }}   // Amber (Alert Warning / Solar)
+      ];
+
+      class WaterNode {{
+        constructor(w, h) {{
+          this.x = Math.random() * w;
+          this.y = Math.random() * h;
+          this.vx = (Math.random() - 0.5) * 0.55;
+          this.vy = (Math.random() - 0.5) * 0.55;
+          this.baseRadius = 1.8 + Math.random() * 2.2;
+          this.radius = this.baseRadius;
+          this.color = PIGMENTS[Math.floor(Math.random() * PIGMENTS.length)];
+          this.pulse = Math.random() * Math.PI * 2;
+          this.pulseSpeed = 0.02 + Math.random() * 0.03;
+          this.pingRadius = 0;
+          this.pingMax = 24;
+          this.pingAlpha = 0;
+        }}
+
+        update(w, h) {{
+          this.pulse += this.pulseSpeed;
+          this.radius = this.baseRadius + Math.sin(this.pulse) * 0.6;
+
+          // Mouse repulsion
+          if (mouse.active) {{
+            const dx = this.x - mouse.x;
+            const dy = this.y - mouse.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < mouse.radius && dist > 0) {{
+              const force = (1 - dist / mouse.radius) * 1.8;
+              this.x += (dx / dist) * force;
+              this.y += (dy / dist) * force;
+            }}
+          }}
+
+          this.x += this.vx;
+          this.y += this.vy;
+
+          if (this.x < 0) {{ this.x = 0; this.vx *= -1; }}
+          if (this.x > w) {{ this.x = w; this.vx *= -1; }}
+          if (this.y < 0) {{ this.y = 0; this.vy *= -1; }}
+          if (this.y > h) {{ this.y = h; this.vy *= -1; }}
+
+          if (this.pingAlpha > 0.01) {{
+            this.pingRadius += 0.8;
+            this.pingAlpha *= 0.94;
+          }} else {{
+            this.pingAlpha = 0;
+          }}
+        }}
+
+        ping() {{
+          this.pingRadius = this.radius;
+          this.pingAlpha = 0.8;
+        }}
+
+        draw() {{
+          const {{ r, g, b }} = this.color;
+          // Node glowing head
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${{r}}, ${{g}}, ${{b}}, 0.85)`;
+          ctx.shadowColor = `rgba(${{r}}, ${{g}}, ${{b}}, 0.9)`;
+          ctx.shadowBlur = 10;
+          ctx.fill();
+
+          // Ripple ping on packet arrival
+          if (this.pingAlpha > 0) {{
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.pingRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(${{r}}, ${{g}}, ${{b}}, ${{this.pingAlpha}})`;
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+          }}
+        }}
+      }}
+
+      class ProcessPacket {{
+        constructor(nodeA, nodeB) {{
+          this.nodeA = nodeA;
+          this.nodeB = nodeB;
+          this.progress = 0;
+          this.speed = 0.012 + Math.random() * 0.018;
+          this.color = nodeA.color;
+        }}
+        update() {{
+          this.progress += this.speed;
+          if (this.progress >= 1) {{
+            this.nodeB.ping();
+            return false;
+          }}
+          return true;
+        }}
+        draw() {{
+          const px = this.nodeA.x + (this.nodeB.x - this.nodeA.x) * this.progress;
+          const py = this.nodeA.y + (this.nodeB.y - this.nodeA.y) * this.progress;
+          const {{ r, g, b }} = this.color;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(px, py, 2.4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = `rgba(${{r}}, ${{g}}, ${{b}}, 1)`;
+          ctx.shadowBlur = 10;
+          ctx.fill();
+
+          const tx = px - (this.nodeB.x - this.nodeA.x) * 0.08;
+          const ty = py - (this.nodeB.y - this.nodeA.y) * 0.08;
+          ctx.beginPath();
+          ctx.moveTo(tx, ty);
+          ctx.lineTo(px, py);
+          ctx.strokeStyle = `rgba(${{r}}, ${{g}}, ${{b}}, 0.85)`;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+          ctx.restore();
+        }}
+      }}
+
+      let nodes = [];
+      let packets = [];
+      const MAX_NODES = Math.min(54, Math.floor(window.innerWidth / 26));
+
+      function resize() {{
+        dpr = window.devicePixelRatio || 1;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+
+        if (nodes.length === 0) {{
+          for (let i = 0; i < MAX_NODES; i++) {{
+            nodes.push(new WaterNode(width, height));
+          }}
+        }}
+      }}
+
+      function loop() {{
+        ctx.clearRect(0, 0, width, height);
+
+        // Update & Draw Nodes
+        for (let i = 0; i < nodes.length; i++) {{
+          nodes[i].update(width, height);
+          nodes[i].draw();
+        }}
+
+        // Connect nearby nodes
+        const maxDist = 145;
+        for (let i = 0; i < nodes.length; i++) {{
+          for (let j = i + 1; j < nodes.length; j++) {{
+            const dx = nodes[i].x - nodes[j].x;
+            const dy = nodes[i].y - nodes[j].y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < maxDist) {{
+              const alpha = (1 - dist / maxDist) * 0.28;
+              const grad = ctx.createLinearGradient(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y);
+              const c1 = nodes[i].color;
+              const c2 = nodes[j].color;
+              grad.addColorStop(0, `rgba(${{c1.r}}, ${{c1.g}}, ${{c1.b}}, ${{alpha}})`);
+              grad.addColorStop(1, `rgba(${{c2.r}}, ${{c2.g}}, ${{c2.b}}, ${{alpha}})`);
+              ctx.beginPath();
+              ctx.moveTo(nodes[i].x, nodes[i].y);
+              ctx.lineTo(nodes[j].x, nodes[j].y);
+              ctx.strokeStyle = grad;
+              ctx.lineWidth = 1.1;
+              ctx.stroke();
+
+              // Random packet spawning on conduits
+              if (packets.length < 14 && Math.random() < 0.003) {{
+                packets.push(new ProcessPacket(nodes[i], nodes[j]));
+              }}
+            }}
+          }}
+        }}
+
+        // Draw Interactive Mouse Laser Conduits
+        if (mouse.active) {{
+          for (let i = 0; i < nodes.length; i++) {{
+            const mdx = mouse.x - nodes[i].x;
+            const mdy = mouse.y - nodes[i].y;
+            const mdist = Math.hypot(mdx, mdy);
+            if (mdist < mouse.radius) {{
+              const mAlpha = (1 - mdist / mouse.radius) * 0.75;
+              ctx.beginPath();
+              ctx.moveTo(nodes[i].x, nodes[i].y);
+              ctx.lineTo(mouse.x, mouse.y);
+              ctx.strokeStyle = `rgba(56, 189, 248, ${{mAlpha}})`;
+              ctx.lineWidth = 1.3;
+              ctx.stroke();
+            }}
+          }}
+        }}
+
+        // Update & Draw Packets
+        for (let i = packets.length - 1; i >= 0; i--) {{
+          if (!packets[i].update()) {{
+            packets.splice(i, 1);
+          }} else {{
+            packets[i].draw();
+          }}
+        }}
+
+        // Draw Click Ripples
+        for (let i = mouse.ripples.length - 1; i >= 0; i--) {{
+          const rip = mouse.ripples[i];
+          rip.radius += 2.2;
+          rip.alpha *= 0.95;
+          ctx.beginPath();
+          ctx.arc(rip.x, rip.y, rip.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0, 242, 254, ${{rip.alpha}})`;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+          if (rip.alpha < 0.02) mouse.ripples.splice(i, 1);
+        }}
+
+        animId = requestAnimationFrame(loop);
+      }}
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('mousemove', (e) => {{
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        mouse.active = true;
+      }});
+      window.addEventListener('mouseleave', () => {{
+        mouse.active = false;
+      }});
+      window.addEventListener('click', (e) => {{
+        mouse.ripples.push({{ x: e.clientX, y: e.clientY, radius: 5, alpha: 0.85 }});
+      }});
+
+      resize();
+      loop();
+    }})();
+
   </script>
 </body>
 </html>"""
@@ -8726,6 +6917,8 @@ class DashboardGenerator:
             'weather.html': 'page-weather',
             'agrometeorology.html': 'page-agro',
             'contact.html': 'page-contact',
+            'spatial.html': 'page-trends',
+            'data.html': 'page-contact',
         }
 
     def _korean_page_variants(self):
@@ -8736,6 +6929,8 @@ class DashboardGenerator:
             'weather.html': 'weather-ko.html',
             'agrometeorology.html': 'agrometeorology-ko.html',
             'contact.html': 'contact-ko.html',
+            'spatial.html': 'spatial-ko.html',
+            'data.html': 'data-ko.html',
         }
 
     def _page_language_links(self, page_class):
