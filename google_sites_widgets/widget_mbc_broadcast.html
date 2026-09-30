@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MBC Gyeongnam News Broadcast - RWESL & K-Water Guard AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #040914;
+      --card-bg: rgba(10, 22, 41, 0.78);
+      --card-border: rgba(56, 189, 248, 0.28);
+      --card-hover-border: rgba(56, 189, 248, 0.6);
+      --primary-cyan: #00d4ff;
+      --primary-blue: #2563eb;
+      --accent-emerald: #10b981;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0d274c 0%, #040914 75%);
+      color: var(--text-main);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 16px;
+      position: relative;
+    }
+
+    /* Ambient Glow Behind Container */
+    .ambient-glow {
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 750px;
+      height: 380px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.16) 0%, rgba(37, 99, 235, 0.08) 50%, transparent 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .broadcast-container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 36px 32px 32px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.75), 0 0 40px rgba(0, 212, 255, 0.12);
+      transition: all 0.35s ease;
+    }
+
+    .broadcast-container:hover {
+      border-color: var(--card-hover-border);
+      box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.85), 0 0 50px rgba(0, 212, 255, 0.18);
+    }
+
+    /* Top Badge & Header */
+    .header-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 26px;
+    }
+
+    .badge-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 18px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 9999px;
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.15);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      margin-bottom: 16px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-red);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-red);
+      animation: pulse-red 1.6s infinite ease-in-out;
+    }
+
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.35); }
+    }
+
+    .broadcast-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(1.8rem, 3.4vw, 2.5rem);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 40%, #7dd3fc 85%, var(--primary-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .broadcast-subtitle {
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      max-width: 820px;
+      line-height: 1.65;
+    }
+
+    .broadcast-subtitle strong {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    /* Video Frame & Player */
+    .video-viewport-wrapper {
+      position: relative;
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #010409;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 15px 45px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      margin-bottom: 24px;
+    }
+
+    .video-viewport-wrapper:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+    }
+
+    .video-player {
+      width: 100%;
+      height: auto;
+      max-height: 520px;
+      aspect-ratio: 16 / 9;
+      display: block;
+      background-color: #000;
+      outline: none;
+    }
+
+    /* Floating HUD Top Overlay */
+    .video-hud-overlay {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .hud-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background: rgba(3, 11, 24, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      backdrop-filter: blur(10px);
+      color: #38bdf8;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .hud-meta-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background: rgba(3, 11, 24, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      color: #94a3b8;
+      font-size: 0.74rem;
+      font-weight: 600;
+    }
+
+    /* Metadata Grid */
+    .meta-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 860px) {
+      .meta-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .meta-cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .meta-card {
+      background: rgba(4, 12, 26, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+      transition: all 0.25s ease;
+    }
+
+    .meta-card:hover {
+      background: rgba(7, 19, 41, 0.85);
+      border-color: rgba(56, 189, 248, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .meta-card-label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--primary-cyan);
+      font-weight: 700;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-card-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.35;
+    }
+
+    .meta-card-sub {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 3px;
+    }
+
+    /* Actions Strip */
+    .action-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      flex-wrap: wrap;
+    }
+
+    .action-summary {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, var(--primary-cyan) 100%);
+      color: #030712;
+      box-shadow: 0 4px 18px rgba(0, 212, 255, 0.35);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 212, 255, 0.55);
+      filter: brightness(1.1);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: var(--primary-cyan);
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow"></div>
+
+  <main class="broadcast-container">
+    
+    <!-- Top Header & Broadcast Title -->
+    <header class="header-row">
+      <div class="badge-wrapper">
+        <span class="live-dot"></span>
+        <span>MBC 경남 NEWS SPECIAL • TELEVISION BROADCAST</span>
+      </div>
+      <h1 class="broadcast-title">MBC 경남 TV News Feature: RWESL & K-Water Guard AI</h1>
+      <p class="broadcast-subtitle">
+        Special television broadcast coverage on <strong>Regional Water Environment System Lab (RWESL)</strong> at Gyeongsang National University, demonstrating real-time autonomous watershed intelligence, Namgang Dam basin management, and AI early-warning telemetry.
+      </p>
+    </header>
+
+    <!-- Centered High-Tech Video Viewport -->
+    <div class="video-viewport-wrapper">
+      <div class="video-hud-overlay">
+        <div class="hud-chip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>MBC경남 뉴스데스크 방영</span>
+        </div>
+        <div class="hud-meta-right">
+          <span>HD 1080p • AUDIO INCLUDED</span>
+        </div>
+      </div>
+
+      <!-- Video Player with Primary and Backup Streaming URLs -->
+      <video 
+        class="video-player" 
+        id="mbcVideoPlayer" 
+        controls 
+        playsinline 
+        preload="metadata"
+        poster="assets/images/research-banner.jpg">
+        <!-- Primary CDN (rwesl- repository) -->
+        <source src="https://muhammadwaqas07171991-tech.github.io/rwesl-/assets/videos/mbc_gyeongnam_news.mp4" type="video/mp4">
+        <!-- Secondary CDN (k-waterguard-dashboard repository) -->
+        <source src="https://muhammadwaqas07171991-tech.github.io/k-waterguard-dashboard/assets/videos/mbc_gyeongnam_news.mp4" type="video/mp4">
+        <!-- Local path fallback -->
+        <source src="assets/videos/mbc_gyeongnam_news.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <!-- Telemetry & Broadcast Details Cards -->
+    <div class="meta-cards-grid">
+      <div class="meta-card">
+        <div class="meta-card-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+            <polyline points="17 2 12 7 7 2"></polyline>
+          </svg>
+          Broadcaster
+        </div>
+        <div class="meta-card-value">MBC 경남 (MBC Gyeongnam)</div>
+        <div class="meta-card-sub">Regional News Feature</div>
+      </div>
+
+      <div class="meta-card">
+        <div class="meta-card-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+          Research Focus
+        </div>
+        <div class="meta-card-value">Namgang Dam & Basin AI</div>
+        <div class="meta-card-sub">Hydrology & Water Quality</div>
+      </div>
+
+      <div class="meta-card">
+        <div class="meta-card-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+          Technology
+        </div>
+        <div class="meta-card-value">K-Water Guard Agent</div>
+        <div class="meta-card-sub">Autonomous Telemetry</div>
+      </div>
+
+      <div class="meta-card">
+        <div class="meta-card-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Institution
+        </div>
+        <div class="meta-card-value">Gyeongsang Nat'l Univ.</div>
+        <div class="meta-card-sub">RWESL • Dept. Agri. Eng.</div>
+      </div>
+    </div>
+
+    <!-- Action Strip & Direct Links -->
+    <footer class="action-strip">
+      <div class="action-summary">
+        <span class="status-indicator"></span>
+        <span>High-definition media broadcast stream active</span>
+      </div>
+      <div class="btn-group">
+        <a href="https://muhammadwaqas07171991-tech.github.io/k-waterguard-dashboard/" target="_blank" rel="noopener" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          Launch AI Dashboard
+        </a>
+        <a href="https://muhammadwaqas07171991-tech.github.io/rwesl-/" target="_blank" rel="noopener" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          RWESL Lab Website
+        </a>
+      </div>
+    </footer>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RWESL Hero & Stats Widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #050d1a;
+      --card-bg: rgba(13, 27, 49, 0.7);
+      --card-border: rgba(56, 189, 248, 0.2);
+      --card-hover-border: rgba(56, 189, 248, 0.5);
+      --primary-cyan: #00d4ff;
+      --primary-blue: #2563eb;
+      --accent-emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0c2340 0%, #050d1a 70%);
+      color: var(--text-main);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Ambient Water Glow Effects */
+    .ambient-glow {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, rgba(37, 99, 235, 0.08) 50%, transparent 70%);
+      filter: blur(60px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .ambient-wave-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
+    .hero-container {
+      position: relative;
+      z-index: 2;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      width: 100%;
+    }
+
+    /* Top Pill Badge */
+    .badge-wrapper {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .uni-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 9999px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.15);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      transition: all 0.3s ease;
+    }
+
+    .uni-badge:hover {
+      border-color: var(--primary-cyan);
+      box-shadow: 0 4px 28px rgba(0, 212, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulseAnimation 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseAnimation {
+      0%, 100% {
+        transform: scale(0.95);
+        opacity: 0.8;
+      }
+      50% {
+        transform: scale(1.3);
+        opacity: 1;
+        box-shadow: 0 0 14px #34d399;
+      }
+    }
+
+    /* Typography & Headers */
+    .hero-header {
+      text-align: center;
+      max-width: 900px;
+      margin: 0 auto 36px auto;
+    }
+
+    .lab-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff 30%, #7dd3fc 70%, #00d4ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 30px rgba(0, 212, 255, 0.15);
+    }
+
+    .lab-subtitle {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      line-height: 1.6;
+      color: var(--text-muted);
+      font-weight: 400;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .lab-subtitle strong {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    /* Action CTA Bar */
+    .cta-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 46px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 26px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4ff 0%, #0284c7 100%);
+      color: #031124;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #38bdf8 0%, #0369a1 100%);
+      box-shadow: 0 8px 30px rgba(0, 212, 255, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 23, 42, 0.6);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: rgba(56, 189, 248, 0.5);
+      color: #38bdf8;
+      transform: translateY(-2px);
+    }
+
+    .btn-icon {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      width: 100%;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--primary-cyan), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--card-hover-border);
+      box-shadow: 0 12px 35px rgba(0, 212, 255, 0.12);
+    }
+
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .stat-icon-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      color: var(--primary-cyan);
+    }
+
+    .stat-number {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.3rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 6px;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .stat-suffix {
+      font-size: 1.4rem;
+      color: var(--primary-cyan);
+      font-weight: 600;
+    }
+
+    .stat-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 4px;
+    }
+
+    .stat-description {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Live Agent Status Footer Bar */
+    .agent-status-strip {
+      margin-top: 28px;
+      background: rgba(10, 25, 47, 0.6);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.85rem;
+    }
+
+    .agent-status-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #e2e8f0;
+    }
+
+    .agent-status-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #6ee7b7;
+      font-weight: 600;
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 640px) {
+      .hero-container {
+        padding: 30px 16px;
+      }
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      .agent-status-strip {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Ambient Glow -->
+  <div class="ambient-glow"></div>
+  <canvas id="waveCanvas" class="ambient-wave-canvas"></canvas>
+
+  <div class="hero-container">
+    
+    <!-- Top University & Lab Pill -->
+    <div class="badge-wrapper">
+      <div class="uni-badge">
+        <span class="pulse-dot"></span>
+        Gyeongsang National University • RWESL
+      </div>
+    </div>
+
+    <!-- Main Headline & Description -->
+    <div class="hero-header">
+      <h1 class="lab-title">Regional Water Environment System Lab</h1>
+      <p class="lab-subtitle">
+        Advancing <strong>science-driven solutions</strong> at the intersection of <strong>artificial intelligence</strong>, <strong>watershed modeling</strong>, and <strong>climate-resilient agricultural hydrology</strong>.
+      </p>
+    </div>
+
+    <!-- Quick Call-To-Action Cluster -->
+    <div class="cta-cluster">
+      <a href="https://muhammadwaqas07171991-tech.github.io/k-waterguard-dashboard/" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Launch K-Water Guard AI
+      </a>
+      <a href="https://sites.google.com/view/rwer/publications" target="_top" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        Explore Publications
+      </a>
+      <a href="https://sites.google.com/view/rwer/members" target="_top" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Research Team
+      </a>
+    </div>
+
+    <!-- 4 Key Research & Technology Stat Cards -->
+    <div class="stats-grid">
+      
+      <!-- Card 1 -->
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+        </div>
+        <div class="stat-number"><span class="counter" data-target="14">0</span><span class="stat-suffix">+</span></div>
+        <div class="stat-label">Water Parameters Tracked</div>
+        <p class="stat-description">Real-time daily analysis of pH, DO, BOD, COD, TN, TP, Chl-a, and turbidity.</p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="stat-number"><span class="counter" data-target="365">0</span><span class="stat-suffix">d</span></div>
+        <div class="stat-label">Autonomous Data Pipelines</div>
+        <p class="stat-description">Continuous automated ETL agent capturing national monitoring station datasets.</p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+            <line x1="8" y1="2" x2="8" y2="18"/>
+            <line x1="16" y1="6" x2="16" y2="22"/>
+          </svg>
+        </div>
+        <div class="stat-number"><span class="counter" data-target="100">0</span><span class="stat-suffix">%</span></div>
+        <div class="stat-label">Spatial Geospatial Coverage</div>
+        <p class="stat-description">High-resolution GIS watershed maps, sen-slope trends & algal bloom alert radars.</p>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+        </div>
+        <div class="stat-number"><span class="counter" data-target="50">0</span><span class="stat-suffix">+</span></div>
+        <div class="stat-label">Published Studies & Models</div>
+        <p class="stat-description">Peer-reviewed research in top SCI journals including SWAT & agro-climate impact models.</p>
+      </div>
+
+    </div>
+
+    <!-- Live Status Strip -->
+    <div class="agent-status-strip">
+      <div class="agent-status-left">
+        <span class="badge-live">SYSTEM LIVE</span>
+        <span><strong>K-Water Guard AI Agent:</strong> Autonomous monitoring & daily pipeline active.</span>
+      </div>
+      <div class="agent-status-right">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Verified Environmental Cloud
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Interactive Smooth Wave Canvas Simulation -->
+  <script>
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height;
+    let step = 0;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function drawWaves() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Wave 1 - Deep blue
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      for (let x = 0; x <= width; x += 20) {
+        const y = Math.sin((x * 0.003) + (step * 0.02)) * 30 + 
+                  Math.cos((x * 0.002) + (step * 0.015)) * 20 + 
+                  (height * 0.85);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(width, height);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 132, 199, 0.08)';
+      ctx.fill();
+
+      // Wave 2 - Cyan highlight
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      for (let x = 0; x <= width; x += 20) {
+        const y = Math.sin((x * 0.004) - (step * 0.018)) * 25 + 
+                  Math.sin((x * 0.0015) + (step * 0.01)) * 15 + 
+                  (height * 0.88);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(width, height);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0, 212, 255, 0.05)';
+      ctx.fill();
+
+      step += 1;
+      requestAnimationFrame(drawWaves);
+    }
+    drawWaves();
+
+    // Animated Counter for Stats
+    function animateCounters() {
+      const counters = document.querySelectorAll('.counter');
+      counters.forEach(counter => {
+        const target = +counter.getAttribute('data-target');
+        let count = 0;
+        const duration = 1600; // ms
+        const increment = target / (duration / 16);
+
+        const updateCount = () => {
+          count += increment;
+          if (count < target) {
+            counter.innerText = Math.ceil(count);
+            requestAnimationFrame(updateCount);
+          } else {
+            counter.innerText = target;
+          }
+        };
+        updateCount();
+      });
+    }
+
+    // Trigger counter on load
+    window.addEventListener('DOMContentLoaded', animateCounters);
+    setTimeout(animateCounters, 200);
+  </script>
+</body>
+</html>
