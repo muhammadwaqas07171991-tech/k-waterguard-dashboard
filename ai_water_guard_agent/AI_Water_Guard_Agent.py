@@ -6423,9 +6423,17 @@ class DashboardGenerator:
           <img class="brand-logo" src="{self._asset_uri('KwGAI logo.png')}" alt="K-Water Guard AI logo">
           <span class="brand-name">K-Water Guard AI</span>
         </div>
-        <div class="status-pill">
-          <span class="pulse-dot"></span>
-          <span>Autonomous Water Guard AI</span>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <a href="https://www.facebook.com/profile.php?id=61585237073673" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 9999px; background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(59, 130, 246, 0.45); color: #93c5fd; text-decoration: none; font-size: 0.82rem; font-weight: 700; transition: all 0.25s ease;" title="Follow RWESL on Facebook">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            <span>Facebook</span>
+          </a>
+          <div class="status-pill">
+            <span class="pulse-dot"></span>
+            <span>Autonomous Water Guard AI</span>
+          </div>
         </div>
       </div>
       <h1>Water Quality Dashboard</h1>
@@ -6590,7 +6598,7 @@ class DashboardGenerator:
         <div class="contact-panel">
           <h3>Project Team</h3>
           <dl class="contact-list">
-            <div><dt>Developed by</dt><dd>Dr. Muhammad Waqas and Mr. Sangbin Ha</dd></div>
+            <div><dt>Developed by</dt><dd>Dr. Muhammad Waqas and Sangbin Ha (Undergraduate Student)</dd></div>
             <div><dt>Idea by</dt><dd>Prof. Sang Min Kim</dd></div>
             <div><dt>Telephone</dt><dd>055-772-1930</dd></div>
             <div><dt>Fax</dt><dd>055-772-1939</dd></div>
@@ -6835,7 +6843,22 @@ class DashboardGenerator:
       <button class="button secondary" id="installSheetClose" type="button">Not now</button>
     </div>
   </div>
-  <footer class="wrap">Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt on the daily agent cycle. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.</footer>
+  <footer class="wrap" style="display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center; padding: 30px 18px; margin-top: 30px; border-top: 1px solid var(--border-glass);">
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center;">
+      <a href="https://www.facebook.com/profile.php?id=61585237073673" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 20px; border-radius: 9999px; background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(59, 130, 246, 0.45); color: #93c5fd; text-decoration: none; font-size: 0.88rem; font-weight: 700; transition: all 0.25s ease;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        Follow RWESL on Facebook
+      </a>
+      <a href="https://muhammadwaqas07171991-tech.github.io/rwesl-/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 20px; border-radius: 9999px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; text-decoration: none; font-size: 0.88rem; font-weight: 700; transition: all 0.25s ease;">
+        RWESL Research Lab
+      </a>
+    </div>
+    <div style="font-size: 0.82rem; color: var(--text-dim); max-width: 960px; line-height: 1.6;">
+      Generated {html.escape(generated_at)} from {html.escape(str(Config.CSV_FILE))}. The dashboard is rebuilt on the daily agent cycle. Alert rules are configurable screening rules based on Korean environmental water-quality standards under the Environmental Policy Framework Act and related enforcement standards.
+    </div>
+  </footer>
   <script>
     const search = document.getElementById('stationSearch');
     const searchStatus = document.getElementById('searchStatus');

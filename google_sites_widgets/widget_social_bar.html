@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RWESL & K-Water Guard - Social & Portals Widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: transparent;
+      color: #f8fafc;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .social-bar-card {
+      width: 100%;
+      max-width: 960px;
+      background: rgba(8, 20, 38, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 20px;
+      padding: 22px 28px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .social-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .social-icon-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(24, 119, 242, 0.15);
+      border: 1px solid rgba(24, 119, 242, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #3b82f6;
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.25);
+    }
+
+    .social-text h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .social-text p {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .social-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .social-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    .btn-fb {
+      background: linear-gradient(135deg, #1877f2 0%, #0d62d9 100%);
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 18px rgba(24, 119, 242, 0.4);
+    }
+
+    .btn-fb:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(24, 119, 242, 0.65);
+      filter: brightness(1.1);
+    }
+
+    .btn-site {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+
+    .btn-site:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: #38bdf8;
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    .btn-dashboard {
+      background: linear-gradient(135deg, #0284c7 0%, #00d4ff 100%);
+      color: #040914;
+      border: none;
+      box-shadow: 0 4px 18px rgba(0, 212, 255, 0.3);
+    }
+
+    .btn-dashboard:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 212, 255, 0.55);
+      filter: brightness(1.1);
+    }
+
+    @media (max-width: 680px) {
+      .social-bar-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .social-buttons {
+        width: 100%;
+      }
+      .social-btn {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="social-bar-card">
+    <div class="social-info">
+      <div class="social-icon-badge">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      </div>
+      <div class="social-text">
+        <h3>Connect With RWESL Lab</h3>
+        <p>Official announcements, watershed research highlights, and community updates</p>
+      </div>
+    </div>
+
+    <div class="social-buttons">
+      <!-- Facebook Button -->
+      <a href="https://www.facebook.com/profile.php?id=61585237073673" target="_blank" rel="noopener noreferrer" class="social-btn btn-fb">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        Follow on Facebook
+      </a>
+
+      <!-- AI Dashboard Button -->
+      <a href="https://muhammadwaqas07171991-tech.github.io/k-waterguard-dashboard/" target="_blank" rel="noopener noreferrer" class="social-btn btn-dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        AI Dashboard
+      </a>
+
+      <!-- Lab Website Button -->
+      <a href="https://muhammadwaqas07171991-tech.github.io/rwesl-/" target="_blank" rel="noopener noreferrer" class="social-btn btn-site">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        RWESL Site
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
