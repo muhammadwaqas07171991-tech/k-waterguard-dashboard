@@ -38,6 +38,20 @@ This widget embeds:
 
 ---
 
+## ⛶ Fullscreen / Maximize Support (Fixed for Google Sites)
+
+> [!IMPORTANT]
+> **Why the browser's native fullscreen button was unclickable:**  
+> When custom HTML is embedded in Google Sites, Google wraps it inside a restricted sandboxed `<iframe>`. The browser automatically disables/greys out the native video fullscreen button because the parent iframe does not grant fullscreen permissions.
+
+### 💡 Two Ways to Watch Fullscreen:
+1. **Built-in `⛶ Full Screen` Button**:  
+   Click the glowing cyan **`⛶ Full Screen`** button located at the top-right of the video (in the HUD) or the **`Maximize to Full Screen`** button right underneath the video. This uses a smart fallback: if native browser fullscreen is blocked by Google Sites, it activates **Theater Mode**, expanding the video to fill the entire window with an **`Exit Fullscreen (Esc)`** button.
+2. **`↗ Open Video in Standalone Tab`**:  
+   Click **`↗ New Tab`** or **`Open Video in Standalone Tab`**. This opens the video directly in a standalone browser tab with **zero iframe restrictions**, giving you 100% native 1080p full screen by pressing `F` or clicking the native full screen button!
+
+---
+
 ## 📁 Option 2: Direct Google Drive Video Upload
 
 If you also want Google's native video player directly inside Google Sites:
