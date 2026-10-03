@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flagship Project Video - Greenhouse Water Circulation & Pollutant Transport</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #040914;
+      --card-bg: rgba(10, 22, 41, 0.88);
+      --card-border: rgba(0, 212, 255, 0.42);
+      --card-hover-border: rgba(0, 212, 255, 0.75);
+      --primary-cyan: #00d4ff;
+      --primary-blue: #2563eb;
+      --accent-emerald: #10b981;
+      --accent-cyan: #38bdf8;
+      --text-main: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-dim: #94a3b8;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0d274c 0%, #040914 80%);
+      color: var(--text-main);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      position: relative;
+    }
+
+    /* Ambient Glow */
+    .ambient-glow {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.18) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .project-container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1020px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 36px 32px 30px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.85), 0 0 45px rgba(0, 212, 255, 0.15);
+      transition: all 0.35s ease;
+    }
+
+    .project-container:hover {
+      border-color: var(--card-hover-border);
+      box-shadow: 0 30px 75px -10px rgba(0, 0, 0, 0.92), 0 0 55px rgba(0, 212, 255, 0.25);
+    }
+
+    .header-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .badge-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 18px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(0, 212, 255, 0.5);
+      border-radius: 9999px;
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.15);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      margin-bottom: 14px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--primary-cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--primary-cyan);
+      animation: pulse-cyan 1.6s infinite ease-in-out;
+    }
+
+    @keyframes pulse-cyan {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(1.35); }
+    }
+
+    .project-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+      font-weight: 800;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 40%, #7dd3fc 85%, var(--primary-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .project-subtitle {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 860px;
+      line-height: 1.65;
+    }
+
+    .project-subtitle strong {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .video-viewport-wrapper {
+      position: relative;
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #010409;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 15px 45px rgba(0, 0, 0, 0.9);
+      margin-bottom: 22px;
+    }
+
+    .video-player {
+      width: 100%;
+      height: auto;
+      max-height: 540px;
+      aspect-ratio: 16 / 9;
+      display: block;
+      background-color: #000;
+      outline: none;
+      object-fit: cover;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .meta-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.25s ease;
+    }
+
+    .meta-card:hover {
+      border-color: rgba(0, 212, 255, 0.35);
+      background: rgba(15, 23, 42, 0.9);
+      transform: translateY(-2px);
+    }
+
+    .meta-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .meta-value {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #ffffff;
+      line-height: 1.4;
+    }
+
+    .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      padding-top: 6px;
+    }
+
+    .tag-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .tag-item:hover {
+      border-color: rgba(0, 212, 255, 0.4);
+      color: var(--primary-cyan);
+      background: rgba(0, 212, 255, 0.08);
+    }
+
+    .actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, var(--primary-cyan) 100%);
+      color: #030712;
+      box-shadow: 0 4px 18px rgba(0, 212, 255, 0.35);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 212, 255, 0.5);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--primary-cyan);
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 860px) {
+      .metadata-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .project-container {
+        padding: 24px 18px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .metadata-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow"></div>
+
+  <main class="project-container">
+    <div class="header-row">
+      <div class="badge-wrapper">
+        <span class="live-dot"></span>
+        <span>FLAGSHIP RESEARCH INITIATIVE • PROJECT VIDEO</span>
+      </div>
+      <h1 class="project-title">Greenhouse Water Circulation &amp; Pollutant Transport to Receiving Waters</h1>
+      <p class="project-subtitle">
+        Integrated hydrological and water-quality monitoring exploring intensive groundwater circulation, greenhouse agricultural return flows, and non-point source nutrient transport to receiving river corridors. Supported by the <strong>Ministry of Environment (환경부)</strong> &amp; <strong>Nakdong River Basin Environmental Office (낙동강유역환경청)</strong>.
+      </p>
+    </div>
+
+    <div class="video-viewport-wrapper">
+      <video class="video-player" id="projectVideo" controls playsinline preload="metadata" poster="https://muhammadwaqas07171991-tech.github.io/rwesl-/assets/images/project_circulation_cover.webp">
+        <source src="assets/videos/greenhouse_water_circulation_project.mp4" type="video/mp4">
+        <source src="https://muhammadwaqas07171991-tech.github.io/rwesl-/assets/videos/greenhouse_water_circulation_project.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <div class="metadata-grid">
+      <div class="meta-card">
+        <span class="meta-label">Project Director</span>
+        <span class="meta-value">Prof. Sang Min Kim (RWESL)</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">Supporting Agencies</span>
+        <span class="meta-value">환경부 • 낙동강유역환경청</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">Watershed Focus</span>
+        <span class="meta-value">Greenhouse Farming Corridors &amp; Receiving Waters</span>
+      </div>
+      <div class="meta-card">
+        <span class="meta-label">Core System</span>
+        <span class="meta-value">Hydrological Circulation &amp; AI Telemetry</span>
+      </div>
+    </div>
+
+    <div class="tags-container">
+      <span class="tag-item">💧 Groundwater Withdrawal &amp; Recovery</span>
+      <span class="tag-item">🌱 Water-Curtain Greenhouse Heating</span>
+      <span class="tag-item">🔄 Pollutant &amp; Nutrient Transport (N, P)</span>
+      <span class="tag-item">🌊 River Basin Receiving Waters</span>
+      <span class="tag-item">📡 High-Frequency Continuous Telemetry</span>
+    </div>
+
+    <div class="actions-row">
+      <a href="https://muhammadwaqas07171991-tech.github.io/k-waterguard-dashboard/" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Launch AI Water Guard Dashboard
+      </a>
+      <a href="https://muhammadwaqas07171991-tech.github.io/rwesl-/" target="_blank" rel="noopener noreferrer" class="btn btn-outline">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Visit RWESL Lab Home
+      </a>
+    </div>
+  </main>
+
+</body>
+</html>
